@@ -18,10 +18,20 @@ extern char g_trap_msg[256];
    memory with everything else, so the heap and VirtualAlloc ranges are compacted: the game peaks at
    ~125 MB of heap and ~580 MB of virtual allocations (mostly mapped archives). */
 #ifdef __EMSCRIPTEN__
-#define GUEST_SPACE            0x50000000ull
-#define GUEST_HEAP_HI          0x20000000u
-#define GUEST_VALLOC_LO        0x20000000u
-#define GUEST_VALLOC_HI        0x50000000u
+/* The browser layout is set in runtime_init: by default the ranges below (0x10000000 heap base, as native).
+   With RC_MEM_COMPACT (WebKit: Safari and every browser on iOS, where a wasm memory is resident in full from
+   the moment it is allocated, and the page is killed past ~2 GB) the guest space sits at the TOP of the wasm
+   memory, the ranges are packed behind the executable, and the memory only grows as the game allocates. */
+extern uint32_t g_guest_space, g_guest_heap_lo, g_guest_heap_hi, g_guest_valloc_lo, g_guest_valloc_hi;
+extern int g_mem_compact;
+#define GUEST_SPACE            ((size_t)g_guest_space)
+#undef GUEST_HEAP_BASE
+#define GUEST_HEAP_BASE        g_guest_heap_lo
+#define GUEST_HEAP_HI          g_guest_heap_hi
+#define GUEST_VALLOC_LO        g_guest_valloc_lo
+#define GUEST_VALLOC_HI        g_guest_valloc_hi
+void guest_commit(uint32_t hi);            /* compact mode: make guest addresses below hi accessible */
+int rc_stack_size(int normal_mb, int compact_mb);   /* host thread stack size for this mode, bytes */
 #else
 #define GUEST_SPACE            0x100000000ull
 #define GUEST_HEAP_HI          0x60000000u

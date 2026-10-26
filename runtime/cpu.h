@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
+#include <float.h>
 
 typedef union {
     float f[4];
@@ -234,10 +236,40 @@ static inline uint16_t FNSTSW(CPU *c) { return (uint16_t)((c->fpu_sw & ~0x3800) 
 /* Precision control (FPU CW bits 8-9). Direct3D 8 switches the FPU to 24-bit precision unless the
    device is created with D3DCREATE_FPU_PRESERVE, so honouring it matters for matching the game. */
 static inline double FPRES(CPU *c, double v) { return ((c->fpu_cw >> 8) & 3) == 0 ? (double)(float)v : v; }
+/* WebAssembly has no dynamic floating-point rounding mode: every op rounds to nearest-even, with no
+   equivalent of fesetround. IGI switches the x87 to "chop" (round toward zero) rounding, which the
+   native build honours via fesetround but the wasm build cannot. A quotient then comes out up to one
+   ULP too large in magnitude, and that bias accumulates through the skinning / animation matrix math
+   into visibly deformed meshes (worst on faces). We correct the division result by hand: compute the
+   round-to-nearest quotient q, recover the exact residual r = a - q*b with a single fma, and if q
+   overshot the true value away from zero, step it one ULP back toward zero. ADD and MUL are emitted as
+   plain C operators (not through a helper) and are not corrected yet; division is the first lever.
+   Active in the wasm build, and in a native build compiled with -DRC_SOFT_ROUND so the correction can
+   be A/B tested against hardware chop. */
+#if defined(__EMSCRIPTEN__) || defined(RC_SOFT_ROUND)
+#define RC_SOFT_DIV_ROUND 1
+#endif
+RC_INLINE double rc_div_round(uint16_t cw, double q, double a, double b) {
+#ifdef RC_SOFT_DIV_ROUND
+    if (((cw >> 10) & 3) == 3) {                 /* chop / round toward zero */
+        if (isinf(q)) return copysign(DBL_MAX, q);  /* overflow truncates to the largest finite value */
+        if (q != 0.0 && !isnan(q)) {
+            double r = fma(-q, b, a);            /* exact residual a - q*b (true quotient = q + r/b) */
+            /* q overshot zero-ward truth when q and r/b have opposite signs; sign(r/b)=sign(r)^sign(b),
+               computed from the sign bits so a tiny b cannot underflow the probe to zero. */
+            if (r != 0.0 && (!!signbit(r) ^ !!signbit(b)) != !!signbit(q))
+                q = nextafter(q, 0.0);
+        }
+    }
+#else
+    (void)cw; (void)a; (void)b;
+#endif
+    return q;
+}
 /* Division, setting the sticky status flags code can read back with FNSTSW: ZE for x/0, IE for 0/0. */
 static inline double FDIV(CPU *c, double a, double b) {
     if (b == 0 && a == a) c->fpu_sw |= (a == 0) ? 0x0001 : 0x0004;
-    return a / b;
+    return rc_div_round(c->fpu_cw, a / b, a, b);
 }
 /* fsin/fcos: out-of-range arguments (|x| >= 2^63) are left unchanged with C2 set, as on hardware */
 #define FTRIG(c, v, fn) (fabs(v) >= 9223372036854775808.0 ? ((c)->fpu_sw |= 0x0400, (v))           \
@@ -283,7 +315,7 @@ RC_INLINE uint16_t FNSTSWx(const X87 *x) { return (uint16_t)((x->sw & ~0x3800) |
 RC_INLINE double FPRESx(const X87 *x, double v) { return ((x->cw >> 8) & 3) == 0 ? (double)(float)v : v; }
 RC_INLINE double FDIVx(X87 *x, double a, double b) {
     if (b == 0 && a == a) x->sw |= (a == 0) ? 0x0001 : 0x0004;
-    return a / b;
+    return rc_div_round(x->cw, a / b, a, b);
 }
 #define FTRIGx(x, v, fn) (fabs(v) >= 9223372036854775808.0 ? ((x)->sw |= 0x0400, (v)) \
                                                          : ((x)->sw &= ~0x0400, fn(v)))

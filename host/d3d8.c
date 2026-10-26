@@ -144,25 +144,8 @@ W(d3d_GetDeviceCaps) { fill_caps(ARG(3)); RET(4, S_OK); }
 W(d3d_GetAdapterMonitor) { RET(2, 0x00070001u); }
 
 static uint32_t new_surface(uint32_t fmt, uint32_t w, uint32_t h, int rt, int depth, int with_mem);
-W(d3d_CreateDevice) {
-    uint32_t pp = ARG(5), out = ARG(6);
-    Device *d = calloc(1, sizeof *d);
-    d->width = R32(pp) ? R32(pp) : (uint32_t)g_screen_w;
-    d->height = R32(pp + 4) ? R32(pp + 4) : (uint32_t)g_screen_h;
-    d->backbuffer_format = R32(pp + 8) ? R32(pp + 8) : FMT_X8R8G8B8;
-    d->windowed = R32(pp + 28);
-    d->depth_format = R32(pp + 32) ? R32(pp + 36) : 0;
-    d->hwnd = R32(pp + 24) ? R32(pp + 24) : ARG(3);
-    d->d3d = THIS;
-    fprintf(stderr, "[d3d] CreateDevice: %ux%u fmt %u, %s, backbuffers %u, multisample %u, swap %u, depth %u, "
-            "behavior %x, flags %x\n", d->width, d->height, d->backbuffer_format, d->windowed ? "windowed" : "fullscreen",
-            R32(pp + 12), R32(pp + 16), R32(pp + 20), d->depth_format, ARG(4), R32(pp + 40));
-    if (R32(pp) == 0) { W32(pp, d->width); W32(pp + 4, d->height); }
-    d->backbuffer = new_surface(d->backbuffer_format, d->width, d->height, 1, 0, 0);
-    if (d->depth_format) d->depth = new_surface(d->depth_format, d->width, d->height, 0, 1, 0);
-    d->st.render_target = d->backbuffer;
-    d->st.depth_stencil = d->depth;
-    /* Direct3D 8's documented default states (D3DRENDERSTATETYPE / D3DTEXTURESTAGESTATETYPE numbering) */
+/* Direct3D 8's documented default states, for a device whose size, back buffer and depth are set */
+void d3d8_default_state(Device *d) {
     uint32_t *rs = d->st.rs;
     rs[7] = d->depth ? 1 : 0;            /* ZENABLE */
     rs[8] = 3;                           /* FILLMODE: solid */
@@ -200,6 +183,27 @@ W(d3d_CreateDevice) {
     for (int i = 0; i < MAX_TS; i++)
         for (int k = 0; k < 4; k++) d->st.transform[i][k * 5] = 1.f;
     d->st.viewport.w = d->width; d->st.viewport.h = d->height; d->st.viewport.maxz = 1.f;
+}
+
+W(d3d_CreateDevice) {
+    uint32_t pp = ARG(5), out = ARG(6);
+    Device *d = calloc(1, sizeof *d);
+    d->width = R32(pp) ? R32(pp) : (uint32_t)g_screen_w;
+    d->height = R32(pp + 4) ? R32(pp + 4) : (uint32_t)g_screen_h;
+    d->backbuffer_format = R32(pp + 8) ? R32(pp + 8) : FMT_X8R8G8B8;
+    d->windowed = R32(pp + 28);
+    d->depth_format = R32(pp + 32) ? R32(pp + 36) : 0;
+    d->hwnd = R32(pp + 24) ? R32(pp + 24) : ARG(3);
+    d->d3d = THIS;
+    fprintf(stderr, "[d3d] CreateDevice: %ux%u fmt %u, %s, backbuffers %u, multisample %u, swap %u, depth %u, "
+            "behavior %x, flags %x\n", d->width, d->height, d->backbuffer_format, d->windowed ? "windowed" : "fullscreen",
+            R32(pp + 12), R32(pp + 16), R32(pp + 20), d->depth_format, ARG(4), R32(pp + 40));
+    if (R32(pp) == 0) { W32(pp, d->width); W32(pp + 4, d->height); }
+    d->backbuffer = new_surface(d->backbuffer_format, d->width, d->height, 1, 0, 0);
+    if (d->depth_format) d->depth = new_surface(d->depth_format, d->width, d->height, 0, 1, 0);
+    d->st.render_target = d->backbuffer;
+    d->st.depth_stencil = d->depth;
+    d3d8_default_state(d);
     if (g_render->init) g_render->init(d);
     g_device_object = com_new(&IDirect3DDevice8_i, RT_DEVICE, d);
     g_device = d;
@@ -348,8 +352,7 @@ static void state_hash_tick(uint32_t frame) {
     }
 }
 
-W(dev_Present) {
-    Device *d = dev(c);
+void d3d8_present(Device *d) {
     d->frame++;
     extern void input_script_tick(uint32_t frame);
     extern void dump_tick(uint32_t frame);
@@ -386,8 +389,8 @@ W(dev_Present) {
     if (g_log_d3d && (d->frame <= 3 || d->frame % 300 == 0))
         fprintf(stderr, "[d3d] Present: frame %u, %u draws\n", d->frame, d->draws_this_frame);
     d->draws_this_frame = 0;
-    RET(5, S_OK);
 }
+W(dev_Present) { d3d8_present(dev(c)); RET(5, S_OK); }
 W(dev_GetBackBuffer) {
     Device *d = dev(c);
     ComObj *o = com_get(d->backbuffer);
@@ -426,6 +429,10 @@ W(dev_CreateRenderTarget) { W32(ARG(6), new_surface(ARG(3), ARG(1), ARG(2), 1, 0
 W(dev_CreateDepthStencilSurface) { W32(ARG(5), new_surface(ARG(3), ARG(1), ARG(2), 0, 1, 0)); RET(6, S_OK); }
 W(dev_CreateImageSurface) { W32(ARG(4), new_surface(ARG(3), ARG(1), ARG(2), 0, 0, 1)); RET(5, S_OK); }
 W(dev_CreateAdditionalSwapChain) { RET(3, D3DERR_NOTAVAILABLE); }
+
+uint32_t d3d8_new_surface(uint32_t fmt, uint32_t w, uint32_t h, int rt, int depth) {
+    return new_surface(fmt, w, h, rt, depth, 0);
+}
 
 static void touch_container(Surface *s) {
     Texture *t = s->container ? com_data(s->container) : NULL;

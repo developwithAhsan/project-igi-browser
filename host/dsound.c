@@ -185,7 +185,14 @@ static void start_mixer(void) {
     if (!g_mixer_sched && !getenv("RC_NO_AUDIO") && start_coreaudio()) { LOG("[dsound] CoreAudio output started\n"); return; }
 #endif
     pthread_t t;
+#ifdef __EMSCRIPTEN__
+    pthread_attr_t at;   /* host code only: a small stack (the 32 MB default is resident in full on WebKit) */
+    pthread_attr_init(&at);
+    pthread_attr_setstacksize(&at, (size_t)rc_stack_size(32, 2));
+    pthread_create(&t, &at, silent_mixer, NULL);
+#else
     pthread_create(&t, NULL, silent_mixer, NULL);
+#endif
     pthread_detach(t);
 }
 

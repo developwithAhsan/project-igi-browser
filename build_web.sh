@@ -38,19 +38,19 @@ HOST_NODE="$(ls "$B"/host/*.o | grep -v '/main.o$' | grep -v '/render_wgpu.o$') 
 
 # Browser build: page thread renders (WebGPU), game files from OPFS, modular loader for loader.js
 emcc -pthread ${LINKOPT:-$OPT} --profiling-funcs -o "$B/www/recomp.js" "$B"/runtime.o "$B"/interp.o $HOST_WEB "$B"/obj/*.o \
-    --use-port=emdawnwebgpu -sWASMFS -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=16 -sALLOW_MEMORY_GROWTH \
-    -sMAXIMUM_MEMORY=4GB -sSTACK_SIZE=8MB -sDEFAULT_PTHREAD_STACK_SIZE=32MB -sENVIRONMENT=web,worker \
+    --use-port=emdawnwebgpu -sWASMFS -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=12 -sALLOW_MEMORY_GROWTH \
+    -sMAXIMUM_MEMORY=2GB -Wl,--wrap=sbrk -sSTACK_SIZE=8MB -sDEFAULT_PTHREAD_STACK_SIZE=32MB -sENVIRONMENT=web,worker \
     -sMODULARIZE -sEXPORT_NAME=createRecomp -sEXPORTED_RUNTIME_METHODS=ENV,wasmMemory -sEXIT_RUNTIME=0 $EXTRA_LINK
 # Firefox rejects any typed array over 2 GB as setBindGroup's dynamic offsets, and the bindings pass a view of
 # the whole wasm memory (with start/length): hand it a copy of just the offsets instead.
 # (matches both the -O1 and the minified -O2 output)
-perl -0pi -e 's/\(growMemViews\(\),\s*HEAPU32\),\s*\(*dynamicOffsetsPtr\)?\s*>>>\s*2\)?,\s*dynamicOffsetCount\)/(growMemViews(),HEAPU32.slice(dynamicOffsetsPtr>>>2,(dynamicOffsetsPtr>>>2)+dynamicOffsetCount)))/g' "$B/www/recomp.js"
+perl -0pi -e 's/\(growMemViews\(\),\s*HEAPU32\),\s*\(*dynamicOffsetsPtr\)?\s*(>>>?)\s*2\)?,\s*dynamicOffsetCount\)/(growMemViews(),HEAPU32.slice(dynamicOffsetsPtr${1}2,(dynamicOffsetsPtr${1}2)+dynamicOffsetCount)))/g' "$B/www/recomp.js"
 grep -q 'HEAPU32.slice(dynamicOffsetsPtr' "$B/www/recomp.js" || echo "warning: setBindGroup offsets patch did not apply (emdawnwebgpu changed?)" >&2
 echo "built build_web/www/recomp.js"
 
 # Node build: headless, real file system, RC_* environment passed through
 emcc -pthread ${LINKOPT:-$OPT} --profiling-funcs -o "$B/node/recomp.js" "$B"/runtime.o "$B"/interp.o "$B"/main_node.o $HOST_NODE "$B"/obj/*.o \
-    -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=12 -sALLOW_MEMORY_GROWTH -sMAXIMUM_MEMORY=4GB \
+    -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=12 -sALLOW_MEMORY_GROWTH -sMAXIMUM_MEMORY=4GB -Wl,--wrap=sbrk \
     -sSTACK_SIZE=8MB -sDEFAULT_PTHREAD_STACK_SIZE=32MB -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1 \
     --pre-js web/node_env.js $EXTRA_LINK
 # Node gives each worker a 4 MB engine stack; recompiled code nests one engine frame per guest call

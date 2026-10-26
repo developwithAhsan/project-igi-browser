@@ -19,6 +19,25 @@ extern uint8_t g_palettes[][1024];
 /* WGPUPrimitiveTopology values (kept numeric so this file doesn't need webgpu.h) */
 enum { TOPO_POINTS = 1, TOPO_LINES = 2, TOPO_TRIANGLES = 4 };
 
+/* RC_INPUT "N:sig" (input.c): log a signature of every draw of frame N, to diff the native and browser
+   recorders. Structure is hashed exactly; floats are quantized first so last-bit differences don't count. */
+uint32_t g_cmd_sig_frame = 0xFFFFFFFFu;
+static uint32_t fnv_qa(uint32_t h, const float *f, size_t n, float scale) {
+    for (size_t i = 0; i < n; i++) {
+        double v = (double)f[i] * scale;
+        int32_t q = v != v ? 0x7FFFFFFF : v > 2e9 ? 2000000000 : v < -2e9 ? -2000000000 : (int32_t)lrint(v);
+        h = (h ^ (uint32_t)q) * 16777619u;
+    }
+    return h;
+}
+static uint32_t sig_pos(const CVert *v, uint32_t n) { uint32_t h = 2166136261u; for (uint32_t i = 0; i < n; i++) h = fnv_qa(h, &v[i].x, 4, 64.f); return h; }
+static uint32_t sig_tc(const CVert *v, uint32_t n) { uint32_t h = 2166136261u; for (uint32_t i = 0; i < n; i++) h = fnv_qa(h, &v[i].tc[0][0], 16, 4096.f); return h; }
+static uint32_t sig_col(const CVert *v, uint32_t n) {
+    uint32_t h = 2166136261u;
+    for (uint32_t i = 0; i < n; i++) { h = (h ^ v[i].diffuse) * 16777619u; h = (h ^ v[i].specular) * 16777619u; }
+    return h;
+}
+
 /* ------------------------------------------------------------------ command buffer
  * One recorder for the whole process: Direct3D calls come from the game thread, but objects can be
  * released from others, so every entry point holds g_rec_lock (recursive). */
@@ -85,6 +104,12 @@ static void cmd_flush(int ends_frame) { (void)ends_frame; }
 
 static int g_snap_detail;
 static uint32_t g_f_drawn;
+
+/* In-mission flag: set while the 3D world is being drawn (any non-pre-transformed geometry), latched per
+   frame at present. dinput.c reads it to invert mouse look only in a mission, not in the 2D menus (where the
+   same relative mouse-Y drives the cursor the other way). */
+int g_in_mission;
+static int g_world_this_frame;
 static uint32_t g_trace_vs;
 
 static int want_screenshot(uint32_t frame) {
@@ -209,6 +234,107 @@ static void unpack_color(uint32_t c, float *o) {
     o[0] = ((c >> 16) & 255) / 255.f; o[1] = ((c >> 8) & 255) / 255.f; o[2] = (c & 255) / 255.f; o[3] = (c >> 24) / 255.f;
 }
 
+/* ------------------------------------------------------------------ fixed-function lighting and vertex fog
+ * Direct3D's per-vertex lighting (LIGHTING with normals: material, ambient and up to 8 lights) and vertex fog
+ * (the fog factor, from the eye distance, goes in the specular alpha), done here on the CPU for untransformed
+ * vertices. Direct3D 7 games rely on both. */
+
+static float dot3(const float *a, const float *b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+static void xform_point(const float *m, const float *p, float *o) {
+    for (int j = 0; j < 3; j++) o[j] = p[0] * m[j] + p[1] * m[4 + j] + p[2] * m[8 + j] + m[12 + j];
+}
+static void xform_dir(const float *m, const float *p, float *o) {
+    for (int j = 0; j < 3; j++) o[j] = p[0] * m[j] + p[1] * m[4 + j] + p[2] * m[8 + j];
+}
+static void normalize3(float *v) {
+    float l = sqrtf(dot3(v, v));
+    if (l > 0) { v[0] /= l; v[1] /= l; v[2] /= l; }
+}
+
+static void light_and_fog(const DevState *st, const FvfLayout *L, const uint8_t *vb, uint32_t stride, const uint32_t *idx,
+                          uint32_t n, CVert *cv) {
+    int lighting = st->rs[137] && L->has_normal;
+    int fog = st->rs[28] && (st->rs[35] || st->rs[140]);   /* table or vertex fog: computed from the eye distance */
+    if (!lighting && !fog) return;
+    const float *world = st->transform[256], *view = st->transform[2];
+    float amb[4];
+    unpack_color(st->rs[139], amb);
+    const float *mat = st->material;   /* diffuse 0-3, ambient 4-7, specular 8-11, emissive 12-15 */
+    int lights[8], nl = 0;
+    for (int k = 0; k < 8; k++) if (st->light_enabled[k]) lights[nl++] = k;
+    float fstart, fend, fdens;
+    memcpy(&fstart, &st->rs[36], 4); memcpy(&fend, &st->rs[37], 4); memcpy(&fdens, &st->rs[38], 4);
+    uint32_t fmode = st->rs[35] ? st->rs[35] : st->rs[140];
+    int range = st->rs[48] != 0 && !st->rs[35];
+    for (uint32_t i = 0; i < n; i++) {
+        const uint8_t *v = vb + (size_t)idx[i] * stride;
+        float p[3], pw[3];
+        memcpy(p, v, 12);
+        xform_point(world, p, pw);
+        if (lighting) {
+            float nrm[3], nw[3];
+            memcpy(nrm, v + L->off_normal, 12);
+            xform_dir(world, nrm, nw);
+            normalize3(nw);
+            /* material sources: COLORVERTEX takes diffuse/ambient/emissive from the vertex color when asked */
+            float vd[4] = { 1, 1, 1, 1 }, vs[4] = { 0, 0, 0, 0 };
+            if (L->has_diffuse) unpack_color(cv[i].diffuse, vd);
+            if (L->has_specular) unpack_color(cv[i].specular, vs);
+            int cvx = st->rs[141] != 0;
+            const float *md = cvx && L->has_diffuse && st->rs[145] == 1 ? vd : cvx && L->has_specular && st->rs[145] == 2 ? vs : mat;
+            const float *ma = cvx && L->has_diffuse && st->rs[147] == 1 ? vd : cvx && L->has_specular && st->rs[147] == 2 ? vs : mat + 4;
+            const float *me = cvx && L->has_diffuse && st->rs[148] == 1 ? vd : cvx && L->has_specular && st->rs[148] == 2 ? vs : mat + 12;
+            float col[3];
+            for (int c = 0; c < 3; c++) col[c] = me[c] + amb[c] * ma[c];
+            for (int k = 0; k < nl; k++) {
+                const uint8_t *lt = st->light[lights[k]];
+                uint32_t type;
+                float ld[4], la[4], pos[3], dir[3], rng, falloff, a0, a1, a2, theta, phi;
+                memcpy(&type, lt, 4); memcpy(ld, lt + 4, 16); memcpy(la, lt + 36, 16);
+                memcpy(pos, lt + 52, 12); memcpy(dir, lt + 64, 12);
+                memcpy(&rng, lt + 76, 4); memcpy(&falloff, lt + 80, 4); memcpy(&a0, lt + 84, 4); memcpy(&a1, lt + 88, 4);
+                memcpy(&a2, lt + 92, 4); memcpy(&theta, lt + 96, 4); memcpy(&phi, lt + 100, 4);
+                float tl[3], att = 1.f;
+                if (type == 3) {   /* directional */
+                    tl[0] = -dir[0]; tl[1] = -dir[1]; tl[2] = -dir[2];
+                    normalize3(tl);
+                } else {           /* point / spot */
+                    tl[0] = pos[0] - pw[0]; tl[1] = pos[1] - pw[1]; tl[2] = pos[2] - pw[2];
+                    float d = sqrtf(dot3(tl, tl));
+                    if (rng > 0 && d > rng) continue;
+                    if (d > 0) { tl[0] /= d; tl[1] /= d; tl[2] /= d; }
+                    float den = a0 + a1 * d + a2 * d * d;
+                    att = den > 0 ? 1.f / den : 1.f;
+                    if (type == 2) {
+                        float sd[3] = { dir[0], dir[1], dir[2] };
+                        normalize3(sd);
+                        float rho = -dot3(tl, sd), ct = cosf(theta * 0.5f), cp = cosf(phi * 0.5f);
+                        if (rho <= cp) att = 0;
+                        else if (rho < ct && ct > cp) att *= powf((rho - cp) / (ct - cp), falloff > 0 ? falloff : 1.f);
+                    }
+                }
+                float ndl = dot3(nw, tl);
+                if (ndl < 0) ndl = 0;
+                for (int c = 0; c < 3; c++) col[c] += att * (la[c] * ma[c] + ndl * ld[c] * md[c]);
+            }
+            float out[4] = { col[0], col[1], col[2], md[3] };
+            uint32_t a = cv[i].specular & 0xFF000000u;
+            cv[i].diffuse = pack_color(out);
+            cv[i].specular = a;   /* no specular highlights; keep the alpha (fog) */
+        }
+        if (fog) {
+            float pv[3];
+            xform_point(view, pw, pv);
+            float d = range ? sqrtf(dot3(pv, pv)) : fabsf(pv[2]), f;
+            if (fmode == 3) f = fend != fstart ? (fend - d) / (fend - fstart) : 1.f;   /* linear */
+            else if (fmode == 1) f = expf(-fdens * d);
+            else f = expf(-(fdens * d) * (fdens * d));
+            f = f < 0 ? 0 : f > 1 ? 1 : f;
+            cv[i].specular = (cv[i].specular & 0x00FFFFFFu) | (uint32_t)(f * 255.f + 0.5f) << 24;
+        }
+    }
+}
+
 /* ------------------------------------------------------------------ textures */
 
 static uint32_t sampler_key(const uint32_t *tss) {
@@ -224,6 +350,22 @@ static uint32_t sampler_key(const uint32_t *tss) {
 static uint32_t bc_format(const Texture *t) {
     if (!g_gpu_bc || !format_is_dxt(t->format) || t->lw[0] % 4 || t->lh[0] % 4) return TEXFMT_RGBA8;
     return t->format == FMT_DXT1 ? TEXFMT_BC1 : t->format <= FMT_DXT3 ? TEXFMT_BC2 : TEXFMT_BC3;
+}
+
+/* DirectDraw source color key: texels whose raw value lies in [ck_lo, ck_hi] become transparent */
+static void apply_color_key(const Texture *t, uint32_t l, uint8_t *rgba) {
+    uint32_t bpp = format_bpp(t->format);
+    if (format_is_dxt(t->format) || bpp < 8) return;
+    for (uint32_t y = 0; y < t->lh[l]; y++) {
+        const uint8_t *row = HP(t->mem[0][l] + y * t->pitch[l]);
+        for (uint32_t x = 0; x < t->lw[l]; x++) {
+            uint32_t v = 0;
+            memcpy(&v, row + x * (bpp / 8), bpp / 8);
+            if (bpp == 32) v &= 0x00FFFFFFu;
+            if (v >= (t->ck_lo & (bpp == 32 ? 0xFFFFFFu : 0xFFFFFFFFu)) && v <= (t->ck_hi & (bpp == 32 ? 0xFFFFFFu : 0xFFFFFFFFu)))
+                rgba[((size_t)y * t->lw[l] + x) * 4 + 3] = 0;
+        }
+    }
 }
 
 static void sync_texture(Device *d, Texture *t) {
@@ -258,6 +400,7 @@ static void sync_texture(Device *d, Texture *t) {
             if (!warned++) fprintf(stderr, "[render] unsupported texture format %x\n", t->format);
             memset(out, 255, (size_t)w * h * 4);
         }
+        if (t->has_ck) apply_color_key(t, l, out);
         out += (size_t)w * h * 4;
     }
     cmd_end();
@@ -337,6 +480,7 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
 
     FvfLayout L;
     fvf_layout(sh ? 0x2 /* XYZ: transformed by the shader */ : st->vs, &L);
+    if (L.pos_type != 0x4) g_world_this_frame = 1;   /* non-RHW = 3D world: we're in a mission, not a menu */
     const uint8_t *vb = NULL;
     uint32_t stride;
     if (vertices_up) { vb = vertices_up; stride = up_stride; }
@@ -416,6 +560,9 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
         if (use_range) { for (uint32_t i = 0; i < n; i++) cv[i] = tmp[idx[i] - lo]; free(tmp); }
     } else {
         for (uint32_t i = 0; i < n; i++) convert_vertex(vb + (size_t)idx[i] * stride, &L, &cv[i]);
+        if (L.pos_type != 0x4) light_and_fog(st, &L, vb, stride, idx, n, cv);
+        else if (st->rs[28] && !L.has_specular)
+            for (uint32_t i = 0; i < n; i++) cv[i].specular |= 0xFF000000u;   /* no fog factor: no fog */
     }
     free(idx);
 
@@ -452,6 +599,10 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
     }
     unpack_color(st->rs[60], u->tfactor);
     u->misc[0] = (st->rs[24] & 255) / 255.f;
+    if (st->rs[41] && !u->flags[1]) {   /* Direct3D 7 COLORKEYENABLE: keyed texels (alpha 0) are not drawn */
+        Texture *t0 = com_data(st->texture[0]);
+        if (t0 && t0->has_ck) { u->flags[1] = 5; u->misc[0] = 0.f; }
+    }
     for (int i = 0; i < 4; i++) u->mat_diffuse[i] = 1.f;
     if (u->flags[3]) {
         /* no normals: lit color is emissive + ambient * material ambient (diffuse lighting needs a normal) */
@@ -464,6 +615,7 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
         }
     }
     memcpy(u->psc, st->ps_const, sizeof u->psc);
+    if (st->rs[28] && !sh) { unpack_color(st->rs[34], u->fog); u->fog[3] = 1.f; }
     for (int s = 0; s < 4; s++) {
         memcpy(u->bem[s], &st->tss[s][7], 16);        /* BUMPENVMAT00, 01, 10, 11 (float bits) */
         memcpy(&u->bel[s][0], &st->tss[s][22], 4);    /* BUMPENVLSCALE */
@@ -473,13 +625,22 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
     PKey k = { st->rs[27] != 0, st->rs[19], st->rs[20], st->rs[171] ? st->rs[171] : 1, st->rs[7] != 0 && st->depth_stencil,
                st->rs[14], st->rs[23], st->rs[22], st->rs[168] & 0xF, topo, st->ps };
     if (L.pos_type == 0x4) k.cull = 1;  /* keep 2D simple: no culling for pre-transformed vertices */
-    else if (k.cull == 2) k.cull = 3; else if (k.cull == 3) k.cull = 2;  /* D3D CW/CCW culls back/front with CW front */
+    /* otherwise k.cull keeps D3D's value (1 none, 2 cull clockwise, 3 cull counter-clockwise): the executor
+       maps it per WebGPU implementation (pipeline_for) */
     c->key = k;
     c->vp[0] = (float)st->viewport.x; c->vp[1] = (float)st->viewport.y;
     c->vp[2] = (float)(st->viewport.w ? st->viewport.w : g_tgt_lw);
     c->vp[3] = (float)(st->viewport.h ? st->viewport.h : g_tgt_lh);
     c->minz = st->viewport.minz;
     c->maxz = st->viewport.maxz > st->viewport.minz ? st->viewport.maxz : 1.f;
+    if (d->frame == g_cmd_sig_frame)
+        fprintf(stderr, "[sig] f%u d%u n=%u key=%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%x fl=%u,%u,%u,%u st=%u/%u,%u/%u "
+                "tex=%u:%u,%u:%u,%u:%u,%u:%u ps=%x vp=%g,%g,%g,%g z=%g,%g mvp=%08x pos=%08x col=%08x tc=%08x\n",
+                d->frame, g_f_drawn - 1, n, k.blend, k.src, k.dst, k.op, k.zen, k.zwrite, k.zfunc, k.cull, k.cmask, k.topo, k.ps,
+                u->flags[0], u->flags[1], u->flags[2], u->flags[3], u->st0[0], u->st0[3], u->st1[0], u->st1[3],
+                c->slot_kind[0], c->slot_id[0], c->slot_kind[1], c->slot_id[1], c->slot_kind[2], c->slot_id[2],
+                c->slot_kind[3], c->slot_id[3], c->pixel_shader, c->vp[0], c->vp[1], c->vp[2], c->vp[3], c->minz, c->maxz,
+                fnv_qa(2166136261u, u->mvp, 16, 1024.f), sig_pos(cv, n), sig_col(cv, n), sig_tc(cv, n));
     cmd_end();
 }
 
@@ -496,13 +657,20 @@ static int rec_init(Device *d) {
 }
 
 static void rec_present_impl(Device *d) {
+#ifdef __EMSCRIPTEN__
+    { extern int g_log; extern void rc_mem_report(const char *, uint32_t);
+      if (g_log && d->frame % 300 == 0) rc_mem_report("game", d->frame); }
+#endif
     CmdPresent *c = cmd_alloc(CMD_PRESENT, sizeof *c);
     c->frame = d->frame;
     c->screenshot = (uint32_t)want_screenshot(d->frame);
     cmd_end();
     cmd_flush(1);
     g_target_sent = 0;   /* the executor ends every frame on the back buffer */
+    if (d->frame == g_cmd_sig_frame + 1) fprintf(stderr, "[sig] f%u end draws=%u\n", g_cmd_sig_frame, g_f_drawn);   /* the present of that frame's draws */
     g_f_drawn = 0;
+    g_in_mission = g_world_this_frame;   /* latch for this frame's input; reset for the next */
+    g_world_this_frame = 0;
 #ifdef __EMSCRIPTEN__
     /* Don't run ahead of the display: two frames queued (a slow frame doesn't skip a vsync). Online every
        queued frame is a frame of input latency on top of the lockstep delay, so RC_QUEUE=1 (?queue=1 on

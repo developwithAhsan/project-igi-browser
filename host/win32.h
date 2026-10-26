@@ -31,7 +31,7 @@
 #define IMPORT(dll, name) { dll "!" #name, w_##name }
 typedef struct { const ImportHandler *list; uint32_t count; } ImportTable;
 extern const ImportTable kernel32_imports, user32_imports, gdi32_imports, advapi32_imports, winmm_imports,
-    directx_imports;
+    directx_imports, ddraw7_imports, mm_imports;
 
 /* Logging of host-side events (RC_LOG=1). */
 extern int g_log;

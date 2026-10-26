@@ -24,7 +24,8 @@ typedef struct {
     float psc[8][4];
     float bem[4][4];
     float bel[4][4];
-} Uniforms;   /* 416 bytes */
+    float fog[4];          /* fog color rgb, w = 1: blend toward it by the specular alpha (the fog factor) */
+} Uniforms;   /* 432 bytes */
 
 typedef struct PKey { uint32_t blend, src, dst, op, zen, zwrite, zfunc, cull, cmask, topo, ps; } PKey;
 

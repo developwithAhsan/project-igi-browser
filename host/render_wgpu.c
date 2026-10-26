@@ -41,6 +41,7 @@ static const char *WGSL_COMMON =
 "  psc: array<vec4<f32>, 8>,   // pixel shader constants c0-c7\n"
 "  bem: array<vec4<f32>, 4>,   // bump-environment matrices per stage (00, 01, 10, 11)\n"
 "  bel: array<vec4<f32>, 4>,   // bump luminance scale, offset per stage\n"
+"  fog: vec4<f32>,       // rgb: fog color, w: 1 = fog by the specular alpha\n"
 "};\n"
 "@group(0) @binding(0) var<uniform> u: U;\n"
 "@group(1) @binding(0) var tex0: texture_2d<f32>;\n"
@@ -134,6 +135,7 @@ static const char *WGSL_FF =
 "    if (u.st1.x != 1u) { cur = stage(u.st1, u.st1b, cur, tx1, i.diffuse, i.specular); }\n"
 "  }\n"
 "  if (u.flags.z == 1u) { cur = vec4<f32>(saturate(cur.rgb + i.specular.rgb), cur.a); }\n"
+"  if (u.fog.w > 0.5) { cur = vec4<f32>(mix(u.fog.rgb, cur.rgb, saturate(i.specular.a)), cur.a); }\n"
 "  if (!alpha_ok(cur.a)) { discard; }\n"
 "  return cur;\n"
 "}\n";
@@ -167,6 +169,12 @@ static uint32_t g_vpos, g_upos;
 #define VBUF_SIZE (32u << 20)
 #define UBUF_SIZE (8u << 20)
 #define USTRIDE 512u
+/* RC_GPU_COALESCE (the page sets it on WebKit): vertex and uniform data are staged in host memory and
+   uploaded with one writeBuffer per batch instead of two per draw. WebKit's WebGPU keeps a page-granular
+   IPC copy per writeBuffer call for a while, and a frame of several hundred such calls made the page hold
+   1-2 GB, which is what gets an iPhone's tab killed. Same bytes land at the same offsets either way. */
+static int g_coalesce;
+static uint8_t *g_vstage, *g_ustage;   /* mirrors of g_vbuf / g_ubuf up to g_vpos / g_upos */
 static WGPUBindGroup g_bg_u;
 static GTex g_white, g_black;
 static WGPUSampler g_samplers[1024];   /* indexed by sampler key: never evicted while in use */
@@ -334,6 +342,12 @@ static void create_resources(void) {
     g_vbuf = wgpuDeviceCreateBuffer(g_dev, &bdesc);
     bdesc.size = UBUF_SIZE; bdesc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
     g_ubuf = wgpuDeviceCreateBuffer(g_dev, &bdesc);
+    g_coalesce = getenv("RC_GPU_COALESCE") != NULL;
+    if (g_coalesce) {
+        g_vstage = malloc(VBUF_SIZE); g_ustage = malloc(UBUF_SIZE);
+        if (!g_vstage || !g_ustage) { fprintf(stderr, "[wgpu] no memory for upload staging: uploading per draw\n"); g_coalesce = 0; }
+        else fprintf(stderr, "[wgpu] uploads coalesced per batch\n");
+    }
     WGPUBindGroupEntry be = WGPU_BIND_GROUP_ENTRY_INIT;
     be.binding = 0; be.buffer = g_ubuf; be.size = sizeof(Uniforms);
     WGPUBindGroupDescriptor bgd = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
@@ -586,7 +600,16 @@ static WGPURenderPipeline pipeline_for(const PKey *k) {
             pd.vertex.bufferCount = 1; pd.vertex.buffers = &vbl;
             pd.primitive.topology = (WGPUPrimitiveTopology)k->topo;
             pd.primitive.frontFace = WGPUFrontFace_CW;
-            pd.primitive.cullMode = k->cull == 2 ? WGPUCullMode_Front : k->cull == 3 ? WGPUCullMode_Back : WGPUCullMode_None;
+            /* D3D culls the named winding in screen space (y down), so its front faces are clockwise, as
+               WebGPU's are with frontFace CW: D3DCULL_CCW (3) culls back faces, D3DCULL_CW (2) front faces.
+               Dawn (the browsers) follows that; wgpu-native (the native build) rasterizes the opposite
+               winding, so it gets the inverse mapping. One mapping for both turns every closed mesh inside
+               out on the other: hollow faces, see-through walls. */
+#ifdef __EMSCRIPTEN__
+            pd.primitive.cullMode = k->cull == 3 ? WGPUCullMode_Back : k->cull == 2 ? WGPUCullMode_Front : WGPUCullMode_None;
+#else
+            pd.primitive.cullMode = k->cull == 3 ? WGPUCullMode_Front : k->cull == 2 ? WGPUCullMode_Back : WGPUCullMode_None;
+#endif
             pd.depthStencil = &ds;
             pd.fragment = &fs;
             pd.multisample.count = 1; pd.multisample.mask = 0xFFFFFFFFu;
@@ -655,6 +678,10 @@ static void destroy_retired(void) {
 
 static void submit(void) {
     end_pass();
+    if (g_coalesce) {
+        if (g_vpos) wgpuQueueWriteBuffer(g_queue, g_vbuf, 0, g_vstage, g_vpos);
+        if (g_upos) wgpuQueueWriteBuffer(g_queue, g_ubuf, 0, g_ustage, g_upos);
+    }
     if (g_enc) {
         WGPUCommandBuffer cb = wgpuCommandEncoderFinish(g_enc, NULL);
         wgpuQueueSubmit(g_queue, 1, &cb);
@@ -917,6 +944,7 @@ static void exec_clear(const CmdClear *c) {
 
 static void exec_draw(const CmdDraw *c) {
     begin_frame();
+    { static int skip = -1; if (skip < 0) skip = getenv("RC_GPU_SKIP") != NULL; if (skip) return; }   /* diagnostics: no draw calls */
     if (!g_pass) begin_pass(0, 0, 1.f, 0);
     uint32_t n = c->nverts, bytes = n * (uint32_t)sizeof(CVert);
     if (g_vpos + bytes > VBUF_SIZE || g_upos + USTRIDE > UBUF_SIZE) { submit(); begin_pass(0, 0, 1.f, 0); }
@@ -934,8 +962,13 @@ static void exec_draw(const CmdDraw *c) {
             views[s] = gs && !gs->depth && gs->view != g_tgt_color ? gs->view : g_black.view;
         }
     }
-    wgpuQueueWriteBuffer(g_queue, g_vbuf, g_vpos, c + 1, bytes);
-    wgpuQueueWriteBuffer(g_queue, g_ubuf, g_upos, &c->u, sizeof c->u);
+    if (g_coalesce) {
+        memcpy(g_vstage + g_vpos, c + 1, bytes);
+        memcpy(g_ustage + g_upos, &c->u, sizeof c->u);
+    } else {
+        wgpuQueueWriteBuffer(g_queue, g_vbuf, g_vpos, c + 1, bytes);
+        wgpuQueueWriteBuffer(g_queue, g_ubuf, g_upos, &c->u, sizeof c->u);
+    }
 
     WGPUBindGroupEntry te[8];
     for (int i = 0; i < 4; i++) {
@@ -1211,6 +1244,17 @@ static void on_web_device(WGPURequestDeviceStatus st, WGPUDevice d, WGPUStringVi
     __atomic_store_n(&g_ready, 1, __ATOMIC_RELEASE);
 }
 
+/* The browser dropped the device (its GPU process died, or the page was pushed out of memory): nothing can
+   be rendered any more. The page shows a reload prompt (loader.js: rcDeviceLost). */
+static void on_web_device_lost(WGPUDevice const *d, WGPUDeviceLostReason reason, WGPUStringView msg, void *u1, void *u2) {
+    (void)d; (void)u1; (void)u2;
+    if (reason == WGPUDeviceLostReason_Destroyed) return;
+    fprintf(stderr, "[wgpu] device lost (%d): %.*s\n", (int)reason, (int)msg.length, msg.data);
+    char text[256];
+    snprintf(text, sizeof text, "%.*s", (int)(msg.length < 200 ? msg.length : 200), msg.data);
+    EM_ASM({ if (typeof rcDeviceLost === 'function') rcDeviceLost(UTF8ToString($0)); }, text);
+}
+
 static void request_web_adapter(int attempt);
 static void on_web_adapter(WGPURequestAdapterStatus st, WGPUAdapter a, WGPUStringView msg, void *u1, void *u2) {
     (void)u2;
@@ -1224,6 +1268,8 @@ static void on_web_adapter(WGPURequestAdapterStatus st, WGPUAdapter a, WGPUStrin
     g_adapter = a;
     WGPUDeviceDescriptor dd = WGPU_DEVICE_DESCRIPTOR_INIT;
     dd.uncapturedErrorCallbackInfo.callback = on_error;
+    dd.deviceLostCallbackInfo.mode = WGPUCallbackMode_AllowSpontaneous;
+    dd.deviceLostCallbackInfo.callback = on_web_device_lost;
     static const WGPUFeatureName bc = WGPUFeatureName_TextureCompressionBC;
     g_gpu_bc = wgpuAdapterHasFeature(g_adapter, bc) && !getenv("RC_NO_BC");   /* DXT textures stay compressed */
     if (g_gpu_bc) { dd.requiredFeatureCount = 1; dd.requiredFeatures = &bc; }

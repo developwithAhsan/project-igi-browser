@@ -42,6 +42,9 @@ static uint32_t module_for(const char *name) {
     return 0;
 }
 
+W(GetVersion) { RET(0, 0x0A280105u); }   /* Windows XP: 5.1, build 2600 */
+W(GetEnvironmentVariableA) { set_error(203 /* ERROR_ENVVAR_NOT_FOUND */); RET(3, 0); }
+
 W(GetModuleHandleA) { RET(1, ARG(0) ? module_for(GSTR(ARG(0))) : g_image_lo); }
 W(LoadLibraryA) {
     uint32_t m = module_for(GSTR(ARG(0)));
@@ -351,6 +354,20 @@ W(FileTimeToSystemTime) {
     W16(p + 6, (uint16_t)tmv.tm_mday); W16(p + 8, (uint16_t)tmv.tm_hour); W16(p + 10, (uint16_t)tmv.tm_min);
     W16(p + 12, (uint16_t)tmv.tm_sec); W16(p + 14, (uint16_t)((ft / 10000) % 1000));
     RET(2, 1);
+}
+W(GetLocalTime) {
+    time_t t = (time_t)(guest_time_100ns() / 10000000ull - 11644473600ull);
+    struct tm tmv;
+    localtime_r(&t, &tmv);
+    uint32_t p = ARG(0);
+    W16(p, (uint16_t)(tmv.tm_year + 1900)); W16(p + 2, (uint16_t)(tmv.tm_mon + 1)); W16(p + 4, (uint16_t)tmv.tm_wday);
+    W16(p + 6, (uint16_t)tmv.tm_mday); W16(p + 8, (uint16_t)tmv.tm_hour); W16(p + 10, (uint16_t)tmv.tm_min);
+    W16(p + 12, (uint16_t)tmv.tm_sec); W16(p + 14, 0);
+    RET(1, 0);
+}
+W(CompareFileTime) {
+    uint64_t a = R64(ARG(0)), b = R64(ARG(1));
+    RET(2, a < b ? 0xFFFFFFFFu : a > b ? 1u : 0u);
 }
 W(GetTimeZoneInformation) { memset(HP(ARG(0)), 0, 172); RET(1, 0 /* TIME_ZONE_ID_UNKNOWN */); }
 W(GetDateFormatA) {
@@ -738,7 +755,11 @@ W(CreateThread) {
     pthread_t pt;
     pthread_attr_t at;
     pthread_attr_init(&at);
+#ifdef __EMSCRIPTEN__
+    pthread_attr_setstacksize(&at, (size_t)rc_stack_size(64, 16));  /* host stack: recompiled frames are large */
+#else
     pthread_attr_setstacksize(&at, 64u << 20);  /* host stack: recompiled frames are large (more so in wasm) */
+#endif
     pthread_create(&pt, &at, thread_main, ts);
     pthread_detach(pt);
     LOG("[kernel32] CreateThread(start=%08x param=%08x flags=%x) -> handle %x tid %x\n", start, param, flags, h, t->id);
@@ -863,6 +884,15 @@ W(GetFileSize) {
     fstat(x->fd, &st);
     if (ARG(1)) W32(ARG(1), (uint32_t)((uint64_t)st.st_size >> 32));
     RET(2, (uint32_t)st.st_size);
+}
+W(GetFileTime) {
+    WinHandle *x = handle_get(ARG(0), H_FILE);
+    if (!x) RET(4, 0);
+    struct stat st;
+    fstat(x->fd, &st);
+    uint64_t ft = ((uint64_t)st.st_mtime + 11644473600ull) * 10000000ull;
+    for (int i = 1; i <= 3; i++) if (ARG(i)) W64(ARG(i), ft);
+    RET(4, 1);
 }
 W(FlushFileBuffers) { RET(1, 1); }
 W(SetEndOfFile) {
@@ -1050,7 +1080,8 @@ W(GetNumberOfConsoleInputEvents) { if (ARG(1)) W32(ARG(1), 0); RET(2, 1); }
 
 #define K(name) IMPORT("KERNEL32.DLL", name)
 static const ImportHandler list[] = {
-    K(GetVersionExA), K(GetModuleHandleA), K(LoadLibraryA), K(FreeLibrary), K(GetProcAddress),
+    K(GetVersionExA), K(GetVersion), K(GetEnvironmentVariableA), K(GetLocalTime), K(CompareFileTime), K(GetFileTime),
+    K(GetModuleHandleA), K(LoadLibraryA), K(FreeLibrary), K(GetProcAddress),
     K(GetModuleFileNameA), K(GetCommandLineA), K(GetEnvironmentStrings), K(GetEnvironmentStringsW),
     K(FreeEnvironmentStringsA), K(FreeEnvironmentStringsW), K(SetEnvironmentVariableA), K(GetStartupInfoA),
     K(GetStdHandle), K(SetStdHandle), K(GetFileType), K(SetHandleCount), K(GetCurrentProcess),

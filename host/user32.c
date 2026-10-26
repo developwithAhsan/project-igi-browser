@@ -210,6 +210,9 @@ W(CharUpperA) {
 }
 W(SetWindowsHookExA) { g_hook_proc = ARG(1); LOG("[user32] SetWindowsHookExA(%d)\n", (int)ARG(0)); RET(4, 0x00040001u); }
 W(UnhookWindowsHookEx) { RET(1, 1); }
+W(InvalidateRect) { RET(3, 1); }
+W(GetDC) { RET(1, 0x00050010u); }
+W(ReleaseDC) { RET(2, 1); }
 W(CallNextHookEx) { RET(4, 0); }
 
 #define U(name) IMPORT("USER32.DLL", name)
@@ -224,6 +227,6 @@ static const ImportHandler list[] = {
     U(LoadCursorA), U(LoadIconA), U(LoadImageA), U(DestroyIcon), U(SetCursor), U(ShowCursor), U(GetCursorPos),
     U(SetCursorPos), U(GetAsyncKeyState), U(GetKeyState), U(GetKeyboardState), U(GetKeyboardLayout),
     U(MapVirtualKeyExA), U(ToAsciiEx), U(keybd_event), U(CharUpperA), U(SetWindowsHookExA),
-    U(UnhookWindowsHookEx), U(CallNextHookEx),
+    U(UnhookWindowsHookEx), U(CallNextHookEx), U(InvalidateRect), U(GetDC), U(ReleaseDC),
 };
 const ImportTable user32_imports = { list, sizeof list / sizeof list[0] };

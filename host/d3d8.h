@@ -27,6 +27,8 @@ typedef struct Texture {
     uint32_t version;             /* bumped on every unlock: backends re-upload when it changes */
     uint32_t gpu_id;              /* renderer's name for it (stable, never reused) */
     uint32_t sent_version;        /* version last sent to the renderer */
+    int has_ck;                   /* DirectDraw source color key: matching texels get alpha 0 */
+    uint32_t ck_lo, ck_hi;
     void *backend;
 } Texture;
 
@@ -89,5 +91,11 @@ Shader *shader_get(uint32_t handle);
 uint32_t gpu_new_id(void);
 uint32_t format_bpp(uint32_t fmt);   /* bits per pixel; DXT1 = 4, DXT2-5 = 8 */
 int format_is_dxt(uint32_t fmt);
+
+/* shared with the DirectDraw 7 / Direct3D 7 layer (ddraw7.c) */
+extern Device *g_device;
+void d3d8_default_state(Device *d);                /* default states; size, back buffer and depth must be set */
+uint32_t d3d8_new_surface(uint32_t fmt, uint32_t w, uint32_t h, int rt, int depth);
+void d3d8_present(Device *d);                      /* end of frame: Present's bookkeeping + the backend */
 
 #endif

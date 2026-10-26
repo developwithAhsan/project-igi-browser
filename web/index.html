@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cricket 07</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Project I.G.I.</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
+<meta name="theme-color" content="#0b2414">
 <style>
   :root {
     --bg: #070b08; --fg: #eef4ef; --muted: #9fb3a5; --faint: #6f8576;
@@ -13,21 +18,40 @@
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow-x: hidden;
     font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 12px; padding: 16px; }
-  .credit { color: var(--muted); font-size: 13px; text-align: center; }
-  .credit a { color: var(--accent-hi); text-decoration: underline; text-underline-offset: 2px; }
-  .credit a:hover { color: var(--fg); }
+  /* Site footer: a clean band below the game stage (not overlaid on it). Generous spacing, a hairline rule,
+     a quiet second line for the legal credit — the restrained, roomy feel of an Apple footer. */
+  #sitefoot { width: min(100%, calc((100vh - 150px) * 4 / 3)); margin: 20px auto 8px; padding: 22px 20px 10px;
+    border-top: 1px solid var(--line); text-align: center; }
+  @media (min-width: 1120px) { body:not(.kbd-off) #sitefoot { width: min(calc(100% - 440px), calc((100vh - 150px) * 4 / 3)); } }
+  #sitefoot .foot-main { display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+    gap: 10px 20px; font-size: 15px; color: var(--fg); }
+  #sitefoot .foot-by { font-weight: 600; letter-spacing: .01em; }
+  #sitefoot a { color: var(--accent-hi); text-decoration: none; display: inline-flex; align-items: center; gap: 7px;
+    transition: color .15s ease; }
+  #sitefoot a:hover { color: var(--fg); }
+  #sitefoot .foot-by a { color: var(--accent-hi); }
+  #sitefoot .foot-ico { width: 34px; height: 34px; justify-content: center; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--muted); }
+  #sitefoot .foot-ico:hover { color: var(--fg); background: var(--card-hi); border-color: rgba(255, 255, 255, .22); }
+  #sitefoot .foot-ico svg { width: 17px; height: 17px; display: block; }
+  #sitefoot .foot-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--faint); opacity: .7; }
+  #sitefoot .foot-visits { color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  #sitefoot .foot-legal { margin: 16px 0 0; color: var(--faint); font-size: 12.5px; line-height: 1.6; }
+  #sitefoot .foot-legal a { color: var(--faint); display: inline; text-decoration: underline; text-underline-offset: 2px; }
+  #sitefoot .foot-legal a:hover { color: var(--muted); }
+  body.coarse #sitefoot, body.touch #sitefoot { display: none; }
   /* The 4:3 stage is centred. On viewports wide enough to fit a side-panel reference without crowding
      the stage, 440px is reserved symmetrically (220 each side) so the panel sits in that gap and the
      stage stays centred rather than off-set. On narrow viewports the panel is hidden and the stage uses
      the full width. The .kbd-off body class (set when the player dismisses the panel) frees the space. */
-  #stage { position: relative; width: min(100%, calc((100vh - 72px) * 4 / 3)); aspect-ratio: 4 / 3; background: #000;
+  #stage { position: relative; width: min(100%, calc((100vh - 150px) * 4 / 3)); aspect-ratio: 4 / 3; background: #000;
     border-radius: 12px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, .55); }
   @media (min-width: 1120px) {
-    body:not(.kbd-off) #stage { width: min(calc(100% - 440px), calc((100vh - 72px) * 4 / 3)); }
+    body:not(.kbd-off) #stage { width: min(calc(100% - 440px), calc((100vh - 150px) * 4 / 3)); }
   }
   canvas { width: 100%; height: 100%; display: block; cursor: none; }
   .hidden { display: none !important; }
@@ -38,6 +62,20 @@
       radial-gradient(120% 80% at 50% -10%, rgba(255, 255, 255, .10), transparent 60%),
       repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0 9%, transparent 9% 18%),
       radial-gradient(140% 120% at 50% 110%, #123d22 0%, #0b2414 45%, #060d08 100%); }
+  /* The game poster fills the landing backdrop; if poster.jpg is missing the whole wrap removes itself
+     (onerror) and the gradient above shows instead. A scrim keeps the title and loading text readable. */
+  #poster-wrap { position: absolute; inset: 0; z-index: 0; }
+  /* The poster is a 640-wide portrait image, so it's never shown sharp (it would upscale and pixelate on any
+     wide screen). Instead it's a heavily blurred ambient backdrop — the colour and shape of the art without
+     its resolution — which stays clean at every size, like the frosted artwork backdrops in Apple Music/TV. */
+  #poster-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    object-position: center 18%; filter: blur(2px) brightness(.84) saturate(1.1); transform: scale(1.03); }
+  #poster-wrap .scrim { position: absolute; inset: 0; background:
+      radial-gradient(54% 46% at 50% 58%, rgba(2, 5, 3, .52), rgba(2, 5, 3, 0) 72%),
+      linear-gradient(rgba(4, 7, 5, .34), rgba(5, 9, 6, .12) 30%, rgba(5, 9, 6, .18) 62%, rgba(4, 7, 5, .5)); }
+  #panel .view, #madeby { position: relative; z-index: 1; }
+  .brand { text-shadow: 0 2px 18px rgba(0, 0, 0, .7), 0 1px 3px rgba(0, 0, 0, .85); }
+  #status { text-shadow: 0 1px 10px rgba(0, 0, 0, .85); }
   .view { width: min(100%, 560px); text-align: center; animation: rise .25s ease-out; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
   @media (prefers-reduced-motion: reduce) { .view { animation: none; } }
@@ -48,9 +86,10 @@
   p { margin: 8px 0; }
 
   /* home: the two big choices */
-  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; justify-content: center; }
+  .choices:has(> .choice.hidden) { grid-template-columns: min(100%, 360px); }
   @media (max-width: 520px) { .choices { grid-template-columns: 1fr; } }
-  .choice { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px 18px; text-align: left;
+  .choice { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 18px; text-align: center;
     border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--fg); font: inherit;
     cursor: pointer; transition: transform .12s ease, background .12s ease, border-color .12s ease; }
   .choice:hover { transform: translateY(-2px); background: var(--card-hi); border-color: rgba(255, 255, 255, .22); }
@@ -111,6 +150,7 @@
   progress::-webkit-progress-value { background: var(--accent); border-radius: 99px; }
   progress::-moz-progress-bar { background: var(--accent); }
   #status { font-variant-numeric: tabular-nums; color: var(--muted); max-width: 52ch; margin-inline: auto; }
+  #eta { margin: 8px 0 0; font-size: 13px; color: var(--faint); font-variant-numeric: tabular-nums; }
 
   /* fullscreen: the stage fills the screen and the game letterboxes itself inside the canvas */
   #stage:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
@@ -123,6 +163,16 @@
   #fs:hover { background: rgba(0, 0, 0, .75); }
   #fstip { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; padding: 6px 14px; border-radius: 99px;
     background: rgba(0, 0, 0, .65); color: #fff; font-size: 13px; pointer-events: none; transition: opacity .4s ease; }
+  #soundtip { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); z-index: 2; padding: 6px 14px; border-radius: 99px;
+    background: rgba(0, 0, 0, .65); color: #fff; font-size: 13px; pointer-events: none; }
+  /* Re-enter fullscreen on phones/tablets: the game starts fullscreen, but if the player leaves it (system
+     back / swipe) the desktop corner button is hidden on touch, so this pill reappears to get back in. */
+  #refull { position: absolute; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px)); transform: translateX(-50%);
+    z-index: 6; display: none; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 99px;
+    border: 1px solid rgba(255, 255, 255, .25); background: rgba(8, 14, 10, .72); color: #fff; font-weight: 600; font-size: 13.5px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+  #refull svg { width: 16px; height: 16px; }
+  body.touch.playing:not(.fs) #refull { display: inline-flex; }
   kbd { font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 1px 6px; border-radius: 5px;
     border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); }
   #netstatus { position: absolute; top: 10px; right: 10px; padding: 4px 10px; border-radius: 99px; background: rgba(0, 0, 0, .6);
@@ -160,12 +210,137 @@
     border-radius: 5px; border: 1px solid rgba(255, 255, 255, .22); background: rgba(255, 255, 255, .07);
     color: var(--fg); white-space: nowrap; }
   #kbd .note { color: var(--faint); font-size: 11.5px; margin: 4px 0 0; }
+  #kbd .kbd-rebind { font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 8px;
+    border-radius: 5px; border: 1px solid rgba(255, 255, 255, .22); background: rgba(255, 255, 255, .07);
+    color: var(--fg); white-space: nowrap; cursor: pointer; min-width: 44px; text-align: center; }
+  #kbd .kbd-rebind:hover { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .4); }
+  #kbd .kbd-rebind.capturing { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #kbd .kbd-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  #kbd .kbd-foot .small { color: var(--faint); font-size: 11px; line-height: 1.35; }
+  #kbd .kbd-foot .btn.ghost { padding: 5px 10px; font-size: 11px; white-space: nowrap; }
   #kbd-show { position: fixed; top: 50%; right: 16px; transform: translateY(-50%); z-index: 2;
     width: 38px; height: 38px; place-items: center; padding: 0;
     background: rgba(10, 18, 12, .78); color: var(--muted); border: 1px solid var(--line);
     border-radius: 10px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: none; }
   #kbd-show:hover { color: var(--fg); background: rgba(10, 18, 12, .92); }
   #kbd-show svg { width: 18px; height: 18px; }
+  /* Left-gutter affiliate card (mirrors #kbd on the right): a rotating Amazon.in gaming-gear pick.
+     Shown only on viewports wide enough to have the gutter, never in fullscreen or on phones/tablets. */
+  #promo { position: fixed; top: 50%; left: 14px; transform: translateY(-50%); z-index: 2;
+    width: 204px; max-height: calc(100vh - 24px); overflow: auto;
+    padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius);
+    background: rgba(10, 18, 12, .78); color: var(--fg); font-size: 13px; line-height: 1.45;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .5); display: none; }
+  @media (min-width: 1120px) { #stage:not(:fullscreen) ~ #promo { display: block; } }
+  #promo .promo-head { display: flex; justify-content: space-between; align-items: center;
+    margin: -4px 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  #promo .promo-head b { font-size: 13px; letter-spacing: .02em; }
+  #promo .promo-tag { font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; }
+  #promo .promo-card { display: block; text-decoration: none; color: var(--fg);
+    border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: rgba(255, 255, 255, .03);
+    transition: opacity .18s ease, background .15s, border-color .15s, transform .15s; }
+  #promo .promo-card:hover { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); transform: translateY(-1px); }
+  #promo .promo-ico { display: grid; place-items: center; width: 46px; height: 46px; font-size: 26px;
+    border-radius: 12px; background: rgba(255, 255, 255, .06); border: 1px solid var(--line); margin-bottom: 10px; }
+  #promo .promo-eyebrow { display: block; font: 600 10.5px/1.3 ui-sans-serif, system-ui, sans-serif;
+    text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  #promo .promo-title { display: block; font-weight: 700; font-size: 14.5px; margin: 3px 0 4px; }
+  #promo .promo-blurb { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
+  #promo .promo-cta { display: inline-block; margin-top: 11px; font-weight: 700; font-size: 12.5px;
+    color: #fff; background: var(--accent); padding: 7px 12px; border-radius: 8px; }
+  #promo .promo-card:hover .promo-cta { background: var(--accent-hi); }
+  #promo .promo-disc { color: var(--faint); font-size: 10px; line-height: 1.35; margin: 10px 0 0; text-align: center; }
+  /* phones and tablets (touch.js): the stage fills the screen, the game letterboxes itself inside the
+     canvas, and the controls sit over it (mostly in the side bars a wide phone leaves) */
+  .mob { display: none; }
+  body.touch .desk, body.coarse .desk { display: none; }
+  body.touch .mob, body.coarse .mob { display: inline; }
+  body.coarse main { padding: 0; }
+  body.coarse .credit, body.coarse #kbd, body.coarse #kbd-show, body.coarse #promo, body.touch #fs { display: none !important; }
+  body.coarse #stage, body.coarse #stage:fullscreen { position: fixed; inset: 0; width: auto; height: auto; aspect-ratio: auto;
+    border-radius: 0; box-shadow: none; }
+  #rotate { display: none; }
+  @media (orientation: portrait) {
+    body.touch #rotate { display: grid; place-items: center; position: absolute; inset: 0; z-index: 5; padding: 24px;
+      background: #000; color: #fff; font-size: 17px; text-align: center; }
+  }
+  #touch { position: absolute; inset: 0; z-index: 3; touch-action: none; user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none; }
+  #touch .t-look { position: absolute; inset: 0; }
+  #touch .t-stick { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: 18px;
+    width: clamp(110px, 32vmin, 160px); aspect-ratio: 1; border-radius: 50%;
+    background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .22); }
+  #touch .t-knob { position: absolute; inset: 30%; border-radius: 50%; background: rgba(255, 255, 255, .35);
+    border: 2px solid rgba(255, 255, 255, .5); pointer-events: none; }
+  #touch .t-btn { position: absolute; display: grid; place-items: center; align-content: center; padding: 0;
+    width: clamp(50px, 14vmin, 64px); aspect-ratio: 1; border-radius: 50%; touch-action: none;
+    border: 2px solid rgba(255, 255, 255, .3); background: rgba(0, 0, 0, .35); color: rgba(255, 255, 255, .9);
+    font: 700 clamp(9px, 2.6vmin, 11px)/1.1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .03em; }
+  #touch .t-btn small { font-size: .8em; font-weight: 600; opacity: .7; }
+  #touch .t-btn.on { background: rgba(52, 184, 102, .55); border-color: rgba(120, 230, 160, .8); }
+  #touch .b-fire { --s: clamp(76px, 22vmin, 100px); width: var(--s); right: max(22px, env(safe-area-inset-right)); bottom: 26px;
+    background: rgba(210, 58, 47, .4); font-size: clamp(12px, 3.4vmin, 15px); }
+  #touch .b-reload { right: calc(max(22px, env(safe-area-inset-right)) + clamp(86px, 25vmin, 112px)); bottom: 18px; }
+  #touch .b-weapon { right: calc(max(22px, env(safe-area-inset-right)) + clamp(70px, 20vmin, 92px)); bottom: calc(18px + clamp(64px, 18vmin, 82px)); }
+  #touch .b-jump { right: max(22px, env(safe-area-inset-right)); bottom: calc(34px + clamp(76px, 22vmin, 100px)); }
+  #touch .b-crouch { right: calc(max(22px, env(safe-area-inset-right)) + clamp(4px, 2vmin, 10px)); bottom: calc(40px + clamp(130px, 38vmin, 172px)); }
+  #touch .b-use { right: calc(max(22px, env(safe-area-inset-right)) + clamp(76px, 22vmin, 100px)); bottom: calc(46px + clamp(120px, 34vmin, 160px)); }
+  #touch .b-bino, #touch .b-zin, #touch .b-zout, #touch .b-map, #touch .b-menu {
+    top: max(10px, env(safe-area-inset-top)); width: clamp(46px, 12vmin, 56px); }
+  #touch .b-menu { left: max(12px, env(safe-area-inset-left)); }
+  #touch .b-map { right: max(12px, env(safe-area-inset-right)); }
+  #touch .b-bino { right: calc(max(12px, env(safe-area-inset-right)) + clamp(52px, 13.5vmin, 62px)); }
+  #touch .b-zin { right: calc(max(12px, env(safe-area-inset-right)) + 2 * clamp(52px, 13.5vmin, 62px)); }
+  #touch .b-zout { right: calc(max(12px, env(safe-area-inset-right)) + 3 * clamp(52px, 13.5vmin, 62px)); }
+
+  /* --- loading & boot flourish --- */
+  /* a faint green scanline drifts down the poster so the landing screen feels alive while files download */
+  #poster-wrap .scan { position: absolute; left: 0; right: 0; height: 36%; z-index: 1; pointer-events: none;
+    background: linear-gradient(rgba(69, 207, 121, 0), rgba(69, 207, 121, .06) 55%, rgba(69, 207, 121, 0));
+    animation: scan 7s linear infinite; }
+  @keyframes scan { from { transform: translateY(-40%); } to { transform: translateY(300%); } }
+  @media (prefers-reduced-motion: reduce) { #poster-wrap .scan { display: none; } }
+
+  /* rotating "intel" tips, shown on the download screen and the boot overlay so the wait isn't a blank bar */
+  .tips { margin: 22px auto 0; max-width: 48ch; min-height: 2.8em; display: flex; gap: 10px;
+    align-items: baseline; justify-content: center; text-align: left; transition: opacity .35s ease; }
+  .tips .tip-eyebrow { flex: none; font: 700 10px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .18em; color: var(--accent-hi); border: 1px solid rgba(69, 207, 121, .4);
+    border-radius: 4px; padding: 1px 6px; text-shadow: none; }
+  .tips .tip-text { color: var(--fg); font-size: 13.5px; line-height: 1.5; text-shadow: 0 1px 8px rgba(0, 0, 0, .85); }
+
+  /* boot overlay: covers the canvas from the Play click to the first rendered frame. The first start loads
+     a whole mission into memory — a blank black minute — so this keeps a radar, a phase line and tips up. */
+  #booting { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; padding: 24px;
+    text-align: center; color: var(--fg);
+    background:
+      radial-gradient(120% 90% at 50% -10%, rgba(52, 184, 102, .10), transparent 55%),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, .02) 0 9%, transparent 9% 18%),
+      radial-gradient(140% 120% at 50% 110%, #123d22 0%, #0b2414 45%, #060d08 100%); }
+  #booting .boot-inner { position: relative; width: min(100%, 460px); animation: rise .3s ease-out; }
+  #booting .boot-title { margin: 0 0 6px; font-size: 26px; font-weight: 800; letter-spacing: .02em;
+    text-transform: uppercase; text-shadow: 0 2px 18px rgba(0, 0, 0, .7); }
+  #booting .boot-phase { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #booting .radar { position: relative; width: 92px; height: 92px; margin: 0 auto 22px; border-radius: 50%;
+    border: 1px solid rgba(69, 207, 121, .35); background: radial-gradient(circle, rgba(52, 184, 102, .10), transparent 70%); }
+  #booting .radar::before, #booting .radar::after { content: ""; position: absolute; border-radius: 50%;
+    border: 1px solid rgba(69, 207, 121, .18); }
+  #booting .radar::before { inset: 0; }
+  #booting .radar::after { inset: 30%; }
+  #booting .radar .sweep { position: absolute; inset: -1px; border-radius: 50%;
+    background: conic-gradient(from 0deg, rgba(69, 207, 121, .55), rgba(69, 207, 121, 0) 42%);
+    animation: radar 2.4s linear infinite; }
+  #booting .radar .ping { position: absolute; top: 22%; left: 62%; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent-hi); box-shadow: 0 0 10px var(--accent-hi); animation: ping 2.4s ease-out infinite; }
+  @keyframes radar { to { transform: rotate(1turn); } }
+  @keyframes ping { 0%, 55% { opacity: 0; } 62% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(2.3); } }
+  #booting .tips { margin-top: 24px; }
+  @media (prefers-reduced-motion: reduce) {
+    #booting .radar .sweep, #booting .radar .ping, #booting .boot-inner { animation: none; }
+  }
 </style>
 
 </head>
@@ -178,42 +353,47 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path id="fs-icon" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
     </button>
+    <div id="soundtip" class="hidden">Tap the game or press a key to turn on sound</div>
+    <button id="refull" type="button" aria-label="Enter fullscreen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      Fullscreen</button>
+    <div id="rotate">Turn your device sideways to play</div>
     <div id="fstip" class="hidden">Press <kbd>Alt</kbd> + <kbd>Enter</kbd> for fullscreen</div>
     <div id="panel">
+      <div id="poster-wrap" aria-hidden="true"><img src="poster.jpg" alt="" onerror="this.closest('#poster-wrap').remove()"><span class="scan"></span><span class="scrim"></span></div>
 
       <!-- loading: browser checks, the first-visit download, errors -->
       <section id="view-loading" class="view">
-        <h1 class="brand">Cricket 07</h1>
+        <h1 class="brand">Project I.G.I.</h1>
         <p id="status">Checking your browser…</p>
         <progress id="progress" class="hidden" max="1" value="0"></progress>
+        <p id="eta" class="hidden"></p>
         <div>
+          <button id="download" class="btn hidden" style="margin-top:16px"></button>
           <label id="pick" class="btn hidden" style="margin-top:16px">Choose game folder
             <input id="folder" type="file" webkitdirectory multiple hidden>
           </label>
         </div>
-        <p id="help" class="hidden small">Pick your Cricket 07 folder: the one that holds <b>Data</b>, <b>Audio</b> and the game's executable. It is copied
-          into this browser's private storage once and never leaves your computer.</p>
+        <p id="help" class="hidden small">Pick your Project I.G.I. folder: the one that holds <b>igi.exe</b>, <b>MISSIONS</b> and <b>COMMON</b>. It is copied
+          into this browser's private storage once (about 600 MB) and never leaves your computer.</p>
+        <div id="tips" class="tips hidden" aria-live="polite"><span class="tip-eyebrow">INTEL</span><span class="tip-text"></span></div>
       </section>
 
       <!-- home: solo or online -->
       <section id="view-home" class="view hidden">
-        <h1 class="brand">Cricket 07</h1>
-        <p class="tagline">Pick how you want to play.</p>
+        <h1 class="brand">Project I.G.I.</h1>
+        <p class="tagline">I'm Going In.</p>
         <div class="choices">
           <button id="play" class="choice">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M14.5 3.5l6 6-9.5 9.5-3 .5-3.5-3.5.5-3z"/><path d="M4.5 19.5L3 21"/><circle cx="18.5" cy="18.5" r="2"/></svg>
-            <b>Play Solo</b>
-            <span>Offline, against the computer or with controllers on this device.</span>
+              <circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg>
+            <b>Play</b>
+            <span class="desk">Click the game to capture the mouse for aiming; Esc releases it.</span>
+            <span class="mob">Left stick to move, drag to aim, tap to click. Play sideways.</span>
           </button>
-          <button id="go-online" class="choice">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2.5 19c.7-3 2.9-5 5.5-5s4.8 2 5.5 5"/><path d="M13.5 14.6c.8-.4 1.6-.6 2.5-.6 2.6 0 4.8 2 5.5 5"/></svg>
-            <b>Play Multiplayer</b>
-            <span>Online 1v1 with a friend, wherever they are.</span>
-          </button>
+          <button id="go-online" class="choice hidden"></button>
         </div>
-        <p class="small" style="margin-top:22px">Use a controller, or the keyboard: arrows to move, S to select.<br>
+        <p class="small desk" style="margin-top:22px">The game's own controls apply (list on the right; change them in Configuration).<br>
           Fullscreen: <kbd>Alt</kbd> + <kbd>Enter</kbd> (<kbd>⌥</kbd> + <kbd>Enter</kbd> on Mac) or the button in the corner.</p>
         <p class="small"><a href="#" id="reset">Use a different game folder</a></p>
       </section>
@@ -294,29 +474,61 @@
       </section>
 
     </div>
+    <div id="booting" class="hidden" aria-live="polite">
+      <div class="boot-inner">
+        <div class="radar"><span class="sweep"></span><span class="ping"></span></div>
+        <h2 class="boot-title">Project I.G.I.</h2>
+        <p class="boot-phase">Starting the game…</p>
+        <div class="tips"><span class="tip-eyebrow">INTEL</span><span class="tip-text"></span></div>
+      </div>
+    </div>
   </div>
+  <footer id="sitefoot">
+    <div class="foot-main">
+      <span class="foot-by">Built by <a href="https://www.instagram.com/aiwithsagar/" target="_blank" rel="noopener">Sagar Joshi</a></span>
+      <a class="foot-ico" href="https://www.instagram.com/aiwithsagar/" target="_blank" rel="noopener" aria-label="Instagram @aiwithsagar" title="Instagram @aiwithsagar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/></svg>
+      </a>
+      <a class="foot-ico" href="https://x.com/sjazz007" target="_blank" rel="noopener" aria-label="X (Twitter) @sjazz007" title="X @sjazz007">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M18.9 2H22l-7.3 8.3L23 22h-6.8l-5.3-6.9L4.8 22H1.7l7.8-8.9L1 2h7l4.8 6.3L18.9 2Zm-1.2 18h1.9L7.4 4H5.4l12.3 16Z"/></svg>
+      </a>
+      <a href="mailto:sagarinfosec@proton.me" title="Email Sagar">sagarinfosec@proton.me</a>
+      <span class="foot-dot" aria-hidden="true"></span>
+      <span id="visits" class="foot-visits" aria-live="polite"></span>
+    </div>
+    <p class="foot-legal">Project I.G.I. &copy; Innerloop Studios / Eidos Interactive — not affiliated with this project</p>
+  </footer>
+  <aside id="promo" aria-label="Recommended gaming gear (advertisement)">
+    <div class="promo-head"><b>Gaming gear</b><span class="promo-tag">Ad</span></div>
+    <a id="promo-card" class="promo-card" href="https://www.amazon.in/?tag=sjazz007-21" target="_blank" rel="sponsored noopener noreferrer">
+      <span class="promo-ico" id="promo-ico" aria-hidden="true">🖱️</span>
+      <span class="promo-eyebrow">Popular on Amazon.in</span>
+      <span class="promo-title" id="promo-title">Gaming mouse</span>
+      <span class="promo-blurb" id="promo-blurb">Lightweight, high-DPI mice for precise aim.</span>
+      <span class="promo-cta">View on Amazon.in →</span>
+    </a>
+    <p class="promo-disc">As an Amazon Associate, we earn from qualifying purchases.</p>
+  </aside>
   <aside id="kbd" aria-label="Keyboard controls">
     <div class="kbd-head"><b>Keyboard controls</b>
       <button id="kbd-close" type="button" aria-label="Hide keyboard controls" title="Hide">×</button>
     </div>
-    <h3>Batting</h3>
-    <div class="row"><span class="label">Normal shot</span><div class="keys"><kbd>S</kbd></div></div>
-    <div class="row"><span class="label">Lofted shot (hold)</span><div class="keys"><kbd>Shift</kbd></div></div>
-    <div class="row"><span class="label">Advanced shot</span><div class="keys"><kbd>D</kbd></div></div>
-    <div class="row"><span class="label">Shot direction</span><div class="keys"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></div></div>
-    <div class="row"><span class="label">Take run</span><div class="keys"><kbd>D</kbd></div></div>
-    <div class="row"><span class="label">Cancel run</span><div class="keys"><kbd>A</kbd></div></div>
-    <h3>Bowling</h3>
-    <div class="row"><span class="label">Stock delivery</span><div class="keys"><kbd>S</kbd></div></div>
-    <div class="row"><span class="label">Special delivery</span><div class="keys"><kbd>A</kbd> <kbd>D</kbd> <kbd>Shift</kbd> <kbd>Alt</kbd></div></div>
-    <div class="row"><span class="label">Place ball</span><div class="keys"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></div></div>
-    <h3>Menu</h3>
-    <div class="row"><span class="label">Select</span><div class="keys"><kbd>S</kbd></div></div>
-    <div class="row"><span class="label">Back</span><div class="keys"><kbd>W</kbd></div></div>
-    <div class="row"><span class="label">Pause</span><div class="keys"><kbd>Esc</kbd></div></div>
+    <!-- Rebindable keys are rendered here by loader.js (click a key to change it). -->
+    <div id="kbd-binds"></div>
+    <h3>Mouse &amp; fixed</h3>
+    <div class="row"><span class="label">Aim</span><div class="keys">mouse</div></div>
+    <div class="row"><span class="label">Fire</span><div class="keys">left click</div></div>
+    <div class="row"><span class="label">Change weapon</span><div class="keys">scroll · right click · <kbd>O</kbd></div></div>
+    <div class="row"><span class="label">Weapon slots</span><div class="keys"><kbd>2</kbd> <kbd>4</kbd>–<kbd>9</kbd></div></div>
+    <div class="row"><span class="label">Alternate fire</span><div class="keys"><kbd>Backspace</kbd></div></div>
+    <div class="row"><span class="label">Map computer</span><div class="keys"><kbd>C</kbd></div></div>
+    <div class="row"><span class="label">Menu</span><div class="keys"><kbd>Esc</kbd></div></div>
     <div class="row"><span class="label">Fullscreen</span><div class="keys"><kbd>Alt</kbd>+<kbd>Enter</kbd></div></div>
+    <div class="kbd-foot">
+      <span class="small">Click a key above, then press the new one. <kbd>Esc</kbd> cancels.</span>
+      <button id="kbd-reset" type="button" class="btn ghost">Reset</button>
+    </div>
   </aside>
-  <p class="credit">Cricket 07 &copy; Electronic Arts, not affiliated with this project &middot; Browser port by <a href="https://twitter.com/dhaiwat" target="_blank" rel="noopener">Dhaiwat</a> &middot; <a href="https://github.com/Dhaiwat10/cricket07-browser" target="_blank" rel="noopener">Source</a></p>
   <button id="kbd-show" type="button" aria-label="Show keyboard controls" title="Show keyboard controls">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <rect x="2.5" y="6" width="19" height="12" rx="2"/>
@@ -324,7 +536,71 @@
     </svg>
   </button>
 </main>
+<script>
+  // Visitor counter (same-origin count.php; a third-party badge would be blocked by COEP). Counts once per
+  // browser session so reloads don't inflate it; still shows the total to returning visitors.
+  (function () {
+    try {
+      var first = !sessionStorage.getItem('igi_v');
+      sessionStorage.setItem('igi_v', '1');
+      fetch('count.php' + (first ? '?hit=1' : ''), { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          var el = document.getElementById('visits');
+          var n = d && d.count != null ? Number(d.count) : null;
+          var compact = n == null ? '' : n < 1000 ? String(n) : (n / 1000).toFixed(2).replace(/\.?0+$/, '') + 'k';
+          if (el && n != null) el.textContent = '\u{1F441} ' + compact + ' visitors';
+        }).catch(function () {});
+    } catch (e) {}
+  })();
+</script>
+<script>
+  // Left-gutter affiliate card: rotates through gaming/tech picks popular with Indian players, each a
+  // tagged Amazon.in search link (search links never 404 or go out of stock, and still carry the tag).
+  // Emoji icons (no Amazon image hotlinking) so nothing is blocked by the page's cross-origin isolation.
+  (function () {
+    var TAG = 'sjazz007-21';
+    var ITEMS = [
+      ['🖱️', 'Gaming mouse', 'Lightweight, high-DPI mice for precise aim.', 'gaming mouse'],
+      ['⌨️', 'Mechanical keyboard', 'Tactile mechanical keys built for gaming.', 'mechanical gaming keyboard'],
+      ['🎧', 'Gaming headset', 'Surround headsets with a clear team mic.', 'gaming headset'],
+      ['🖲️', 'Extended mouse pad', 'Big desk mats for low-sensitivity swipes.', 'extended gaming mouse pad'],
+      ['🎮', 'Game controller', 'Plug-and-play USB & wireless gamepads.', 'usb gaming controller'],
+      ['💨', 'Laptop cooling pad', 'Keep your laptop cool through long sessions.', 'laptop cooling pad'],
+      ['🪑', 'Gaming chair', 'Ergonomic chairs for marathon play.', 'gaming chair'],
+      ['💾', 'Portable SSD', 'Fast external SSDs for your game library.', 'portable ssd'],
+      ['🖥️', 'Gaming monitor', 'High-refresh monitors for smoother play.', '144hz gaming monitor'],
+      ['📶', 'Wi-Fi router', 'Low-lag routers for online gaming.', 'gaming wifi router'],
+      ['🎤', 'Streaming mic', 'USB condenser mics for voice & streams.', 'usb condenser microphone'],
+      ['🔋', 'Power bank', 'Fast-charging power banks for on the go.', 'fast charging power bank'],
+      ['🧠', 'RAM upgrade', 'Add memory to speed up your rig.', 'ddr4 ram 16gb'],
+      ['🎵', 'Wireless earbuds', 'Popular budget TWS earbuds.', 'wireless earbuds']
+    ];
+    var ico = document.getElementById('promo-ico'), title = document.getElementById('promo-title'),
+        blurb = document.getElementById('promo-blurb'), card = document.getElementById('promo-card'),
+        promo = document.getElementById('promo');
+    if (!card || !promo) return;
+    var link = function (q) { return 'https://www.amazon.in/s?k=' + encodeURIComponent(q) + '&tag=' + TAG; };
+    var i = Math.floor(Math.random() * ITEMS.length), timer = 0;
+    function show(n) {
+      card.style.opacity = '0';
+      setTimeout(function () {
+        var it = ITEMS[n];
+        ico.textContent = it[0]; title.textContent = it[1]; blurb.textContent = it[2];
+        card.href = link(it[3]); card.setAttribute('aria-label', it[1] + ' on Amazon.in');
+        card.style.opacity = '1';
+      }, 180);
+    }
+    function next() { i = (i + 1) % ITEMS.length; show(i); }
+    function start() { stop(); timer = setInterval(next, 7000); }
+    function stop() { if (timer) { clearInterval(timer); timer = 0; } }
+    show(i); start();
+    promo.addEventListener('mouseenter', stop);   // pause rotation while the visitor is reading it
+    promo.addEventListener('mouseleave', start);
+  })();
+</script>
 <script src="netplay.js"></script>
-<script src="loader.js"></script>
+<script src="touch.js?v=3"></script>
+<script src="loader.js?v=11"></script>
 </body>
 </html>

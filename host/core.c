@@ -22,7 +22,11 @@ char g_user_root[1024];
 #define HEAP_MAGIC 0x4EA911C8u
 #define NCLASS 256
 static pthread_mutex_t g_heap_lock = PTHREAD_MUTEX_INITIALIZER;
+#ifdef __EMSCRIPTEN__
+static uint32_t g_heap_top;   /* guest_heap_init: the layout is chosen at run time */
+#else
 static uint32_t g_heap_top = HEAP_LO;
+#endif
 static uint32_t g_free[NCLASS + 1];  /* singly linked through the first payload word */
 
 static uint32_t round16(uint32_t n) { return (n + 15) & ~15u; }
@@ -51,6 +55,9 @@ uint32_t heap_alloc(uint32_t size, int zero) {
         }
         a = g_heap_top + 16;
         g_heap_top += 16 + sz;
+#ifdef __EMSCRIPTEN__
+        guest_commit(g_heap_top);
+#endif
         W32(a - 16, sz);
     }
     W32(a - 12, HEAP_MAGIC);
@@ -91,7 +98,11 @@ uint32_t heap_realloc(uint32_t a, uint32_t size, int zero) {
 
 #define VALLOC_LO GUEST_VALLOC_LO
 #define VALLOC_HI GUEST_VALLOC_HI
+#ifdef __EMSCRIPTEN__
+static uint32_t g_valloc_top;   /* guest_heap_init */
+#else
 static uint32_t g_valloc_top = VALLOC_LO;
+#endif
 
 uint32_t guest_valloc(uint32_t size) {
     size = (size + 0xffff) & ~0xffffu;  /* Windows allocation granularity */
@@ -99,10 +110,16 @@ uint32_t guest_valloc(uint32_t size) {
     uint32_t a = g_valloc_top;
     if (a + size > VALLOC_HI) { pthread_mutex_unlock(&g_heap_lock); return 0; }
     g_valloc_top += size;
+#ifdef __EMSCRIPTEN__
+    guest_commit(g_valloc_top);
+#endif
     pthread_mutex_unlock(&g_heap_lock);
     return a;  /* never handed out before, so still zero */
 }
 
+#ifdef __EMSCRIPTEN__
+void guest_heap_init(void) { g_heap_top = HEAP_LO; g_valloc_top = VALLOC_LO; }   /* runtime_init, before any use */
+#endif
 void guest_mem_ranges(uint32_t r[4]) { r[0] = HEAP_LO; r[1] = g_heap_top; r[2] = VALLOC_LO; r[3] = g_valloc_top; }
 void guest_mem_stats(uint32_t *heap_used, uint32_t *valloc_used) {
     *heap_used = g_heap_top - HEAP_LO;

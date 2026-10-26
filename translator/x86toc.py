@@ -1344,7 +1344,24 @@ class Program:
                     if tlo <= t < thi and outside and t not in self.entries and t not in seen:
                         cands.add(t); seen.add(t); todo.append(t)
                 if m in ("ret", "retn", "jmp", "int3"):
+                    # Older MSVC pads functions with nop as well as int3: a function that follows a ret
+                    # and its padding inside this span is another entry Ghidra never reached.
+                    nx = ins.address + ins.size
+                    p = nx
+                    while p < span_end and self.img[p - self.base] in (0x90, 0xCC):
+                        p += 1
+                    if m in ("ret", "retn") and p > nx and p < span_end and p not in seen and p not in self.entries \
+                            and p not in jt and len(list(md.disasm(self.code(p, p + 32), p, count=3))) == 3:
+                        cands.add(p); seen.add(p); todo.append(p)
                     break
+            # The flow scan above stops at the first ret, but a function's later blocks (after an early
+            # return) can register callbacks too: sweep the rest of the span linearly, accepting only
+            # targets that look like function starts.
+            for ins in md.disasm(self.code(e, span_end), e):
+                if ins.mnemonic in ("push", "mov") and ins.operands and ins.operands[-1].type == CS_OP_IMM:
+                    v = ins.operands[-1].imm & 0xffffffff
+                    if v not in seen and plausible(v):
+                        cands.add(v); seen.add(v); todo.append(v)
         ordered = sorted(self.entries | cands)
         for t in cands:
             nxt = ordered[ordered.index(t) + 1] if t != ordered[-1] else thi

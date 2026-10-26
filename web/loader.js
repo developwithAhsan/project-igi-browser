@@ -1,8 +1,10 @@
-// Cricket 07 in the browser: copies the player's own game folder into OPFS (once; it never leaves the
+// Project I.G.I. in the browser: copies the player's own game folder into OPFS (once; it never leaves the
 // computer), starts the recompiled build (build/recomp.js), replays its frames with WebGPU and feeds it
 // input and audio.
 //
 // URL options: ?mute (no audio) ?fps (frame rate in the console) ?log (host log) ?autoplay
+//              ?devgame (download the hosted game folder without asking; testing)
+//              ?touch (on-screen controls even without a touch screen) ?touchsens=<x> (look speed, default 1)
 //              ?exe=<name> (the executable inside the game folder, if not the profile's default)
 //              ?pads=N (game controllers to expose, default 1, at most 4)
 //              ?queue=1 (frames queued ahead of the display, default 2: 1 cuts 16 ms of input latency online
@@ -23,8 +25,131 @@ const NETPLAY_BASE = new URL(params.get('netplay') || './', location.href).href.
 const status = (t) => { $('status').textContent = t; };
 // the launcher's screens (index.html): loading, home, online, lobby
 const show = (view) => { for (const v of document.querySelectorAll('#panel .view')) v.classList.toggle('hidden', v.id !== 'view-' + view); };
-const fail = (e) => { status('Error: ' + e.message); $('panel').classList.remove('hidden'); show('loading'); };
+const fail = (e) => { hideBoot(); status('Error: ' + e.message); $('panel').classList.remove('hidden'); show('loading'); };
 const mb = (n) => (n / 1e6).toFixed(0);
+
+// Rotating "intel" tips: a one-time 500 MB download and the first-mission load both take a minute, so the
+// wait gets real game tips and a little lore instead of a bare progress bar. Each tip fades to the next.
+const TIPS = [
+  'You are David Llewellyn Jones — ex-SAS, going in alone.',
+  'Open the map computer to see guard positions update in real time.',
+  'Silence is a weapon: the knife and silenced pistol keep you unheard.',
+  'Cut the alarm before a guard reaches the panel, or the whole base wakes up.',
+  'Crouch to steady your aim and shrink your profile.',
+  'Scout with the binoculars before you cross open ground.',
+  'A headshot drops a guard before he can radio for backup.',
+  'Lofted grenades clear a room you can’t safely walk into.',
+  'Anya runs mission control from the air — the clock is always ticking.',
+  'This is the real 2000 game: about 500 MB, downloaded to your device once.',
+  'Nothing leaves your computer — the whole game runs inside your browser.',
+  'The first start is the slow one: after this the game opens straight away.',
+];
+function startTips(box) {
+  if (!box) return () => {};
+  const textEl = box.querySelector('.tip-text');
+  box.classList.remove('hidden');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let i = Math.floor(Math.random() * TIPS.length);
+  const render = () => { textEl.textContent = TIPS[i % TIPS.length]; i++; };
+  render();
+  const next = () => {
+    if (reduce) { render(); return; }
+    box.style.opacity = '0';
+    setTimeout(() => { render(); box.style.opacity = '1'; }, 350);
+  };
+  const id = setInterval(next, 4800);
+  return () => { clearInterval(id); box.classList.add('hidden'); box.style.opacity = ''; };
+}
+
+// Boot overlay (index.html #booting): between the Play click and the first rendered frame the canvas is a
+// black void while the game loads a mission into memory. Cover it with a radar, a phase line that escalates
+// if it runs long, and tips, then remove it the moment the first frame is presented (run()).
+let stopBootTips = null;
+function showBoot() {
+  const b = $('booting');
+  if (!b) return;
+  const phase = b.querySelector('.boot-phase');
+  phase.textContent = 'Starting the game…';
+  b.classList.remove('hidden');
+  stopBootTips = startTips(b.querySelector('.tips'));
+  showBoot.t1 = setTimeout(() => { phase.textContent = 'Loading the game into memory…'; }, 12000);
+  showBoot.t2 = setTimeout(() => { phase.textContent = 'The first launch is the slow one — almost there…'; }, 45000);
+  showBoot.t3 = setTimeout(() => { phase.textContent = 'Still working — a slow phone can take a couple of minutes…'; }, 90000);
+  showBoot.t4 = setTimeout(hideBoot, 300000);   // safety: never trap the player behind the cover
+  b.onpointerdown = () => hideBoot();            // escape hatch: tap to dismiss
+}
+function hideBoot() {
+  const b = $('booting');
+  for (const k of ['t1', 't2', 't3', 't4']) clearTimeout(showBoot[k]);
+  if (stopBootTips) { stopBootTips(); stopBootTips = null; }
+  if (b) { b.classList.add('hidden'); b.onpointerdown = null; }
+}
+
+// Mid-game loading cover: after boot, the game blocks hard (no frames presented) while it loads a selected
+// mission or the next level — up to a couple of minutes on a phone, a black screen that looks frozen. The
+// frame loop (run()) watches for that stall and shows this, then hides it the moment frames stream again.
+let stopLoadTips = null;
+function showLoading() {
+  const b = $('booting');
+  if (!b) return;
+  const phase = b.querySelector('.boot-phase');
+  phase.textContent = 'Loading mission…';
+  b.classList.remove('hidden');
+  stopLoadTips = startTips(b.querySelector('.tips'));
+  showLoading.t1 = setTimeout(() => { phase.textContent = 'Loading mission… a phone can take a minute or two.'; }, 15000);
+  showLoading.t2 = setTimeout(() => { phase.textContent = 'Still loading — hang tight, almost there…'; }, 50000);
+}
+function hideLoading() {
+  const b = $('booting');
+  for (const k of ['t1', 't2']) clearTimeout(showLoading[k]);
+  if (stopLoadTips) { stopLoadTips(); stopLoadTips = null; }
+  if (b) b.classList.add('hidden');
+}
+
+// On-screen diagnostics for phones (no devtools): ?debug shows a log overlay capturing errors, warnings,
+// unhandled rejections and lost-GPU events, so a remote tester can screenshot exactly what failed (e.g. a
+// mission that won't load). Harmless when off.
+const DEBUG = params.has('debug');
+(function setupDebugLog() {
+  if (!DEBUG) return;
+  const box = document.createElement('div');
+  box.id = 'debuglog';
+  box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:45vh;overflow:auto;z-index:99999;' +
+    'background:rgba(0,0,0,.85);color:#9fe6b0;font:11px/1.4 ui-monospace,Menlo,monospace;padding:8px 10px;' +
+    'white-space:pre-wrap;word-break:break-word;border-top:2px solid #2ecc71';
+  const add = (tag, args) => {
+    const line = document.createElement('div');
+    line.textContent = tag + ' ' + args.map((a) => (a && a.stack) || (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    if (tag === 'ERR') line.style.color = '#ff8b8b';
+    box.appendChild(line); box.scrollTop = box.scrollHeight;
+    while (box.childElementCount > 300) box.firstChild.remove();
+  };
+  document.addEventListener('DOMContentLoaded', () => document.body.appendChild(box));
+  if (document.body) document.body.appendChild(box);
+  const oe = console.error, ow = console.warn, ol = console.log;
+  console.error = (...a) => { add('ERR', a); oe.apply(console, a); };
+  console.warn = (...a) => { add('WARN', a); ow.apply(console, a); };
+  console.log = (...a) => { add('log', a); ol.apply(console, a); };
+  window.addEventListener('error', (e) => add('ERR', [e.message, e.filename + ':' + e.lineno]));
+  window.addEventListener('unhandledrejection', (e) => add('ERR', ['unhandled rejection:', e.reason]));
+  add('log', ['debug log on · ' + navigator.userAgent]);
+})();
+
+// Surface WebGPU failures (console.error, so the ?debug overlay shows them): a mission that exceeds a mobile
+// GPU's buffer/texture limits, or a lost device (out of memory), otherwise fails silently to a black screen.
+if (navigator.gpu && GPUAdapter.prototype.requestDevice) {
+  const orig = GPUAdapter.prototype.requestDevice;
+  GPUAdapter.prototype.requestDevice = async function (desc) {
+    try {
+      const dev = await orig.call(this, desc);
+      try {
+        dev.addEventListener('uncapturederror', (e) => console.error('WebGPU uncaptured error:', e.error?.message || e.error));
+        dev.lost.then((info) => console.error('WebGPU device lost:', info.reason, info.message));
+      } catch {}
+      return dev;
+    } catch (e) { console.error('WebGPU requestDevice failed:', e.message); throw e; }
+  };
+}
 
 // ------------------------------------------------------------------ game files in OPFS
 
@@ -53,11 +178,15 @@ async function fileHandle(dir, relPath, create) {
   return dir.getFileHandle(parts[parts.length - 1], { create });
 }
 
+// installer leftovers the game never reads: not worth copying into the browser
+const SKIP = /^(directx[^/]*\/|.*\.(mp4|ds_store)$)|(^|\/)\.DS_Store$/i;
+
 async function importFromPicker(fileList) {
   // the whole folder, minus its own name: <picked>/a/b.dat -> a/b.dat
   const list = [...fileList].map((f) => ({ f, dest: f.webkitRelativePath.split('/').slice(1).join('/') }))
-    .filter((e) => e.dest);
-  if (!list.some((e) => e.dest.toLowerCase().endsWith('.exe'))) throw new Error('No .exe in that folder.');
+    .filter((e) => e.dest && !SKIP.test(e.dest));
+  if (!list.some((e) => e.dest.toLowerCase() === 'igi.exe'))
+    throw new Error('No igi.exe in that folder: pick the Project I.G.I. folder itself.');
   const root = await navigator.storage.getDirectory();
   try { await root.removeEntry(OPFS_DIR, { recursive: true }); } catch {}
   await navigator.storage.persist?.();
@@ -77,6 +206,112 @@ async function importFromPicker(fileList) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sig));
   await writeMarker([...new Uint8Array(digest)].slice(0, 6).map((b) => b.toString(16).padStart(2, '0')).join(''));
   $('progress').classList.add('hidden');
+}
+
+// A hosted copy of the game folder: web/serve.py --game DIR serves it at game/, with game/manifest.json
+// listing [{ path, size }]. Each file streams straight into OPFS (a phone couldn't hold 500 MB in memory),
+// and files already there at the right size are kept, so an interrupted download resumes where it stopped.
+async function hostedManifest() {
+  try {
+    const r = await fetch('game/manifest.json');
+    if (!r.ok) return null;
+    const list = (await r.json()).filter((e) => !SKIP.test(e.path));
+    return list.some((e) => e.path.toLowerCase() === 'igi.exe') ? list : null;
+  } catch { return null; }
+}
+
+// The game folder is served through a CDN (Cloudflare) that caches it on an edge near the player, so one
+// host is already fast: the files are pulled by a pool of workers over the browser's single multiplexed
+// HTTP/2 connection. Each streams straight into OPFS and files already at the right size are skipped, so an
+// interrupted download resumes where it stopped.
+const DL_CONCURRENCY = 10;
+async function importFromServer(list) {
+  const stopTips = startTips($('tips'));
+  try {
+    await importFromServerInner(list);
+  } finally {
+    stopTips();
+  }
+}
+async function importFromServerInner(list) {
+  await navigator.storage.persist?.();
+  const dir = await gameDir(true);
+  const total = list.reduce((s, e) => s + e.size, 0);
+  let done = 0, shownAt = 0;
+  const startT = performance.now();
+  let baseDone = null, baseT = 0;   // a steady-state anchor (set after ~1.5s) so the ETA isn't noisy at the start
+  $('progress').classList.remove('hidden');
+  const etaText = (secs) => {
+    secs = Math.round(secs);
+    if (secs >= 110) return `about ${Math.round(secs / 60)} minutes left`;
+    if (secs >= 50) return 'about a minute left';
+    if (secs >= 18) return `about ${Math.round(secs / 10) * 10} seconds left`;
+    return 'a few seconds left';
+  };
+  const shown = (force) => {
+    const now = performance.now();
+    if (!force && now - shownAt < 120) return;   // several workers report at once; don't thrash the DOM
+    shownAt = now;
+    status(`Loading necessary files to start the game… ${Math.floor((done / total) * 100)}%`);
+    $('progress').value = done / total;
+    if (baseDone === null && now - startT > 1500) { baseDone = done; baseT = now; }
+    if (baseDone !== null && done < total) {
+      const rate = (done - baseDone) / Math.max(0.5, (now - baseT) / 1000);   // bytes/s, steady-state
+      // only a time estimate — not the download size (a big MB figure just worries people)
+      if (rate > 60000) { $('eta').textContent = etaText((total - done) / rate); $('eta').classList.remove('hidden'); }
+    }
+  };
+  // done is counted per completed file (not per chunk): several workers run at once, so a per-chunk counter
+  // couldn't be reset cleanly when a file is retried. 1955 files make the per-file progress fine-grained.
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+  // big files first, so the pool packs well and the slowest file isn't left for last
+  const queue = list.slice().sort((a, b) => b.size - a.size);
+
+  const fetchInto = async (e, fh) => {
+    // no-store: don't also keep a copy in the browser's HTTP cache (OPFS is the permanent store); the CDN
+    // edge cache still serves these, so repeat loads stay fast.
+    const r = await fetch('game/' + e.path.split('/').map(encodeURIComponent).join('/'), { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const w = await fh.createWritable();
+    const reader = r.body.getReader();
+    let wrote = 0;
+    for (;;) {
+      const { done: end, value } = await reader.read();
+      if (end) break;
+      await w.write(value);
+      wrote += value.length;
+    }
+    await w.close();
+    if (wrote !== e.size) throw new Error(`short read ${wrote}/${e.size}`);
+  };
+
+  const worker = async () => {
+    for (;;) {
+      const e = queue.shift();
+      if (!e) return;
+      const fh = await fileHandle(dir, e.path, true);
+      if ((await fh.getFile()).size === e.size) { done += e.size; shown(); continue; }
+      // Fetch with retries: a dropped or truncated connection (ERR_CONTENT_LENGTH_MISMATCH, a short body) must
+      // not leave a wrong-sized file that later breaks a mission — re-fetch until the written size is exact.
+      let ok = false, lastErr;
+      for (let attempt = 0; attempt < 6 && !ok; attempt++) {
+        try { await fetchInto(e, fh); ok = true; }
+        catch (err) { lastErr = err; if (attempt < 5) await sleep(400 * (attempt + 1)); }
+      }
+      if (!ok) throw new Error(`Download failed at ${e.path} (${lastErr?.message}). Reload the page to resume where it stopped.`);
+      done += e.size; shown();
+    }
+  };
+  // a pool of workers over the one connection; if any throws it surfaces (and the others settle) so a reload can resume
+  const workers = Array.from({ length: Math.min(DL_CONCURRENCY, list.length) }, () => worker());
+  await Promise.all(workers);
+  shown(true);
+  const sig = list.map((e) => `${e.path}:${e.size}`).sort().join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sig));
+  await writeMarker([...new Uint8Array(digest)].slice(0, 6).map((b) => b.toString(16).padStart(2, '0')).join(''));
+  $('progress').classList.add('hidden');
+  $('eta').classList.add('hidden');
 }
 
 // ------------------------------------------------------------------ input
@@ -110,6 +345,97 @@ const NET_KEYS = {   // KeyboardEvent.code -> standard-gamepad bit (20: Esc key)
 let netKeyBits = 0;
 let netKeyPressed = 0;   // keys pressed since the last poll, so a tap shorter than a frame still counts
 
+// ---- Single-player key remapping ----------------------------------------------------------------
+// The game's own control bindings (its config.qvm) stay at their defaults; here we translate the
+// player's chosen physical keys onto the game's default key for each action, entirely in the browser
+// and saved per browser (localStorage), so keys can be rebound without touching the game. Netplay is
+// unaffected: online, the keyboard only drives the pad (above), never raw keys.
+// id, label, default physical KeyboardEvent.code, the game's default key for that action (its code), group
+const CONTROLS = [
+  ['forward', 'Move forward',   'KeyW',        'ArrowUp',      'Movement'],
+  ['back',    'Move backward',  'KeyS',        'ArrowDown',    'Movement'],
+  ['left',    'Strafe left',    'KeyA',        'ArrowLeft',    'Movement'],
+  ['right',   'Strafe right',   'KeyD',        'ArrowRight',   'Movement'],
+  ['walkrun', 'Walk / run',     'ShiftLeft',   'KeyW',         'Movement'],
+  ['crouch',  'Crouch',         'ControlLeft', 'ControlRight', 'Movement'],
+  ['jump',    'Jump',           'Space',       'Numpad0',      'Movement'],
+  ['peek',    'Peek',           'KeyQ',        'Numpad1',      'Movement'],
+  ['peek2',   'Peek (alt)',     'KeyE',        'Numpad1',      'Movement'],
+  ['reload',  'Reload',         'KeyR',        'Enter',        'Weapons & action'],
+  ['zoomin',  'Zoom in',        'Digit1',      'PageUp',       'Weapons & action'],
+  ['zoomout', 'Zoom out',       'Digit3',      'PageDown',     'Weapons & action'],
+  ['use',     'Use / activate', 'Tab',         'ShiftRight',   'Weapons & action'],
+];
+const CONTROL_STORE = 'igi-controls';
+// how a KeyboardEvent.code reads on screen
+function keyLabel(code) {
+  if (!code) return '—';
+  const m = {
+    ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', ControlLeft: 'L-Ctrl', ControlRight: 'R-Ctrl',
+    ShiftLeft: 'L-Shift', ShiftRight: 'R-Shift', AltLeft: 'L-Alt', AltRight: 'R-Alt', Space: 'Space',
+    Enter: 'Enter', NumpadEnter: 'Num ⏎', Tab: 'Tab', Escape: 'Esc', Backspace: '⌫', CapsLock: 'Caps',
+    PageUp: 'PgUp', PageDown: 'PgDn', Home: 'Home', End: 'End', Insert: 'Ins', Delete: 'Del',
+    Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\',
+    Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',
+  };
+  if (m[code]) return m[code];
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code.startsWith('Numpad')) return 'Num ' + code.slice(6);
+  return code;
+}
+let userKeys = {};   // id -> physical KeyboardEvent.code
+let keyRemap = {};   // physical code -> HID usage to send to the game
+function rebuildRemap() {
+  keyRemap = {};
+  for (const [id, , , target] of CONTROLS) {
+    const phys = userKeys[id], u = HID[target];
+    if (phys && u !== undefined) keyRemap[phys] = u;
+  }
+}
+function loadControls() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(CONTROL_STORE) || '{}') || {}; } catch { saved = {}; }
+  userKeys = {};
+  for (const [id, , def] of CONTROLS) userKeys[id] = typeof saved[id] === 'string' ? saved[id] : def;
+  rebuildRemap();
+}
+function saveControls() { try { localStorage.setItem(CONTROL_STORE, JSON.stringify(userKeys)); } catch { /* storage blocked */ } }
+loadControls();
+
+// The keyboard panel (index.html #kbd) doubles as the rebind UI: click a key, then press the new one.
+function setupControls() {
+  const host = $('kbd-binds');
+  if (!host) return;
+  let capturing = null;   // id being rebound
+  const groups = [];
+  for (const c of CONTROLS) {
+    let g = groups.find((x) => x.name === c[4]);
+    if (!g) groups.push(g = { name: c[4], items: [] });
+    g.items.push(c);
+  }
+  const render = () => {
+    host.innerHTML = groups.map((g) =>
+      `<h3>${g.name}</h3>` + g.items.map(([id, label]) =>
+        `<div class="row"><span class="label">${label}</span>` +
+        `<button class="kbd-rebind${capturing === id ? ' capturing' : ''}" data-id="${id}">` +
+        `${capturing === id ? 'press…' : keyLabel(userKeys[id])}</button></div>`).join('')).join('');
+    host.querySelectorAll('.kbd-rebind').forEach((b) => {
+      b.onclick = () => { capturing = capturing === b.dataset.id ? null : b.dataset.id; render(); };
+    });
+  };
+  // While rebinding, grab the next key in the capture phase so it reaches neither the page nor the game.
+  window.addEventListener('keydown', (e) => {
+    if (!capturing) return;
+    e.preventDefault(); e.stopPropagation();
+    if (e.code !== 'Escape' && HID[e.code] !== undefined) { userKeys[capturing] = e.code; saveControls(); rebuildRemap(); }
+    capturing = null; render();
+  }, true);
+  const reset = $('kbd-reset');
+  if (reset) reset.onclick = () => { for (const [id, , def] of CONTROLS) userKeys[id] = def; saveControls(); rebuildRemap(); capturing = null; render(); };
+  render();
+}
+
 function hookInput(M, net) {
   const canvas = $('canvas');
   if (net) {
@@ -127,7 +453,7 @@ function hookInput(M, net) {
     return;
   }
   const key = (down) => (e) => {
-    const u = HID[e.code];
+    const u = keyRemap[e.code] !== undefined ? keyRemap[e.code] : HID[e.code];
     if (u === undefined || e.repeat) return;
     if (!(e.metaKey && !down)) e.preventDefault();
     M._input_key_hid(u, down ? 1 : 0);
@@ -144,8 +470,21 @@ function hookInput(M, net) {
     M._input_mouse_button([0, 2, 1][e.button] ?? 0, 1);
   });
   window.addEventListener('mouseup', (e) => M._input_mouse_button([0, 2, 1][e.button] ?? 0, 0));
+  // Pass raw relative motion; the engine (dinput.c) inverts look-Y only during a mission, so the 2D menus
+  // keep their normal cursor direction.
   canvas.addEventListener('mousemove', (e) => M._input_mouse_move(e.movementX, e.movementY));
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  // Mouse wheel cycles weapons: up = next (the game's right-click), down = previous (its O key). A short
+  // lock keeps a fast flick from stacking presses; each is held ~100 ms so a game frame samples it.
+  let wheelLock = 0;
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const now = performance.now();
+    if (now < wheelLock) return;
+    wheelLock = now + 140;
+    if (e.deltaY < 0) { M._input_mouse_button(1, 1); setTimeout(() => M._input_mouse_button(1, 0), 100); }
+    else { M._input_key_hid(18, 1); setTimeout(() => M._input_key_hid(18, 0), 100); }
+  }, { passive: false });
 }
 
 // Gamepads (Gamepad API, polled every animation frame). Browsers only expose a pad after a button press
@@ -223,25 +562,84 @@ function pollGamepads(M) {
 
 // ------------------------------------------------------------------ audio
 
-async function startAudio(M) {
-  if (params.has('mute')) return;
-  const ctx = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
+// The context is made by run() while the Play click still counts as a user gesture, so it usually starts
+// right away. Otherwise (?autoplay, a browser that wants a gesture on the game itself) it waits for the next
+// click or key on the page, and a hint says so.
+function newAudioContext() {
+  if (params.has('mute') || !window.AudioContext) return null;
+  try { return new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' }); } catch { return null; }
+}
+
+async function startAudio(M, ctx) {
+  if (!ctx) return;
   await ctx.audioWorklet.addModule('audio-worklet.js');
   const node = new AudioWorkletNode(ctx, 'rc-ring', { outputChannelCount: [2] });
   node.port.postMessage({ memory: M.wasmMemory, ring: M._rc_audio_ring() });
   node.connect(ctx.destination);
-  const resume = () => ctx.resume();
-  window.addEventListener('pointerdown', resume);
-  window.addEventListener('keydown', resume);
+  const tip = $('soundtip');
+  const sync = () => tip.classList.toggle('hidden', ctx.state === 'running' || ctx.state === 'closed');
+  const resume = () => { if (ctx.state !== 'running') ctx.resume().then(sync, sync); };
+  // capture phase, so no other handler can keep the gesture from reaching here
+  for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend'])
+    window.addEventListener(ev, resume, { capture: true });
+  ctx.onstatechange = () => { sync(); if (ctx.state === 'interrupted') resume(); };   // Safari: interrupted
+  resume();
+  sync();
 }
 
 // ------------------------------------------------------------------ run
+
+const isWebKit = () => /AppleWebKit\//.test(navigator.userAgent) && !/Chrome\/|Chromium\/|Edg\//.test(navigator.userAgent);
+function compactMemory() {
+  const want = params.get('mem');
+  return want === 'compact' || (want !== 'full' && isWebKit());
+}
+
+// The browser dropped the WebGPU device (its GPU process died, or the page was pushed out of memory): the
+// game can't draw any more (render_wgpu.c calls this). Say so instead of leaving a frozen picture.
+window.rcDeviceLost = (msg) => {
+  if ($('gpulost')) return;
+  const d = document.createElement('div');
+  d.id = 'gpulost';
+  d.style.cssText = 'position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(0,0,0,.92);color:#fff;' +
+    'font:16px/1.5 ui-sans-serif,system-ui,sans-serif;text-align:center;padding:24px';
+  d.innerHTML = '<div><p style="font-size:20px;margin:0 0 8px">The graphics device was lost</p>' +
+    '<p style="opacity:.8;margin:0 0 18px">The browser stopped the game\'s renderer' + (msg ? ' (' + msg.replace(/[<>&]/g, '') + ')' : '') +
+    '. Your progress since the last save is lost.</p>' +
+    '<button id="gpulost-reload" style="font:inherit;padding:10px 22px;border-radius:8px;border:0;background:#45cf79;color:#000;font-weight:700">Reload the game</button></div>';
+  document.body.appendChild(d);
+  $('gpulost-reload').onclick = () => location.reload();
+};
 
 function sizeCanvas() {
   const canvas = $('canvas');
   const r = canvas.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.max(640, Math.round(r.width * dpr));
   canvas.height = Math.max(480, Math.round(r.height * dpr));
+}
+
+// On a phone the stage is fixed to the viewport (index.html: body.coarse #stage). If the page ends up zoomed
+// or scrolled (iOS does that around rotation and fullscreen, Android when the browser's zoom setting is on),
+// a fixed box is laid out to the layout viewport and overflows the screen: the picture is cropped and the
+// touch controls land off-screen. Size and place the stage on the VISUAL viewport instead whenever the two
+// differ; with no zoom and no offset this sets exactly the box the stylesheet gives it.
+function followVisualViewport(stage) {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  let applied = false;
+  const apply = () => {
+    const zoomed = Math.abs(vv.scale - 1) > 0.01 || vv.offsetLeft > 0.5 || vv.offsetTop > 0.5 ||
+      Math.abs(vv.width - innerWidth) > 1 || Math.abs(vv.height - innerHeight) > 1;
+    if (!zoomed && !applied) return;
+    applied = zoomed;
+    if (!zoomed) { stage.style.cssText = ''; return; }
+    stage.style.cssText = `position:fixed;inset:auto;left:${vv.offsetLeft}px;top:${vv.offsetTop}px;width:${vv.width}px;` +
+      `height:${vv.height}px;aspect-ratio:auto;border-radius:0;box-shadow:none`;
+  };
+  vv.addEventListener('resize', apply);
+  vv.addEventListener('scroll', apply);
+  window.addEventListener('orientationchange', () => setTimeout(apply, 300));
+  apply();
 }
 
 // A netplay session: every peer starts from the same empty saves folder, kept apart from this browser's
@@ -277,12 +675,20 @@ function showNetStatus(M, session) {
 }
 
 async function run(session) {
+  const audio = newAudioContext();   // first, while the click that called run() is still a user gesture
+  const touch = !session && RcTouch.wanted();
+  if (touch) RcTouch.goFullscreen($('stage'));   // also needs the gesture
   $('panel').classList.add('hidden');
-  fullscreenTip();
+  document.body.classList.add('playing');   // enables the touch re-fullscreen pill (index.html)
+  showBoot();   // cover the black canvas until the first frame renders (see frame loop below)
+  if (touch) {
+    // on a phone the game starts fullscreen; if the player later leaves it, #refull gets them back in
+    $('refull').onclick = () => RcTouch.goFullscreen($('stage'));
+  } else fullscreenTip();
   if (session) await clearNetSaves(session);
   sizeCanvas();
   const script = document.createElement('script');
-  script.src = 'build/recomp.js';
+  script.src = 'build/recomp.js?v=6';
   await new Promise((ok, fail) => { script.onload = ok; script.onerror = fail; document.head.appendChild(script); });
   const M = await createRecomp({
     arguments: ['/opfs/' + OPFS_DIR],
@@ -293,28 +699,54 @@ async function run(session) {
       if (params.get('exe')) m.ENV.RC_EXE = params.get('exe');
       if (params.has('log')) m.ENV.RC_LOG = '1';
       if (params.has('pads')) m.ENV.RC_PADS = params.get('pads');
+      if (params.has('input')) m.ENV.RC_INPUT = params.get('input');   // testing: scripted input (host/input.c)
       if (params.has('queue')) m.ENV.RC_QUEUE = params.get('queue');
+      if (params.has('gpuskip')) m.ENV.RC_GPU_SKIP = '1';   // diagnostics: the executor issues no draws
       if (session) Object.assign(m.ENV, RcNetplay.gameEnv(session), { RC_USERDATA: '/opfs/' + netSaves(session) });
       m.ENV.RC_LOG_FPS = params.has('fps') ? '1' : '';
       if (!params.has('fps')) delete m.ENV.RC_LOG_FPS;
+      // WebKit (Safari, and every browser on an iPhone or iPad) keeps a wasm memory resident in full from the
+      // moment it is allocated and kills the page past ~2 GB, so there the guest memory is packed and grows
+      // only as the game allocates (runtime.c, RC_MEM_COMPACT). ?mem=compact / ?mem=full force it either way.
+      if (compactMemory()) m.ENV.RC_MEM_COMPACT = '1';
+      // and there the frame's vertex/uniform uploads go up in one writeBuffer per batch instead of two per
+      // draw (render_wgpu.c): WebKit's WebGPU holds a page-sized IPC copy per call for a while, which added
+      // 1-2 GB to the page. ?gpu=coalesce / ?gpu=direct force it either way.
+      const gpu = params.get('gpu');
+      if (gpu === 'coalesce' || (gpu !== 'direct' && isWebKit())) m.ENV.RC_GPU_COALESCE = '1';
     }],
   });
   const canvas = $('canvas');
   M._rc_gpu_init(canvas.width, canvas.height);
   new ResizeObserver(() => { sizeCanvas(); M._rc_set_canvas_size(canvas.width, canvas.height); }).observe(canvas);
   hookInput(M, !!session);
+  if (touch) { RcTouch.attach(M, $('stage'), canvas); followVisualViewport($('stage')); }
   if (session) { session.client.attach(M); showNetStatus(M, session); }
-  startAudio(M).catch((e) => console.warn('audio unavailable:', e));
+  startAudio(M, audio).catch((e) => console.warn('audio unavailable:', e));
   const poll = session ? pollLocalPad : pollGamepads;
   // Online, present at most 60 times a second: every Present is a lockstep frame, and the input delay and
   // the time a frame has to simulate are counted in those (netplay.js: autoDelay), so following a 120 Hz
   // display would halve both. Solo play follows the display. A frame is due every 1/60 s, with a little
   // tolerance so a 60 Hz display's own jitter doesn't skip one.
-  let due = 0;
+  let due = 0, booted = false, shownFrames = 0, lastPresent = 0, loading = false;
   const frame = (t) => {
     poll(M);
     if (!session || t >= due - 4) {
-      if (M._rc_gpu_pump(1)) { due = Math.max(due + 1000 / 60, t - 4); }
+      const n = M._rc_gpu_pump(1);
+      if (n) {
+        due = Math.max(due + 1000 / 60, t - 4);
+        lastPresent = t;
+        // Drop the boot cover only once the game is actually STREAMING frames (its menu/mission is up), not
+        // on the first frame: while the game loads a cold install it submits nothing for up to ~2 minutes,
+        // then a stray clear-frame, then the real render loop. Counting to a couple dozen frames waits for
+        // that render loop so the cover never lifts onto a still-black screen.
+        if (!booted) { shownFrames += n; if (shownFrames >= 24) { booted = true; hideBoot(); } }
+        else if (loading) { loading = false; hideLoading(); }   // frames resumed: level finished loading
+      } else if (booted && !loading && !session && lastPresent && t - lastPresent > 2500) {
+        // Booted and running, but no frame for 2.5 s: the game is blocked loading a mission/level. Cover the
+        // frozen black screen so it doesn't look crashed (solo only — online must never stall the loop).
+        loading = true; showLoading();
+      }
     } else M._rc_gpu_pump(0);   // mid-frame readbacks only
     requestAnimationFrame(frame);
   };
@@ -329,8 +761,15 @@ async function run(session) {
 }
 
 async function boot() {
-  if (!crossOriginIsolated) { status('This page needs cross-origin isolation (COOP/COEP headers; see web/serve.py).'); return; }
-  if (!navigator.gpu) { status('This browser has no WebGPU. Use a current Chrome, Edge or Safari.'); return; }
+  // Friendly, device-specific message when the browser can't run the game (WebGPU + cross-origin isolation
+  // arrived on iPhone/iPad in iOS 26). Avoids developer jargon the tester would read as an error.
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const needHint = isIOS
+    ? 'On iPhone or iPad this needs iOS 26 or later, opened in Safari. Please update iOS and try again.'
+    : 'Please use an up-to-date Chrome or Edge (Android or desktop), or Safari 26+ on Apple devices.';
+  if (!crossOriginIsolated) { status('This browser can’t run the game yet — it’s missing a feature the game needs (cross-origin isolation). ' + needHint); return; }
+  if (!navigator.gpu) { status('This browser doesn’t support WebGPU, which the game needs for graphics. ' + needHint); return; }
   // navigator.gpu can exist with no usable adapter (GPU or driver blocklisted, hardware acceleration off,
   // Remote Desktop / VM): say so instead of starting a game that can only show a black screen
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null) ||
@@ -372,9 +811,32 @@ async function boot() {
     $('help').classList.remove('hidden');
   };
 
-  $('reset').onclick = (e) => { e.preventDefault(); show('loading'); showPicker('Choose your Cricket 07 folder.'); };
+  // A hosted game folder (game/manifest.json) is downloaded; without one the player picks their own copy.
+  // Phones and tablets can't pick folders, so there it's the only way in.
+  const hosted = await hostedManifest();
+  if (hosted) $('reset').textContent = 'Reload the game again';
+  const offerDownload = (msg) => {
+    status(msg);
+    $('download').textContent = 'Download the game (one time)';
+    $('download').classList.remove('hidden');
+  };
+  $('download').onclick = async () => {
+    $('download').classList.add('hidden');
+    $('pick').classList.add('hidden');
+    try { await importFromServer(hosted); ready(); }
+    catch (err) { offerDownload(err.message); }
+  };
+  $('reset').onclick = (e) => {
+    e.preventDefault();
+    show('loading');
+    if (hosted) offerDownload('Reload the game again.'); else showPicker('Choose your Project I.G.I. folder.');
+  };
   if (!(await readMarker())) {
-    showPicker('Choose your Cricket 07 folder to start.');
+    // Hosted page (always, on phone or desktop): start the one-time download straight away, no click to
+    // waste. On failure the click handler re-shows the button to retry. Without a hosted folder (desktop
+    // dev), the player picks their own copy.
+    if (hosted) { $('download').click(); return; }
+    showPicker('Choose your Project I.G.I. folder to start.');
     return;
   }
   ready();
@@ -388,6 +850,12 @@ async function boot() {
 function setupFullscreen() {
   const stage = $('stage');
   const active = () => document.fullscreenElement || document.webkitFullscreenElement;
+  // body.fs drives the touch re-fullscreen pill (index.html): shown only when playing and NOT fullscreen.
+  // Registered unconditionally (even where the desktop button is unavailable) so the pill is always right.
+  const syncFsClass = () => document.body.classList.toggle('fs', !!active());
+  document.addEventListener('fullscreenchange', syncFsClass);
+  document.addEventListener('webkitfullscreenchange', syncFsClass);
+  syncFsClass();
   const toggle = () => {
     if (active()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
     else (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage)?.catch?.(() => {});
@@ -433,7 +901,7 @@ function fullscreenTip() {
 async function buildVersion() {
   // peers must run the same build and game files, or their simulations diverge
   const marker = await readMarker();
-  const wasm = await fetch('build/recomp.wasm', { method: 'HEAD' }).catch(() => null);
+  const wasm = await fetch('build/recomp6.wasm', { method: 'HEAD' }).catch(() => null);
   // the ETag comes back weak (W/"...") when the response is compressed: compare only its value
   const etag = (wasm?.headers.get('ETag') || '').replace(/^W\//, '').replace(/"/g, '');
   return `${marker?.version || 'local'}:${etag || wasm?.headers.get('Content-Length') || '?'}`;
@@ -561,6 +1029,8 @@ function setupKbdHelp() {
   apply();
 }
 
+if (RcTouch.wanted()) document.body.classList.add('coarse');   // phone / tablet layout (index.html)
 setupFullscreen();
 setupKbdHelp();
+setupControls();
 boot();

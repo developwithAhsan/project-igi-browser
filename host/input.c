@@ -4,6 +4,9 @@
  * identified by USB HID usage IDs, which both SDL scancodes and the browser's KeyboardEvent.code map
  * onto directly. */
 #include "win32.h"
+
+#include <math.h>
+#include <stdlib.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #define EXPORT EMSCRIPTEN_KEEPALIVE   /* called by the page */
@@ -19,6 +22,75 @@ void dinput_mouse_move(int dx, int dy);
 int netplay_on(void);
 int netplay_local_pad(int idx, int connected, uint32_t buttons, const int32_t axis[4]);
 EXPORT void input_mouse_move(int dx, int dy) { if (!netplay_on()) dinput_mouse_move(dx, dy); }
+/* Touch screens: a tap clicks at (x, y) of the game's screen. The game moves its cursor by relative motion
+   through its own acceleration and shows a move a few frames late, so a jump can't be computed up front:
+   tap_tick() moves the cursor, waits for it to settle, reads back where it landed (PROFILE_CURSOR_X / _Y,
+   the game's cursor position as 32-bit ints) and corrects, learning how far a count goes, then clicks. A
+   cursor that doesn't follow a first nudge of a few counts (none on screen, as in a mission) drops the tap.
+   Returns 0 if the game's profile doesn't say where its cursor is. */
+enum { TAP_IDLE, TAP_SEND, TAP_SETTLE };
+static struct {
+    volatile int req;
+    int x, y, state, tries, frames, still, ox, oy, lx, ly, qx, qy, sentx, senty, release;
+    double gx, gy;   /* pixels per count, learned per axis */
+} g_tap = { .gx = 1.25, .gy = 0.75 };
+EXPORT int input_tap(int x, int y) {
+#ifdef PROFILE_CURSOR_X
+    if (netplay_on()) return 0;
+    g_tap.x = x; g_tap.y = y;
+    __atomic_store_n(&g_tap.req, 1, __ATOMIC_RELEASE);
+    return 1;
+#else
+    (void)x; (void)y;
+    return 0;
+#endif
+}
+static int clampi(int v, int lim) { return v > lim ? lim : v < -lim ? -lim : v; }
+static void tap_tick(void) {
+#ifdef PROFILE_CURSOR_X
+    if (g_tap.release && --g_tap.release == 0) dinput_mouse_button(0, 0);
+    int cx = (int)R32(PROFILE_CURSOR_X), cy = (int)R32(PROFILE_CURSOR_Y);
+    if (__atomic_exchange_n(&g_tap.req, 0, __ATOMIC_ACQUIRE)) {
+        g_tap.state = TAP_SETTLE; g_tap.tries = 0; g_tap.frames = 0; g_tap.still = 9;   /* plan right away */
+        g_tap.sentx = g_tap.senty = 0; g_tap.lx = g_tap.ox = cx; g_tap.ly = g_tap.oy = cy;
+    }
+    if (g_tap.state == TAP_IDLE) return;
+    if (g_tap.state == TAP_SEND) {   /* at most 12 counts a frame, where the game's acceleration is mild */
+        int dx = clampi(g_tap.qx, 12), dy = clampi(g_tap.qy, 12);
+        dinput_mouse_move(dx, dy);
+        g_tap.qx -= dx; g_tap.qy -= dy;
+        if (!g_tap.qx && !g_tap.qy) { g_tap.state = TAP_SETTLE; g_tap.frames = 0; g_tap.still = 0; g_tap.lx = cx; g_tap.ly = cy; }
+        return;
+    }
+    /* settle: until the cursor has stopped for 3 frames (or 12 frames have passed) */
+    g_tap.still = (cx == g_tap.lx && cy == g_tap.ly) ? g_tap.still + 1 : 0;
+    g_tap.lx = cx; g_tap.ly = cy;
+    if (g_tap.still < 3 && ++g_tap.frames < 12) return;
+    if (g_tap.sentx || g_tap.senty) {
+        int mx = cx - g_tap.ox, my = cy - g_tap.oy;
+        if (g_tap.tries == 1 && !mx && !my) { g_tap.state = TAP_IDLE; return; }   /* no cursor follows the mouse */
+        if (abs(g_tap.sentx) >= 3 && mx) g_tap.gx = 0.5 * g_tap.gx + 0.5 * fmin(3, fmax(0.3, (double)mx / g_tap.sentx));
+        if (abs(g_tap.senty) >= 3 && my) g_tap.gy = 0.5 * g_tap.gy + 0.5 * fmin(3, fmax(0.3, (double)my / g_tap.senty));
+    }
+    int ex = g_tap.x - cx, ey = g_tap.y - cy;
+    if (getenv("RC_TAP_LOG")) fprintf(stderr, "[tap] try %d cursor %d,%d target %d,%d gain %.2f,%.2f\n", g_tap.tries, cx, cy,
+                                      g_tap.x, g_tap.y, g_tap.gx, g_tap.gy);
+    if ((abs(ex) <= 2 && abs(ey) <= 2) || g_tap.tries >= 6) {
+        dinput_mouse_button(0, 1);
+        g_tap.release = 4;   /* held for a few frames, as a real click is */
+        g_tap.state = TAP_IDLE;
+        return;
+    }
+    int dx = (int)lround(ex / g_tap.gx), dy = (int)lround(ey / g_tap.gy);
+    if (!dx && ex) dx = ex > 0 ? 1 : -1;
+    if (!dy && ey) dy = ey > 0 ? 1 : -1;
+    if (g_tap.tries == 0) { dx = clampi(dx, 3); dy = clampi(dy, 3); }   /* first a nudge: is there a cursor? */
+    g_tap.qx = g_tap.sentx = dx; g_tap.qy = g_tap.senty = dy;
+    g_tap.ox = cx; g_tap.oy = cy;
+    g_tap.tries++;
+    g_tap.state = TAP_SEND;
+#endif
+}
 /* Gamepads, in the W3C "standard gamepad" layout (both SDL's GameController and the browser's Gamepad API
    map onto it): buttons bit 0-16 = A B X Y, LB RB, LT RT (digital), Back Start, L3 R3, d-pad up down left
    right, Guide; axes -32768..32767 (left x/y, right x/y; +y = down). */
@@ -170,10 +242,11 @@ EXPORT void input_mouse_button(int b, int down) {
 
 /* Scripted input for automated testing, driven by the game's frame counter:
    RC_INPUT="500:click,700:key=1c,900:key=c8,950:move=-75:-180,990:pad=1,1200:stick=0:-32768"
-   (DIK codes in hex; a key, click or pad press is held 4 frames; move is relative mouse motion; pad=<hex>[/frames]
+   (DIK codes in hex; a key, click or pad press is held 4 frames, key=<hex>/<frames> longer; move is relative mouse motion; pad=<hex>[/frames]
    presses standard-gamepad buttons on pad 0, e.g. 1 = A, 2000 = d-pad down; stick=lx:ly sets the left
    stick until changed). */
 void input_script_tick(uint32_t frame) {
+    tap_tick();
     static const char *script = (const char *)1;
     static struct { uint32_t frame; int kind; uint8_t code; } pending[64];
     static int npending;
@@ -197,15 +270,20 @@ void input_script_tick(uint32_t frame) {
             fprintf(stderr, "[input] frame %u: click\n", frame);
             input_mouse_button(0, 1);
             if (npending < 64) pending[npending++] = (typeof(pending[0])){ frame + 4, 0, 0 };
+        } else if (!strncmp(a, "tap=", 4)) {      /* tap=x:y, a touch-screen tap on the game's screen */
+            int x = (int)strtol(a + 4, (char **)&a, 10), y = *a == ':' ? (int)strtol(a + 1, NULL, 10) : 0;
+            fprintf(stderr, "[input] frame %u: tap %d,%d\n", frame, x, y);
+            input_tap(x, y);
         } else if (!strncmp(a, "move=", 5)) {     /* move=dx:dy, relative mouse motion in pixels */
             int dx = (int)strtol(a + 5, (char **)&a, 10), dy = *a == ':' ? (int)strtol(a + 1, NULL, 10) : 0;
             fprintf(stderr, "[input] frame %u: move %d,%d\n", frame, dx, dy);
             dinput_mouse_move(dx, dy);
         } else if (!strncmp(a, "key=", 4)) {
-            uint8_t code = (uint8_t)strtoul(a + 4, NULL, 16);
+            uint8_t code = (uint8_t)strtoul(a + 4, (char **)&a, 16);
+            uint32_t hold = *a == '/' ? (uint32_t)strtoul(a + 1, NULL, 10) : 4;   /* key=<hex>/<frames> */
             fprintf(stderr, "[input] frame %u: key %02x\n", frame, code);
             key_event_dik(code, 1);
-            if (npending < 64) pending[npending++] = (typeof(pending[0])){ frame + 4, 1, code };
+            if (npending < 64) pending[npending++] = (typeof(pending[0])){ frame + hold, 1, code };
         } else if (!strncmp(a, "pad=", 4)) {
             pad_buttons = (uint32_t)strtoul(a + 4, (char **)&a, 16);
             uint32_t hold = *a == '/' ? (uint32_t)strtoul(a + 1, NULL, 10) : 4;   /* pad=<hex>/<frames> */
@@ -217,6 +295,12 @@ void input_script_tick(uint32_t frame) {
             pad_lx = (int)strtol(a + 6, (char **)&a, 10); pad_ly = *a == ':' ? (int)strtol(a + 1, NULL, 10) : 0;
             fprintf(stderr, "[input] frame %u: stick %d,%d\n", frame, pad_lx, pad_ly);
             input_gamepad(0, 1, pad_buttons, pad_lx, pad_ly, 0, 0);
+        } else if (!strncmp(a, "shot", 4)) {      /* shot: marker line; the page's test driver screenshots on it */
+            fprintf(stderr, "[shot] frame %u\n", frame);
+        } else if (!strncmp(a, "sig", 3)) {       /* sig: the recorder logs a signature of every draw of this frame */
+            extern uint32_t g_cmd_sig_frame;
+            g_cmd_sig_frame = frame;
+            fprintf(stderr, "[sig] frame %u begin\n", frame);
         }
     }
 }

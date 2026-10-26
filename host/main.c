@@ -50,6 +50,9 @@ static void *watchdog(void *arg) {
 }
 
 static void *game_main(void *arg) {
+#ifdef __EMSCRIPTEN__
+    { extern void rc_stack_poison(void); if (getenv("RC_LOG")) rc_stack_poison(); }
+#endif
     (void)arg;
     CPU *c = &g_cpu;
     thread_main_init(c);
@@ -87,7 +90,7 @@ int main(int argc, char **argv) {
     static ImportHandler all[1024];
     uint32_t n = 0;
     const ImportTable *tables[] = { &kernel32_imports, &user32_imports, &gdi32_imports, &advapi32_imports,
-                                    &winmm_imports, &directx_imports };
+                                    &winmm_imports, &directx_imports, &ddraw7_imports, &mm_imports };
     for (size_t t = 0; t < sizeof tables / sizeof tables[0]; t++)
         for (uint32_t i = 0; i < tables[t]->count; i++) all[n++] = tables[t]->list[i];
     set_import_handlers(all, n);
@@ -117,7 +120,11 @@ int main(int argc, char **argv) {
     /* Recompiled code nests one host frame per guest call, so give the game a generous host stack. */
     pthread_attr_t at;
     pthread_attr_init(&at);
+#ifdef __EMSCRIPTEN__
+    pthread_attr_setstacksize(&at, (size_t)rc_stack_size(256, 32));   /* WebKit keeps it all resident: see runtime.h */
+#else
     pthread_attr_setstacksize(&at, 256u << 20);
+#endif
     pthread_t th;
     pthread_create(&th, &at, game_main, NULL);
     if (getenv("RC_WATCHDOG")) {

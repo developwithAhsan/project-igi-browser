@@ -1,3 +1,33 @@
+# Project I.G.I. in the browser
+
+[Project I.G.I.](https://en.wikipedia.org/wiki/Project_I.G.I.) (Innerloop Studios / Eidos, 2000) running in a
+browser tab, on desktop and on phones. Play it at **https://igi.sagarinfosec.site** with your own copy of the
+game (the page downloads nothing you don't already own: this repo has no game files and no game code).
+
+This is a port of [Dhaiwat Pandya's cricket07-browser](https://github.com/Dhaiwat10/cricket07-browser), a
+static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a different game. What it adds:
+
+- **DirectDraw 7 / Direct3D 7** (`host/ddraw7.c`), which this game uses instead of Direct3D 8, on the same
+  WebGPU renderer, plus the few extra Windows calls the game makes (`host/mm.c`, registry, timers, threads).
+- **Phones and tablets**: on-screen stick and buttons (`web/touch.js`), fullscreen and landscape, the stage
+  following the visual viewport so a zoomed or scrolled page never crops the picture.
+- **Keyboard**: WASD defaults with every key rebindable from the page (saved in the browser).
+- **Safari / iOS**: WebKit keeps far more memory per page than Chromium (its baseline WebAssembly JIT alone
+  holds about 1.6 GB for this game) and iPhones kill a tab near 2 GB. The guest memory is laid out
+  compactly and grown on demand, host thread stacks are small, and GPU uploads are coalesced per batch
+  (`RC_MEM_COMPACT`, `RC_GPU_COALESCE`, set by `web/loader.js` on WebKit only). Measured in the first
+  mission: 2.8 GB before, 1.5 GB after.
+- **Rendering fixes**: back-face culling mapped correctly for Dawn (Chrome) and wgpu-native, x87 rounding
+  details in `runtime/cpu.h`, a draw-signature harness (`RC_INPUT=...:sig`) for comparing native and browser
+  frames draw by draw.
+- A hosted-game flow (`web/serve.py --manifest`, `?devgame`), scripted input for headless testing
+  (`host/input.c`), and the site's own extras (visitor counter, affiliate card).
+
+The game profile is `ports/project-igi/profile.h`; build with `PROFILE=ports/project-igi/profile.h` in the
+commands below. Everything below this line is the original project's README, which still applies.
+
+---
+
 # Cricket 07 in the browser
 
 EA Sports Cricket 07 (2006, Windows) running in a browser tab, with game controllers and online 1v1

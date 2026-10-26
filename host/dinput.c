@@ -265,7 +265,11 @@ W(dev_GetDeviceState) {
     } else if (d && d->kind == DEV_JOYSTICK) {
         pad_write_state(d, p, n);
     } else if (d && d->kind == DEV_MOUSE && n >= 16) {
-        W32(p, (uint32_t)g_mouse_dx); W32(p + 4, (uint32_t)g_mouse_dy);
+        /* Browser movement is +down; IGI's mission look treats that as look-up, so invert Y to match the
+           Windows original (push the mouse down -> aim down). Only in a mission: the 2D menus drive their
+           cursor from the same axis the other way, so inverting there would reverse menu navigation. */
+        extern int g_in_mission;
+        W32(p, (uint32_t)g_mouse_dx); W32(p + 4, (uint32_t)(g_in_mission ? -g_mouse_dy : g_mouse_dy));
         g_mouse_dx = g_mouse_dy = 0;
         double now = host_seconds();
         for (int b = 0; b < 4; b++)
@@ -484,4 +488,11 @@ void w_DirectInputCreateA(CPU *c) {
     LOG("[dinput] DirectInputCreateA(version %x)\n", ARG(1));
     W32(ARG(2), com_new(&IDirectInput_i, 0, NULL));
     RET(4, S_OK);
+}
+
+/* DirectInputCreateEx(hinst, version, riid, ppv, outer): IDirectInput7A shares IDirectInputA's layout (+ CreateDeviceEx) */
+void w_DirectInputCreateEx(CPU *c) {
+    LOG("[dinput] DirectInputCreateEx(version %x)\n", ARG(1));
+    W32(ARG(3), com_new(&IDirectInput_i, 0, NULL));
+    RET(5, S_OK);
 }

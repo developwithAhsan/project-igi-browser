@@ -181,10 +181,16 @@ double fpu_round(CPU *c, double v) { return round_mode(c, v); }
 
 #include <fenv.h>
 void fpu_sync_rounding(CPU *c) {
+#ifdef RC_FORCE_NEAREST
+    /* A/B harness only: pin the host FPU to round-to-nearest to mimic WebAssembly, which has no dynamic
+       rounding mode. Pair with -DRC_SOFT_ROUND to test the software chop-correction (see rc_div_round). */
+    (void)c; fesetround(FE_TONEAREST); return;
+#else
     static const int modes[4] = { FE_TONEAREST, FE_DOWNWARD, FE_UPWARD, FE_TOWARDZERO };
     static __thread int current = -1;  /* MSVC's _ftol switches modes twice per conversion: skip no-ops */
     int rc = (c->fpu_cw >> 10) & 3;
     if (rc != current) { fesetround(modes[rc]); current = rc; }
+#endif
 }
 
 double RF80(uint32_t a) {
@@ -355,11 +361,74 @@ int load_image(const char *path, LoadedImage *out) {
 
 /* ------------------------------------------------------------------ memory + CPU setup */
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/heap.h>
+#include <errno.h>
+uint32_t g_guest_space = 0x50000000u, g_guest_heap_lo = 0x10000000u, g_guest_heap_hi = 0x20000000u,
+         g_guest_valloc_lo = 0x20000000u, g_guest_valloc_hi = 0x50000000u;
+int g_mem_compact;
+static uintptr_t g_guest_base;   /* compact: guest address 0 in the wasm memory; the host heap stays below */
+/* Everything the host mallocs after runtime_init (thread stacks, textures, frame chunks, file buffers) has
+   to fit under the guest space: this much is reserved for it. */
+#define COMPACT_HOST_RESERVE (192u << 20)
+/* All of malloc's memory comes through sbrk (linked with --wrap=sbrk): in compact mode it is refused past
+   the guest base instead of silently overlapping guest memory. */
+void *__real_sbrk(intptr_t inc);
+void *__wrap_sbrk(intptr_t inc) {
+    if (g_guest_base && inc > 0 && *emscripten_get_sbrk_ptr() + (uintptr_t)inc > g_guest_base) {
+        static int said;
+        if (!said++) fprintf(stderr, "host heap reserve exhausted (%u MB): allocation of %ld bytes refused\n",
+                             COMPACT_HOST_RESERVE >> 20, (long)inc);
+        errno = ENOMEM;
+        return (void *)-1;
+    }
+    return __real_sbrk(inc);
+}
+void guest_commit(uint32_t hi) {
+    if (!g_mem_compact) return;
+    size_t need = g_guest_base + (size_t)hi + 0x10000, have = emscripten_get_heap_size();
+    if (need <= have) return;
+    size_t step = 32u << 20, want = (need + step - 1) / step * step;
+    if (!emscripten_resize_heap(want) && !emscripten_resize_heap(need)) {
+        fprintf(stderr, "cannot grow the wasm memory to %zu MB for the guest\n", need >> 20);
+        abort();
+    }
+}
+int rc_stack_size(int normal_mb, int compact_mb) { return (g_mem_compact ? compact_mb : normal_mb) << 20; }
+#endif
+
+extern uint32_t g_heap_next;
 void runtime_init(CPU *c) {
     /* +64 KiB so multi-byte accesses straddling 0xFFFFFFFF stay inside the mapping */
 #ifdef __EMSCRIPTEN__
-    g_mem = calloc(1, (size_t)GUEST_SPACE + 0x10000);
-    if (!g_mem) { fprintf(stderr, "cannot allocate guest memory\n"); exit(1); }
+    g_mem_compact = getenv("RC_MEM_COMPACT") != NULL;
+    if (g_mem_compact) {
+        /* image 0x400000..0xC35000; the heap right behind it (512 MB: mission 1 alone holds 160 MB, and
+           only what is used gets resident), then the VirtualAlloc range (this game makes no VirtualAlloc
+           calls) up to whatever the 2 GB wasm memory leaves above the host reserve */
+        g_guest_heap_lo = 0x01000000u;
+        g_guest_heap_hi = g_guest_valloc_lo = 0x21000000u;
+        uintptr_t brk = *emscripten_get_sbrk_ptr();
+        g_guest_base = (brk + COMPACT_HOST_RESERVE + 0xFFFFu) & ~(uintptr_t)0xFFFFu;
+        size_t room = emscripten_get_heap_max() - g_guest_base - 0x10000;
+        g_guest_valloc_hi = room < 0x50000000u ? (uint32_t)(room & ~0xFFFFu) : 0x50000000u;
+        g_guest_space = g_guest_valloc_hi;
+        size_t had = emscripten_get_heap_size();
+        g_mem = (uint8_t *)g_guest_base;
+        guest_commit(g_guest_heap_lo);   /* TIB, stack, image: used before any allocation */
+        /* fresh wasm pages are zero; memory that already existed above the break never belonged to malloc
+           but is cleared anyway, as the guest expects */
+        if (had > g_guest_base) memset(g_mem, 0, had - g_guest_base);
+        fprintf(stderr, "[mem] compact guest space: base %zu MB, heap %08x-%08x, valloc %08x-%08x, host reserve %u MB\n",
+                (size_t)g_guest_base >> 20, g_guest_heap_lo, g_guest_heap_hi, g_guest_valloc_lo, g_guest_valloc_hi,
+                COMPACT_HOST_RESERVE >> 20);
+    } else {
+        g_mem = calloc(1, (size_t)GUEST_SPACE + 0x10000);
+        if (!g_mem) { fprintf(stderr, "cannot allocate guest memory\n"); exit(1); }
+    }
+    extern void guest_heap_init(void);
+    guest_heap_init();
+    g_heap_next = GUEST_HEAP_BASE;
 #else
     g_mem = mmap(NULL, GUEST_SPACE + 0x10000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
     if (g_mem == MAP_FAILED) { perror("mmap 4GiB guest space"); exit(1); }
@@ -376,7 +445,11 @@ void runtime_init(CPU *c) {
     W32(GUEST_TIB + 0x08, GUEST_STACK_TOP - GUEST_STACK_SIZE);
 }
 
+#ifdef __EMSCRIPTEN__
+uint32_t g_heap_next;   /* set in runtime_init (the layout is chosen at run time) */
+#else
 uint32_t g_heap_next = GUEST_HEAP_BASE;
+#endif
 
 uint32_t guest_alloc(uint32_t size) {
     uint32_t a = (g_heap_next + 15) & ~15u;

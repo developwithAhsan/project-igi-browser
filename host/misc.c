@@ -23,11 +23,24 @@ W(SetBkMode) { RET(2, 1); }
 W(ExtTextOutA) { RET(8, 1); }
 W(BitBlt) { RET(9, 1); }
 W(GetPixel) { RET(3, 0); }
+W(CreateICA) { RET(4, 0x00050011u); }
+W(GetDeviceCaps) {
+    switch (ARG(1)) {
+    case 8: RET(2, g_screen_w);    /* HORZRES */
+    case 10: RET(2, g_screen_h);   /* VERTRES */
+    case 12: RET(2, 32);           /* BITSPIXEL */
+    case 14: RET(2, 1);            /* PLANES */
+    case 88: case 90: RET(2, 96);  /* LOGPIXELSX/Y */
+    case 116: RET(2, 60);          /* VREFRESH */
+    default: RET(2, 0);
+    }
+}
 
 #define G(name) IMPORT("GDI32.DLL", name)
 static const ImportHandler gdi_list[] = {
     G(CreateCompatibleDC), G(DeleteDC), G(CreateBitmap), G(CreateFontA), G(SelectObject), G(DeleteObject),
     G(GetStockObject), G(SetTextColor), G(SetBkColor), G(SetBkMode), G(ExtTextOutA), G(BitBlt), G(GetPixel),
+    G(CreateICA), G(GetDeviceCaps),
 };
 const ImportTable gdi32_imports = { gdi_list, sizeof gdi_list / sizeof gdi_list[0] };
 
@@ -123,6 +136,9 @@ static uint64_t timers_next_due_us(void) {
 }
 
 static void *timer_main(void *arg) {
+#ifdef __EMSCRIPTEN__
+    { extern void rc_stack_poison(void); if (g_log) rc_stack_poison(); }
+#endif
     (void)arg;
     sched_enter(g_timer_sched);
     GuestThread *t = guest_thread_new();
@@ -180,6 +196,9 @@ static void *timer_main(void *arg) {
         uint32_t a[5] = { tm.id, 0, tm.user, 0, 0 };
         static unsigned fired;
         if (fired++ % 500 == 0) LOG("[winmm] timer callbacks so far: %u\n", fired);
+#ifdef __EMSCRIPTEN__
+        { extern void rc_mem_report(const char *, uint32_t); if (g_log && fired % 2000 == 1) rc_mem_report("timer", fired); }
+#endif
         guest_stdcall(c, tm.callback, 5, a);
         pthread_mutex_lock(&g_timer_lock);
     }
@@ -204,7 +223,11 @@ W(timeSetEvent) {
         pthread_t pt;
         pthread_attr_t at;
         pthread_attr_init(&at);
+#ifdef __EMSCRIPTEN__
+        pthread_attr_setstacksize(&at, (size_t)rc_stack_size(64, 8));
+#else
         pthread_attr_setstacksize(&at, 64u << 20);
+#endif
         pthread_create(&pt, &at, timer_main, NULL);
         pthread_detach(pt);
     }
@@ -231,10 +254,6 @@ const ImportTable winmm_imports = { mm_list, sizeof mm_list / sizeof mm_list[0] 
  * Direct3D 8 lives in d3d8.c.
  */
 void w_Direct3DCreate8(CPU *c);  /* d3d8.c */
-W(DirectDrawCreate) {
-    LOG("[ddraw] DirectDrawCreate -> fails (game should fall back)\n");
-    RET(3, 0x80004005u /* E_FAIL */);
-}
 void w_DirectInputCreateA(CPU *c);  /* dinput.c */
 void w_DirectSoundCreate(CPU *c);         /* dsound.c */
 void w_DirectSoundCaptureCreate(CPU *c);  /* dsound.c */
@@ -249,7 +268,6 @@ static const ImportHandler dx_list[] = {
     { "D3D8.DLL!ValidateVertexShader", w_ValidateVertexShader },
     { "D3D8.DLL!ValidatePixelShader", w_ValidatePixelShader },
     { "D3D8.DLL!Direct3DCreate8", w_Direct3DCreate8 },
-    { "DDRAW.DLL!DirectDrawCreate", w_DirectDrawCreate },
     { "DINPUT.DLL!DirectInputCreateA", w_DirectInputCreateA },
     { "DSOUND.DLL!#1", w_DirectSoundCreate },
     { "DSOUND.DLL!#6", w_DirectSoundCaptureCreate },
