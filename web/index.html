@@ -2,11 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-  <!-- Google AdSense: fill in the publisher id and the two ad-unit slot ids once the account is approved
-       (ads.txt at the site root and the google-adsense-account meta below too). Left empty, the page shows
-       the Amazon affiliate card instead, exactly as before. -->
-  <!-- <meta name="google-adsense-account" content="ca-pub-XXXXXXXXXXXXXXXX"> -->
-  <script>window.RC_ADS = { client: '', side: '', mobile: '' };</script>
+  <!-- Ads: the network's tags live in ad.html (one per slot); set a slot to true here to show it. All false,
+       the page shows the Amazon affiliate card instead, exactly as before. Sizes must match ad.html. -->
+  <script>window.RC_ADS = { side: false, desk: false, mobile: false };</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -269,7 +267,7 @@
   #admob { display: none; position: relative; z-index: 1; margin-top: 14px; padding-bottom: env(safe-area-inset-bottom, 0px); }
   #admob .ad-tag { display: block; text-align: center; font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; text-transform: uppercase;
     letter-spacing: .1em; color: var(--faint); margin-bottom: 5px; }
-  body.coarse #admob.on { display: block; }
+  #admob.on { display: block; }
   /* phones and tablets (touch.js): the stage fills the screen, the game letterboxes itself inside the
      canvas, and the controls sit over it (mostly in the side bars a wide phone leaves) */
   .mob { display: none; }
@@ -673,36 +671,37 @@
 <script src="touch.js?v=4"></script>
 <script src="loader.js?v=12"></script>
 <script>
-  // Google AdSense (when RC_ADS is filled in). The page is cross-origin isolated, which blocks third-party ad
-  // frames, so each unit loads in ad.html inside an <iframe credentialless>: that lifts the check for the frame
-  // and everything Google nests in it (Chromium 110+; Safari and Firefox lack it and keep the affiliate card).
-  // A credentialless frame has no cookies, so the ads are non-personalised.
+  // Ads (slots switched on in RC_ADS; the network tags are in ad.html). The page is cross-origin isolated,
+  // which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>: that
+  // lifts the check for the frame and everything the network nests in it (Chromium 110+; Safari and Firefox
+  // lack it and keep the affiliate card). A credentialless frame has no cookies: ads are non-personalised.
   (function () {
-    var A = window.RC_ADS;
-    if (!A || !/^ca-pub-\d{6,}$/.test(A.client || '')) return;
+    var A = window.RC_ADS || {};
     if (!('credentialless' in HTMLIFrameElement.prototype)) return;
     var frame = function (slot, w, h) {
       var f = document.createElement('iframe');
       f.credentialless = true;
       f.setAttribute('credentialless', '');
-      f.src = 'ad.html?client=' + encodeURIComponent(A.client) + '&slot=' + encodeURIComponent(slot) + '&w=' + w + '&h=' + h;
-      f.width = w; f.height = h; f.title = 'Advertisement'; f.loading = 'lazy'; f.scrolling = 'no';
+      f.src = 'ad.html?slot=' + slot;
+      f.width = w; f.height = h; f.title = 'Advertisement'; f.scrolling = 'no';
       f.style.cssText = 'width:' + w + 'px;height:' + h + 'px';
       return f;
     };
+    var coarse = document.body.classList.contains('coarse');
     var promo = document.getElementById('promo');
-    if (promo && /^\d{6,}$/.test(A.side || '')) {   // desktop gutter: 160x600 skyscraper in place of the affiliate card
+    if (promo && A.side) {   // desktop gutter: 160x600 in place of the affiliate card
       var card = document.getElementById('promo-card'), disc = promo.querySelector('.promo-disc'), head = promo.querySelector('.promo-head b');
       if (card) card.remove();
       if (disc) disc.remove();
       if (head) head.textContent = 'Sponsored';
-      promo.appendChild(frame(A.side, 160, 600));
+      promo.appendChild(frame('side', 160, 600));
     }
-    if (document.body.classList.contains('coarse') && /^\d{6,}$/.test(A.mobile || '')) {   // phones: 320x100 under the landing views
+    var landing = coarse ? (A.mobile && ['mobile', 320, 100]) : (A.desk && ['desk', 300, 250]);
+    if (landing) {   // under the landing views (download, Play); never over the game
       var d = document.createElement('div');
       d.id = 'admob'; d.className = 'on';
       d.innerHTML = '<span class="ad-tag">Advertisement</span>';
-      d.appendChild(frame(A.mobile, 320, 100));
+      d.appendChild(frame(landing[0], landing[1], landing[2]));
       document.getElementById('panel').appendChild(d);
     }
   })();
