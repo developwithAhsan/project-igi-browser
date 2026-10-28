@@ -4,7 +4,8 @@
 //
 // URL options: ?mute (no audio) ?fps (frame rate in the console) ?log (host log) ?autoplay
 //              ?devgame (download the hosted game folder without asking; testing)
-//              ?touch (on-screen controls even without a touch screen) ?touchsens=<x> (look speed, default 1)
+//              ?touch (on-screen controls even without a touch screen) ?touchsens=<x> (extra look factor; the
+//              settings sheet on the phone is the normal way)
 //              ?exe=<name> (the executable inside the game folder, if not the profile's default)
 //              ?pads=N (game controllers to expose, default 1, at most 4)
 //              ?queue=1 (frames queued ahead of the display, default 2: 1 cuts 16 ms of input latency online
@@ -365,6 +366,7 @@ const CONTROLS = [
   ['zoomin',  'Zoom in',        'Digit1',      'PageUp',       'Weapons & action'],
   ['zoomout', 'Zoom out',       'Digit3',      'PageDown',     'Weapons & action'],
   ['use',     'Use / activate', 'Tab',         'ShiftRight',   'Weapons & action'],
+  ['bino',    'Binoculars',     'KeyB',        'Space',        'Weapons & action'],   // Space itself is Jump above
 ];
 const CONTROL_STORE = 'igi-controls';
 // how a KeyboardEvent.code reads on screen
@@ -431,9 +433,33 @@ function setupControls() {
     if (e.code !== 'Escape' && HID[e.code] !== undefined) { userKeys[capturing] = e.code; saveControls(); rebuildRemap(); }
     capturing = null; render();
   }, true);
+  // Mouse buttons and sensitivity (controls.js): which action each button does in a mission, and a multiplier
+  // on the mouse motion on top of the game's own sensitivity setting.
+  const mouseHost = $('kbd-mouse');
+  const renderMouse = () => {
+    if (!mouseHost) return;
+    const C = RcControls, s = C.get();
+    const sel = (btn) => `<select data-btn="${btn}">` + C.MOUSE_CHOICES.map((a) =>
+      `<option value="${a}"${s.mouse[btn] === a ? ' selected' : ''}>${C.ACTIONS[a].label}</option>`).join('') + '</select>';
+    mouseHost.innerHTML = '<h3>Mouse</h3>' +
+      `<div class="row"><span class="label">Left</span>${sel(0)}</div>` +
+      `<div class="row"><span class="label">Right</span>${sel(2)}</div>` +
+      `<div class="row"><span class="label">Middle</span>${sel(1)}</div>` +
+      '<div class="row"><span class="label">Scroll</span><div class="keys">next / prev weapon</div></div>' +
+      `<div class="row"><span class="label">Sensitivity</span><output>${s.mouseSens.toFixed(1)}×</output></div>` +
+      `<input class="kbd-range" type="range" min="0.2" max="3" step="0.1" value="${s.mouseSens}" aria-label="Mouse sensitivity">`;
+    mouseHost.querySelectorAll('select').forEach((e) => { e.onchange = () => RcControls.setMouse(Number(e.dataset.btn), e.value); });
+    const range = mouseHost.querySelector('input[type=range]');
+    range.oninput = () => { RcControls.set('mouseSens', Number(range.value)); mouseHost.querySelector('output').textContent = Number(range.value).toFixed(1) + '×'; };
+  };
   const reset = $('kbd-reset');
-  if (reset) reset.onclick = () => { for (const [id, , def] of CONTROLS) userKeys[id] = def; saveControls(); rebuildRemap(); capturing = null; render(); };
+  if (reset) reset.onclick = () => {
+    for (const [id, , def] of CONTROLS) userKeys[id] = def;
+    saveControls(); rebuildRemap(); capturing = null; render();
+    RcControls.reset(); renderMouse();
+  };
   render();
+  renderMouse();
 }
 
 function hookInput(M, net) {
@@ -452,27 +478,41 @@ function hookInput(M, net) {
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     return;
   }
+  const C = RcControls;
+  C.attach(M);
   const key = (down) => (e) => {
     const u = keyRemap[e.code] !== undefined ? keyRemap[e.code] : HID[e.code];
     if (u === undefined || e.repeat) return;
     if (!(e.metaKey && !down)) e.preventDefault();
+    C.keyUsage(u, down);   // a weapon key drops the scope state (controls.js)
     M._input_key_hid(u, down ? 1 : 0);
   };
   window.addEventListener('keydown', key(true));
   window.addEventListener('keyup', key(false));
   // The game draws its own cursor and reads relative motion. Lock the pointer when the browser allows
   // it (then the system cursor can't leave the game); without a lock, motion over the canvas still works.
+  // Each button does the action the player bound to it (controls.js; the Controls panel): in a mission
+  // only, the menus always get the plain click. The action a press started is what its release ends, even
+  // if the binding or the mission state changed in between.
+  const held = {};
   canvas.addEventListener('mousedown', (e) => {
     if (document.pointerLockElement !== canvas) {
       const p = canvas.requestPointerLock?.();
       if (p && p.catch) p.catch(() => {});
     }
-    M._input_mouse_button([0, 2, 1][e.button] ?? 0, 1);
+    if (held[e.button]) C.act(held[e.button], false);
+    held[e.button] = C.mouseAction(e.button);
+    C.act(held[e.button], true);
   });
-  window.addEventListener('mouseup', (e) => M._input_mouse_button([0, 2, 1][e.button] ?? 0, 0));
-  // Pass raw relative motion; the engine (dinput.c) inverts look-Y only during a mission, so the 2D menus
-  // keep their normal cursor direction.
-  canvas.addEventListener('mousemove', (e) => M._input_mouse_move(e.movementX, e.movementY));
+  window.addEventListener('mouseup', (e) => { if (held[e.button]) { C.act(held[e.button], false); held[e.button] = null; } });
+  // Relative motion, scaled by the mouse sensitivity setting in a mission (fractions carry over, so 1 = the
+  // raw counts as before). The engine (dinput.c) inverts look-Y only during a mission, so the 2D menus keep
+  // their normal cursor direction.
+  canvas.addEventListener('mousemove', (e) => {
+    if (!C.inMission()) { M._input_mouse_move(e.movementX, e.movementY); return; }
+    const k = C.get().mouseSens;
+    C.look(e.movementX * k, e.movementY * k);
+  });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   // Mouse wheel cycles weapons: up = next (the game's right-click), down = previous (its O key). A short
   // lock keeps a fast flick from stacking presses; each is held ~100 ms so a game frame samples it.
@@ -482,6 +522,7 @@ function hookInput(M, net) {
     const now = performance.now();
     if (now < wheelLock) return;
     wheelLock = now + 140;
+    C.weaponChanged();
     if (e.deltaY < 0) { M._input_mouse_button(1, 1); setTimeout(() => M._input_mouse_button(1, 0), 100); }
     else { M._input_key_hid(18, 1); setTimeout(() => M._input_key_hid(18, 0), 100); }
   }, { passive: false });
@@ -684,11 +725,11 @@ async function run(session) {
   if (touch) {
     // on a phone the game starts fullscreen; if the player later leaves it, #refull gets them back in
     $('refull').onclick = () => RcTouch.goFullscreen($('stage'));
-  } else fullscreenTip();
+  } else { fullscreenTip(); controlsTip(); }
   if (session) await clearNetSaves(session);
   sizeCanvas();
   const script = document.createElement('script');
-  script.src = 'build/recomp.js?v=6';
+  script.src = 'build/recomp.js?v=7';
   await new Promise((ok, fail) => { script.onload = ok; script.onerror = fail; document.head.appendChild(script); });
   const M = await createRecomp({
     arguments: ['/opfs/' + OPFS_DIR],
@@ -896,12 +937,23 @@ function fullscreenTip() {
   setTimeout(() => tip.classList.add('hidden'), 5500);
 }
 
+// and, a moment later, the controls that differ from what players of other shooters expect
+function controlsTip() {
+  const tip = $('ctltip');
+  if (!tip) return;
+  const C = RcControls.get(), right = RcControls.ACTIONS[C.mouse[2]]?.label || 'nothing';
+  tip.innerHTML = `Right click: <b>${right}</b> · scroll: weapon · <kbd>Shift</kbd> walk/run · <kbd>Ctrl</kbd> crouch — change them in the Controls panel`;
+  setTimeout(() => { tip.classList.remove('hidden'); tip.style.opacity = '1'; }, 6000);
+  setTimeout(() => { tip.style.opacity = '0'; }, 16000);
+  setTimeout(() => tip.classList.add('hidden'), 16500);
+}
+
 // ------------------------------------------------------------------ online lobby
 
 async function buildVersion() {
   // peers must run the same build and game files, or their simulations diverge
   const marker = await readMarker();
-  const wasm = await fetch('build/recomp6.wasm', { method: 'HEAD' }).catch(() => null);
+  const wasm = await fetch('build/recomp7.wasm', { method: 'HEAD' }).catch(() => null);
   // the ETag comes back weak (W/"...") when the response is compressed: compare only its value
   const etag = (wasm?.headers.get('ETag') || '').replace(/^W\//, '').replace(/"/g, '');
   return `${marker?.version || 'local'}:${etag || wasm?.headers.get('Content-Length') || '?'}`;

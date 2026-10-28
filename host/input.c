@@ -22,6 +22,10 @@ void dinput_mouse_move(int dx, int dy);
 int netplay_on(void);
 int netplay_local_pad(int idx, int connected, uint32_t buttons, const int32_t axis[4]);
 EXPORT void input_mouse_move(int dx, int dy) { if (!netplay_on()) dinput_mouse_move(dx, dy); }
+/* 1 while the game draws a 3D world (a mission), 0 in its 2D menus (render_rec.c latches it per frame). The
+   page's controls layer (web/controls.js) remaps mouse buttons and scales the look only in a mission, so the
+   menus always get a plain click and cursor. */
+EXPORT int input_in_mission(void) { extern int g_in_mission; return g_in_mission; }
 /* Touch screens: a tap clicks at (x, y) of the game's screen. The game moves its cursor by relative motion
    through its own acceleration and shows a move a few frames late, so a jump can't be computed up front:
    tap_tick() moves the cursor, waits for it to settle, reads back where it landed (PROFILE_CURSOR_X / _Y,

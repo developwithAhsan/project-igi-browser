@@ -161,8 +161,9 @@
   #fs svg { width: 20px; height: 20px; }
   #stage.awake #fs, #fs:focus-visible { opacity: 1; }
   #fs:hover { background: rgba(0, 0, 0, .75); }
-  #fstip { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; padding: 6px 14px; border-radius: 99px;
-    background: rgba(0, 0, 0, .65); color: #fff; font-size: 13px; pointer-events: none; transition: opacity .4s ease; }
+  #fstip, #ctltip { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; padding: 6px 14px; border-radius: 99px;
+    background: rgba(0, 0, 0, .65); color: #fff; font-size: 13px; pointer-events: none; transition: opacity .4s ease; white-space: nowrap; }
+  #ctltip { opacity: 0; }
   #soundtip { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); z-index: 2; padding: 6px 14px; border-radius: 99px;
     background: rgba(0, 0, 0, .65); color: #fff; font-size: 13px; pointer-events: none; }
   /* Re-enter fullscreen on phones/tablets: the game starts fullscreen, but if the player leaves it (system
@@ -182,7 +183,7 @@
   /* keyboard cheat sheet: shows beside the stage when the viewport has room, because in-game prompts
      use controller glyphs (triangle/circle/×/square, L1, R1) that keyboard players would otherwise have
      to guess at. Hidden in fullscreen, on narrow viewports and by choice (remembered in localStorage). */
-  #kbd { position: fixed; top: 50%; right: 14px; transform: translateY(-50%); z-index: 2;
+  #kbd { position: fixed; top: 50%; right: 14px; transform: translateY(-50%); z-index: 2; max-height: calc(100vh - 28px); overflow-y: auto;
     width: 204px; max-height: calc(100vh - 24px); overflow: auto;
     padding: 12px 14px 14px; border: 1px solid var(--line); border-radius: var(--radius);
     background: rgba(10, 18, 12, .78); color: var(--fg); font-size: 13px; line-height: 1.45;
@@ -215,6 +216,11 @@
     color: var(--fg); white-space: nowrap; cursor: pointer; min-width: 44px; text-align: center; }
   #kbd .kbd-rebind:hover { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .4); }
   #kbd .kbd-rebind.capturing { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #kbd select { font: 600 10.5px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 4px; border-radius: 5px; max-width: 132px;
+    border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); color: var(--fg); }
+  #kbd select option { background: #0f1a13; color: var(--fg); }
+  #kbd .kbd-range { display: block; width: 100%; box-sizing: border-box; accent-color: var(--accent); margin: 0 0 6px; }
+  #kbd output { color: var(--fg); font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
   #kbd .kbd-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px;
     margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
   #kbd .kbd-foot .small { color: var(--faint); font-size: 11px; line-height: 1.35; }
@@ -295,6 +301,44 @@
   #touch .b-bino { right: calc(max(12px, env(safe-area-inset-right)) + clamp(52px, 13.5vmin, 62px)); }
   #touch .b-zin { right: calc(max(12px, env(safe-area-inset-right)) + 2 * clamp(52px, 13.5vmin, 62px)); }
   #touch .b-zout { right: calc(max(12px, env(safe-area-inset-right)) + 3 * clamp(52px, 13.5vmin, 62px)); }
+  #touch .b-gear { top: max(10px, env(safe-area-inset-top)); width: clamp(46px, 12vmin, 56px);
+    left: calc(max(12px, env(safe-area-inset-left)) + clamp(52px, 13.5vmin, 62px)); font-size: clamp(16px, 4.5vmin, 20px); }
+  #touch .b-scope { width: clamp(54px, 15vmin, 68px); right: calc(max(22px, env(safe-area-inset-right)) + clamp(150px, 44vmin, 200px));
+    bottom: calc(26px + clamp(20px, 6vmin, 30px)); border-color: rgba(255, 255, 255, .45); }
+  #touch .b-scope.on { background: rgba(69, 150, 220, .55); border-color: rgba(140, 200, 255, .9); }
+  #touch .b-walk { left: calc(max(18px, env(safe-area-inset-left)) + clamp(130px, 36vmin, 180px)); bottom: 30px; }
+  /* settings sheet and the first-start guide (touch.js); both live inside #stage so they show in fullscreen */
+  #tsettings, #tguide { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; padding: 12px;
+    background: rgba(0, 0, 0, .55); -webkit-user-select: none; user-select: none; }
+  #tsettings.hidden, #tguide.hidden { display: none; }
+  #tguide { z-index: 8; }
+  .ts-card, .tg-card { width: min(100%, 440px); max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 14px 16px;
+    border-radius: 14px; background: rgba(10, 18, 12, .96); border: 1px solid rgba(255, 255, 255, .14); color: var(--fg);
+    font: 13px/1.4 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 16px 48px rgba(0, 0, 0, .6); }
+  .ts-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .ts-head b { font-size: 14px; }
+  .ts-close { background: transparent; border: 0; color: var(--muted); font-size: 22px; line-height: 1; padding: 0 4px; }
+  .ts-row { display: block; margin: 8px 0; }
+  @media (max-height: 420px) { .ts-row { margin: 5px 0; } .ts-head { margin-bottom: 4px; } .ts-foot { margin-top: 6px; } .ts-card { padding: 10px 14px; } }
+  .ts-row > span { display: flex; justify-content: space-between; color: var(--muted); font-size: 12.5px; margin-bottom: 3px; }
+  .ts-row output { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .ts-row input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); }
+  .ts-seg { display: flex; gap: 0; border: 1px solid rgba(255, 255, 255, .22); border-radius: 8px; overflow: hidden; }
+  .ts-seg button { flex: 1; padding: 7px 4px; border: 0; background: transparent; color: var(--muted); font: 600 12px ui-sans-serif, system-ui, sans-serif; }
+  .ts-seg button.on { background: var(--accent); color: #04140a; }
+  .ts-note { display: block; color: var(--faint); font-size: 11px; margin-top: 4px; min-height: 1.2em; }
+  .ts-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+  .ts-foot button { padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .22); background: transparent; color: var(--fg);
+    font: 600 12px ui-sans-serif, system-ui, sans-serif; }
+  .tg-title { display: block; font-size: 16px; margin-bottom: 8px; }
+  .tg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+  .tg-grid > div { display: flex; gap: 8px; align-items: flex-start; }
+  .tg-grid i { flex: none; width: 22px; height: 22px; display: grid; place-items: center; font-style: normal; border-radius: 6px;
+    background: rgba(255, 255, 255, .1); color: var(--accent-hi); font-size: 13px; }
+  .tg-grid span { font-size: 12px; line-height: 1.35; color: var(--muted); }
+  .tg-grid span b { color: var(--fg); }
+  .tg-ok { margin-top: 12px; width: 100%; padding: 9px; }
+  @media (max-height: 420px) { .tg-grid { gap: 3px 12px; } .tg-grid span { font-size: 11px; } .tg-card { padding: 10px 14px; } .tg-ok { margin-top: 8px; padding: 7px; } }
 
   /* --- loading & boot flourish --- */
   /* a faint green scanline drifts down the poster so the landing screen feels alive while files download */
@@ -358,7 +402,22 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
       Fullscreen</button>
     <div id="rotate">Turn your device sideways to play</div>
+    <div id="tguide" class="hidden" role="dialog" aria-label="How to play">
+      <div class="tg-card">
+        <b class="tg-title">How to play</b>
+        <div class="tg-grid">
+          <div><i>✥</i><span><b>Move</b> — the stick on the left. Up/down also move through menus.</span></div>
+          <div><i>⌖</i><span><b>Aim</b> — swipe anywhere on the right. Hold FIRE and drag to aim while shooting.</span></div>
+          <div><i>◎</i><span><b>Scope</b> — SCOPE toggles the sniper scope and binocular zoom; ZOOM+ / ZOOM− fine-tune it.</span></div>
+          <div><i>⇅</i><span><b>Walk / crouch</b> — WALK and CROUCH toggle (lit = on). Project I.G.I. has no prone.</span></div>
+          <div><i>⚙</i><span><b>Settings</b> — swipe sensitivity, scope sensitivity, gyroscope aiming (turn the phone to aim).</span></div>
+          <div><i>☰</i><span><b>Menu</b> — MENU opens the game menu. Leave its Configuration keys at default, the buttons depend on them.</span></div>
+        </div>
+        <button type="button" class="tg-ok btn">Got it</button>
+      </div>
+    </div>
     <div id="fstip" class="hidden">Press <kbd>Alt</kbd> + <kbd>Enter</kbd> for fullscreen</div>
+    <div id="ctltip" class="hidden"></div>
     <div id="panel">
       <div id="poster-wrap" aria-hidden="true"><img src="poster.jpg" alt="" onerror="this.closest('#poster-wrap').remove()"><span class="scan"></span><span class="scrim"></span></div>
 
@@ -388,12 +447,12 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg>
             <b>Play</b>
-            <span class="desk">Click the game to capture the mouse for aiming; Esc releases it.</span>
-            <span class="mob">Left stick to move, drag to aim, tap to click. Play sideways.</span>
+            <span class="desk">Click the game to capture the mouse; Esc releases it. Right click = scope, scroll = weapon, Shift = walk, Ctrl = crouch.</span>
+            <span class="mob">Stick to move, swipe to aim, SCOPE to zoom. ⚙ sets sensitivity and gyro aiming. Play sideways.</span>
           </button>
           <button id="go-online" class="choice hidden"></button>
         </div>
-        <p class="small desk" style="margin-top:22px">The game's own controls apply (list on the right; change them in Configuration).<br>
+        <p class="small desk" style="margin-top:22px">Keys, mouse buttons and sensitivity: the Controls panel on the right (leave the game's own Configuration at its defaults).<br>
           Fullscreen: <kbd>Alt</kbd> + <kbd>Enter</kbd> (<kbd>⌥</kbd> + <kbd>Enter</kbd> on Mac) or the button in the corner.</p>
         <p class="small"><a href="#" id="reset">Use a different game folder</a></p>
       </section>
@@ -510,22 +569,21 @@
     <p class="promo-disc">As an Amazon Associate, we earn from qualifying purchases.</p>
   </aside>
   <aside id="kbd" aria-label="Keyboard controls">
-    <div class="kbd-head"><b>Keyboard controls</b>
-      <button id="kbd-close" type="button" aria-label="Hide keyboard controls" title="Hide">×</button>
+    <div class="kbd-head"><b>Controls &amp; settings</b>
+      <button id="kbd-close" type="button" aria-label="Hide controls" title="Hide">×</button>
     </div>
-    <!-- Rebindable keys are rendered here by loader.js (click a key to change it). -->
+    <!-- Mouse buttons and sensitivity, then the rebindable keys: rendered by loader.js (click a key to change it). -->
+    <div id="kbd-mouse"></div>
     <div id="kbd-binds"></div>
-    <h3>Mouse &amp; fixed</h3>
-    <div class="row"><span class="label">Aim</span><div class="keys">mouse</div></div>
-    <div class="row"><span class="label">Fire</span><div class="keys">left click</div></div>
-    <div class="row"><span class="label">Change weapon</span><div class="keys">scroll · right click · <kbd>O</kbd></div></div>
+    <h3>Fixed keys</h3>
+    <div class="row"><span class="label">Change weapon</span><div class="keys">scroll · <kbd>O</kbd></div></div>
     <div class="row"><span class="label">Weapon slots</span><div class="keys"><kbd>2</kbd> <kbd>4</kbd>–<kbd>9</kbd></div></div>
     <div class="row"><span class="label">Alternate fire</span><div class="keys"><kbd>Backspace</kbd></div></div>
     <div class="row"><span class="label">Map computer</span><div class="keys"><kbd>C</kbd></div></div>
     <div class="row"><span class="label">Menu</span><div class="keys"><kbd>Esc</kbd></div></div>
     <div class="row"><span class="label">Fullscreen</span><div class="keys"><kbd>Alt</kbd>+<kbd>Enter</kbd></div></div>
     <div class="kbd-foot">
-      <span class="small">Click a key above, then press the new one. <kbd>Esc</kbd> cancels.</span>
+      <span class="small">Click a key, then press the new one (<kbd>Esc</kbd> cancels). Walk/run and crouch toggle on each press. This game has no prone.</span>
       <button id="kbd-reset" type="button" class="btn ghost">Reset</button>
     </div>
   </aside>
@@ -600,7 +658,8 @@
   })();
 </script>
 <script src="netplay.js"></script>
-<script src="touch.js?v=3"></script>
-<script src="loader.js?v=11"></script>
+<script src="controls.js?v=1"></script>
+<script src="touch.js?v=4"></script>
+<script src="loader.js?v=12"></script>
 </body>
 </html>

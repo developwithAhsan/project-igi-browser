@@ -15,3 +15,9 @@ python3 web/serve.py --game /path/to/Project_IGI_folder                         
 
 Useful switches: `?log` (host log in the console), `?input=500:tap=320:200,...` (scripted input, see
 `host/input.c`), `?mem=compact|full` and `?gpu=coalesce|direct` (the WebKit memory paths, on any browser).
+
+Controls on the page: `web/controls.js` holds the game's actions with their default keys (from its
+`config.qvm`), the mouse-button bindings, the scope toggle, the sensitivity settings and the gyroscope;
+`web/loader.js` renders the Controls panel (keys, mouse, sensitivity) and `web/touch.js` the on-screen
+buttons, settings sheet and guide. The game's own Configuration menu must stay at its defaults for these to
+match. Project I.G.I. has no prone / crawl: crouch is the lowest stance.

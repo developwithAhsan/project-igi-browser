@@ -1,62 +1,66 @@
 // On-screen controls for phones and tablets: a stick on the left for the arrow keys (move and strafe, and
 // up / down in menus), dragging anywhere else to move the mouse (aim in a mission, the cursor in menus), a
-// tap there to click at that spot, and buttons for the game's default keys (index.html's keyboard list).
+// tap there to click at that spot, and buttons for the game's actions (controls.js: the game's default keys).
+// A gear opens the settings (swipe sensitivity, gyroscope), a first start shows the controls guide.
 // Everything goes in as the keyboard and mouse the game already reads (host/input.c), so remapping keys in
 // the game's Configuration menu breaks the matching button.
 'use strict';
 
 const RcTouch = (() => {
-  const HOLD_MS = 70;   // the game samples input once a frame (30 fps in missions): hold taps at least this long
-  const BUTTONS = [     // id, label, what it presses (HID usage, or mouse button), placement class
-    ['fire', 'FIRE', { mouse: 0 }, 'b-fire'],
-    ['reload', 'RELOAD<small>OK</small>', { key: 40 }, 'b-reload'],       // Enter
-    ['weapon', 'WEAPON', { mouse: 1 }, 'b-weapon'],                       // right click
-    ['crouch', 'CROUCH', { key: 228 }, 'b-crouch'],                       // Right Ctrl
-    ['jump', 'JUMP', { key: 98 }, 'b-jump'],                              // Num 0
-    ['use', 'USE', { key: 229 }, 'b-use'],                                // Right Shift
-    ['bino', 'BINO', { key: 44 }, 'b-bino'],                              // Space
-    ['zin', 'ZOOM+', { key: 75 }, 'b-zin'],                               // Page Up
-    ['zout', 'ZOOM−', { key: 78 }, 'b-zout'],                             // Page Down
-    ['map', 'MAP', { key: 6 }, 'b-map'],                                  // C
-    ['menu', 'MENU', { key: 41 }, 'b-menu'],                              // Esc
+  const BUTTONS = [     // id, label, action (controls.js) or key (HID usage), placement class, toggle?
+    ['fire', 'FIRE', { act: 'fire' }, 'b-fire'],
+    ['scope', 'SCOPE', { act: 'scope' }, 'b-scope', 'scope'],
+    ['reload', 'RELOAD<small>OK</small>', { act: 'reload' }, 'b-reload'],
+    ['weapon', 'WEAPON', { act: 'nextweapon' }, 'b-weapon'],
+    ['crouch', 'CROUCH', { act: 'crouch' }, 'b-crouch', 'latch'],
+    ['jump', 'JUMP', { act: 'jump' }, 'b-jump'],
+    ['use', 'USE', { act: 'use' }, 'b-use'],
+    ['walk', 'WALK', { act: 'walk' }, 'b-walk', 'latch'],
+    ['bino', 'BINO', { act: 'bino' }, 'b-bino', 'latch'],
+    ['zin', 'ZOOM+', { act: 'zoomin' }, 'b-zin'],
+    ['zout', 'ZOOM−', { act: 'zoomout' }, 'b-zout'],
+    ['map', 'MAP', { act: 'map' }, 'b-map'],
+    ['menu', 'MENU', { act: 'menu' }, 'b-menu'],
+    ['gear', '⚙', { settings: true }, 'b-gear'],
   ];
   const ARROWS = { up: 82, down: 81, left: 80, right: 79 };
+  const GUIDE_SEEN = 'igi-guide-seen';
 
   const wanted = () => new URLSearchParams(location.search).has('touch') ||
     (matchMedia('(pointer: coarse)').matches && navigator.maxTouchPoints > 0);
 
   function attach(M, stage, canvas) {
+    const C = RcControls;
+    C.attach(M);
     const root = document.createElement('div');
     root.id = 'touch';
     root.innerHTML = '<div class="t-look"></div><div class="t-stick"><div class="t-knob"></div></div>' +
       BUTTONS.map(([id, label, , cls]) => `<button class="t-btn ${cls}" data-id="${id}">${label}</button>`).join('');
     stage.appendChild(root);
     document.body.classList.add('touch');
+    const byId = (id) => root.querySelector(`.t-btn[data-id="${id}"]`);
 
-    // input with a minimum hold, so a quick tap still lasts a game frame
-    const downAt = new Map();
+    // Latching buttons mirror a state the game toggles on each press (crouch, walk/run, binoculars): the
+    // button stays lit while the state is on. The scope button follows the real scope state (controls.js).
+    const latched = {};
     const press = (what, down) => {
-      const k = what.key !== undefined ? 'k' + what.key : 'm' + what.mouse;
-      const send = (v) => (what.key !== undefined ? M._input_key_hid(what.key, v) : M._input_mouse_button(what.mouse, v));
-      if (down) { downAt.set(k, performance.now()); send(1); return; }
-      const held = performance.now() - (downAt.get(k) ?? 0);
-      downAt.delete(k);
-      if (held >= HOLD_MS) send(0); else setTimeout(() => { if (!downAt.has(k)) send(0); }, HOLD_MS - held);
+      if (what.act) C.act(what.act, down);
+      else if (what.key !== undefined) C.press(what, down);
     };
+    C.onScope((on) => byId('scope').classList.toggle('on', on));
 
-    // Finger motion -> mouse counts. The game turns a count into about 1.33 px across and 0.8 px down of
-    // its 640x480 screen, which the canvas letterboxes at 4:3: these factors make the menu cursor follow the
-    // finger. Fractions carry over so slow drags still move.
-    const sens = Number(new URLSearchParams(location.search).get('touchsens')) || 1;
-    let fx = 0, fy = 0;
+    // Finger motion -> mouse counts. In the 2D menus the game turns a count into about 1.33 px across and
+    // 0.8 px down of its 640x480 screen, which the canvas letterboxes at 4:3: these factors make the menu
+    // cursor follow the finger. In a mission both axes get the same scale (what a swipe feels like), times
+    // the player's sensitivity and the scope multiplier.
+    const legacy = Number(new URLSearchParams(location.search).get('touchsens')) || 1;
     const move = (dx, dy) => {
       const r = canvas.getBoundingClientRect();
       const h = Math.min(r.height, (r.width * 3) / 4), w = (h * 4) / 3;
-      fx += (dx * 640) / w / 1.333 * sens;
-      fy += (dy * 480) / h / 0.8 * sens;
-      const ix = Math.trunc(fx), iy = Math.trunc(fy);
-      // raw motion; the engine inverts look-Y only in a mission (see dinput.c), menus are unaffected
-      if (ix || iy) { M._input_mouse_move(ix, iy); fx -= ix; fy -= iy; }
+      if (C.inMission()) {
+        const k = (640 / w / 1.333) * C.get().look * C.lookScale() * legacy;
+        C.look(dx * k, dy * k);
+      } else C.look((dx * 640) / w / 1.333, (dy * 480) / h / 0.8);
     };
 
     // a point on the page -> pixels of the game's 640x480 screen, letterboxed at 4:3 in the canvas
@@ -72,8 +76,8 @@ const RcTouch = (() => {
     const stick = root.querySelector('.t-stick'), knob = root.querySelector('.t-knob');
     let arrows = new Set();
     const setArrows = (next) => {
-      for (const a of arrows) if (!next.has(a)) press({ key: ARROWS[a] }, false);
-      for (const a of next) if (!arrows.has(a)) press({ key: ARROWS[a] }, true);
+      for (const a of arrows) if (!next.has(a)) C.press({ key: ARROWS[a] }, false);
+      for (const a of next) if (!arrows.has(a)) C.press({ key: ARROWS[a] }, true);
       arrows = next;
     };
     const steer = (f, x, y) => {
@@ -98,11 +102,16 @@ const RcTouch = (() => {
       const btn = e.target.closest('.t-btn');
       const f = { x: e.clientX, y: e.clientY, t0: performance.now(), moved: 0 };
       if (btn) {
+        const def = BUTTONS.find((b) => b[0] === btn.dataset.id);
         f.kind = 'btn';
         f.btn = btn;
-        f.what = BUTTONS.find((b) => b[0] === btn.dataset.id)[2];
-        btn.classList.add('on');
-        press(f.what, true);
+        f.what = def[2];
+        if (f.what.settings) { f.kind = 'ui'; openSettings(); }
+        else {
+          if (def[4] === 'latch') { latched[def[0]] = !latched[def[0]]; btn.classList.toggle('on', latched[def[0]]); }
+          else if (def[4] !== 'scope') btn.classList.add('on');
+          press(f.what, true);
+        }
       } else if (e.target.closest('.t-stick')) {
         f.kind = 'stick';
         steer(f, e.clientX, e.clientY);
@@ -128,14 +137,17 @@ const RcTouch = (() => {
       const f = fingers.get(e.pointerId);
       if (!f) return;
       fingers.delete(e.pointerId);
-      if (f.kind === 'btn') { f.btn.classList.remove('on'); press(f.what, false); }
-      else if (f.kind === 'stick') { knob.style.transform = ''; setArrows(new Set()); }
+      if (f.kind === 'btn') {
+        const def = BUTTONS.find((b) => b[0] === f.btn.dataset.id);
+        if (!def[4]) f.btn.classList.remove('on');
+        press(f.what, false);
+      } else if (f.kind === 'stick') { knob.style.transform = ''; setArrows(new Set()); }
       // A tap (not a drag) clicks where the finger is: the game steers its cursor there first when its profile
       // says where the cursor is (host/input.c: input_tap; in a mission, with no cursor, a tap does nothing).
       // Otherwise it clicks wherever the cursor is.
-      else if (f.moved < 12 && performance.now() - f.t0 < 300) {
+      else if (f.kind === 'look' && f.moved < 12 && performance.now() - f.t0 < 300) {
         const p = gamePoint(f.x, f.y);
-        if (!(M._input_tap && M._input_tap(p.x, p.y))) { press({ mouse: 0 }, true); press({ mouse: 0 }, false); }
+        if (!(M._input_tap && M._input_tap(p.x, p.y))) { C.press({ mouse: 0 }, true); C.press({ mouse: 0 }, false); }
       }
     };
     root.addEventListener('pointerup', end);
@@ -145,9 +157,74 @@ const RcTouch = (() => {
     root.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     root.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
     window.addEventListener('blur', () => {
-      for (const [id, f] of fingers) end({ pointerId: id });
+      for (const [id] of fingers) end({ pointerId: id });
     });
+
+    // ---- settings sheet: swipe and scope sensitivity, gyroscope; the game keeps running underneath
+    const sheet = document.createElement('div');
+    sheet.id = 'tsettings';
+    sheet.className = 'hidden';
+    sheet.innerHTML = `
+      <div class="ts-card">
+        <div class="ts-head"><b>Controls &amp; settings</b><button type="button" class="ts-close" aria-label="Close">×</button></div>
+        <label class="ts-row"><span>Swipe sensitivity <output data-for="look"></output></span>
+          <input type="range" min="0.3" max="4" step="0.1" data-k="look"></label>
+        <label class="ts-row"><span>Sensitivity while scoped <output data-for="scopeSens"></output></span>
+          <input type="range" min="0.2" max="2" step="0.1" data-k="scopeSens"></label>
+        <div class="ts-row"><span>Gyroscope aiming</span>
+          <div class="ts-seg" data-k="gyro">
+            <button type="button" data-v="off">Off</button><button type="button" data-v="on">Always</button><button type="button" data-v="scope">Scoped only</button>
+          </div><small class="ts-note" id="ts-gyro-note"></small></div>
+        <label class="ts-row"><span>Gyroscope sensitivity <output data-for="gyroSens"></output></span>
+          <input type="range" min="0.2" max="3" step="0.1" data-k="gyroSens"></label>
+        <div class="ts-foot">
+          <button type="button" class="ts-guide">How to play</button>
+          <button type="button" class="ts-reset">Reset</button>
+        </div>
+      </div>`;
+    stage.appendChild(sheet);
+    const fmt = (v) => `${Number(v).toFixed(1)}×`;
+    const syncSheet = () => {
+      const s = C.get();
+      for (const r of sheet.querySelectorAll('input[type=range]')) {
+        r.value = s[r.dataset.k];
+        sheet.querySelector(`output[data-for="${r.dataset.k}"]`).textContent = fmt(r.value);
+      }
+      for (const b of sheet.querySelectorAll('.ts-seg button')) b.classList.toggle('on', b.dataset.v === s.gyro);
+      const note = sheet.querySelector('#ts-gyro-note'), st = C.gyroState();
+      note.textContent = s.gyro === 'off' ? 'Turn the phone to look around. Needs a gyroscope.'
+        : st === 'denied' ? 'Motion access was refused. Allow it in the browser\'s site settings, then try again.'
+        : st === 'none' ? 'No gyroscope found on this device.'
+        : st === 'on' ? 'On. Turn the phone to look around; swipe still works.' : 'Starting…';
+    };
+    for (const r of sheet.querySelectorAll('input[type=range]'))
+      r.addEventListener('input', () => { C.set(r.dataset.k, Number(r.value)); syncSheet(); });
+    for (const b of sheet.querySelectorAll('.ts-seg button'))
+      b.addEventListener('click', async () => {
+        C.set('gyro', b.dataset.v);
+        if (b.dataset.v !== 'off') { syncSheet(); await C.gyroEnable(); setTimeout(syncSheet, 1600); }
+        syncSheet();
+      });
+    sheet.querySelector('.ts-reset').addEventListener('click', () => { C.reset(); syncSheet(); });
+    sheet.querySelector('.ts-close').addEventListener('click', () => sheet.classList.add('hidden'));
+    sheet.querySelector('.ts-guide').addEventListener('click', () => { sheet.classList.add('hidden'); showGuide(); });
+    sheet.addEventListener('pointerdown', (e) => { if (e.target === sheet) sheet.classList.add('hidden'); });
+    const openSettings = () => { syncSheet(); sheet.classList.remove('hidden'); byId('gear').classList.remove('on'); };
+
+    // ---- the controls guide: shown on the first start (over the boot screen), later from the settings
+    const guide = $('tguide');
+    const showGuide = () => { if (guide) guide.classList.remove('hidden'); };
+    if (guide) {
+      guide.querySelector('.tg-ok').addEventListener('click', () => {
+        guide.classList.add('hidden');
+        try { localStorage.setItem(GUIDE_SEEN, '1'); } catch { /* storage blocked */ }
+      });
+      let seen = false;
+      try { seen = localStorage.getItem(GUIDE_SEEN) === '1'; } catch { /* storage blocked */ }
+      if (!seen) showGuide();
+    }
   }
+  const $ = (id) => document.getElementById(id);
 
   // Landscape, fullscreen where the browser allows it (not on iPhone; there, Add to Home Screen gives the
   // most room). Called from the Play tap, which counts as the user gesture both need.

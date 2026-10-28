@@ -9,9 +9,14 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
 
 - **DirectDraw 7 / Direct3D 7** (`host/ddraw7.c`), which this game uses instead of Direct3D 8, on the same
   WebGPU renderer, plus the few extra Windows calls the game makes (`host/mm.c`, registry, timers, threads).
-- **Phones and tablets**: on-screen stick and buttons (`web/touch.js`), fullscreen and landscape, the stage
-  following the visual viewport so a zoomed or scrolled page never crops the picture.
-- **Keyboard**: WASD defaults with every key rebindable from the page (saved in the browser).
+- **Phones and tablets**: on-screen stick and buttons (`web/touch.js`), a scope toggle, walk and crouch
+  toggles, gyroscope aiming (turn the phone to aim), swipe and scope sensitivity settings, a first-start
+  controls guide, fullscreen and landscape, the stage following the visual viewport so a zoomed or scrolled
+  page never crops the picture.
+- **Keyboard and mouse**: WASD defaults with every key rebindable from the page, mouse buttons bindable to any
+  action (right click toggles the sniper scope by default), a mouse sensitivity setting; all saved in the
+  browser (`web/controls.js`). The game only has hold-to-zoom keys, so the scope toggle holds Zoom In for a
+  moment and later holds Zoom Out for as long as the view was zoomed.
 - **Safari / iOS**: WebKit keeps far more memory per page than Chromium (its baseline WebAssembly JIT alone
   holds about 1.6 GB for this game) and iPhones kill a tab near 2 GB. The guest memory is laid out
   compactly and grown on demand, host thread stacks are small, and GPU uploads are coalesced per batch
