@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- One Google AdSense unit, loaded by index.html inside an <iframe credentialless>. The site is cross-origin
+     isolated (COOP/COEP, for WebAssembly threads), which blocks third-party ad frames; a credentialless iframe
+     lifts that check for everything inside it, so this page and the ad frames Google nests in it can load.
+     This file is exempt from the isolation headers in .htaccess. Query: client (ca-pub-…), slot, w, h. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Advertisement</title>
+<style>html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; } ins.adsbygoogle { display: inline-block; }</style>
+</head>
+<body>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var client = q.get('client') || '', slot = q.get('slot') || '', w = parseInt(q.get('w'), 10), h = parseInt(q.get('h'), 10);
+    if (!/^ca-pub-\d{6,}$/.test(client) || !/^\d{6,}$/.test(slot) || !(w >= 50 && w <= 2000) || !(h >= 50 && h <= 2000)) return;
+    var ins = document.createElement('ins');
+    ins.className = 'adsbygoogle';
+    ins.style.cssText = 'display:inline-block;width:' + w + 'px;height:' + h + 'px';
+    ins.setAttribute('data-ad-client', client);
+    ins.setAttribute('data-ad-slot', slot);
+    document.body.appendChild(ins);
+    var s = document.createElement('script');
+    s.async = true;
+    s.crossOrigin = 'anonymous';
+    s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(client);
+    document.head.appendChild(s);
+    (window.adsbygoogle = window.adsbygoogle || []).push({});
+  })();
+</script>
+</body>
+</html>

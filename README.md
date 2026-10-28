@@ -26,7 +26,8 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
   details in `runtime/cpu.h`, a draw-signature harness (`RC_INPUT=...:sig`) for comparing native and browser
   frames draw by draw.
 - A hosted-game flow (`web/serve.py --manifest`, `?devgame`), scripted input for headless testing
-  (`host/input.c`), and the site's own extras (visitor counter, affiliate card).
+  (`host/input.c`), and the site's own extras (visitor counter, affiliate card, and an AdSense slot that
+  works inside the cross-origin-isolated page through an `<iframe credentialless>` around `web/ad.html`).
 
 The game profile is `ports/project-igi/profile.h`; build with `PROFILE=ports/project-igi/profile.h` in the
 commands below. Everything below this line is the original project's README, which still applies.

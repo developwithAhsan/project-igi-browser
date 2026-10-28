@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+  <!-- Google AdSense: fill in the publisher id and the two ad-unit slot ids once the account is approved
+       (ads.txt at the site root and the google-adsense-account meta below too). Left empty, the page shows
+       the Amazon affiliate card instead, exactly as before. -->
+  <!-- <meta name="google-adsense-account" content="ca-pub-XXXXXXXXXXXXXXXX"> -->
+  <script>window.RC_ADS = { client: '', side: '', mobile: '' };</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -259,6 +264,12 @@
     color: #fff; background: var(--accent); padding: 7px 12px; border-radius: 8px; }
   #promo .promo-card:hover .promo-cta { background: var(--accent-hi); }
   #promo .promo-disc { color: var(--faint); font-size: 10px; line-height: 1.35; margin: 10px 0 0; text-align: center; }
+  #promo iframe, #admob iframe { display: block; border: 0; margin: 0 auto; background: transparent; }
+  /* AdSense on phones: a banner under the landing views (never over the game) — see the ads script at the end */
+  #admob { display: none; position: relative; z-index: 1; margin-top: 14px; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  #admob .ad-tag { display: block; text-align: center; font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--faint); margin-bottom: 5px; }
+  body.coarse #admob.on { display: block; }
   /* phones and tablets (touch.js): the stage fills the screen, the game letterboxes itself inside the
      canvas, and the controls sit over it (mostly in the side bars a wide phone leaves) */
   .mob { display: none; }
@@ -661,5 +672,40 @@
 <script src="controls.js?v=1"></script>
 <script src="touch.js?v=4"></script>
 <script src="loader.js?v=12"></script>
+<script>
+  // Google AdSense (when RC_ADS is filled in). The page is cross-origin isolated, which blocks third-party ad
+  // frames, so each unit loads in ad.html inside an <iframe credentialless>: that lifts the check for the frame
+  // and everything Google nests in it (Chromium 110+; Safari and Firefox lack it and keep the affiliate card).
+  // A credentialless frame has no cookies, so the ads are non-personalised.
+  (function () {
+    var A = window.RC_ADS;
+    if (!A || !/^ca-pub-\d{6,}$/.test(A.client || '')) return;
+    if (!('credentialless' in HTMLIFrameElement.prototype)) return;
+    var frame = function (slot, w, h) {
+      var f = document.createElement('iframe');
+      f.credentialless = true;
+      f.setAttribute('credentialless', '');
+      f.src = 'ad.html?client=' + encodeURIComponent(A.client) + '&slot=' + encodeURIComponent(slot) + '&w=' + w + '&h=' + h;
+      f.width = w; f.height = h; f.title = 'Advertisement'; f.loading = 'lazy'; f.scrolling = 'no';
+      f.style.cssText = 'width:' + w + 'px;height:' + h + 'px';
+      return f;
+    };
+    var promo = document.getElementById('promo');
+    if (promo && /^\d{6,}$/.test(A.side || '')) {   // desktop gutter: 160x600 skyscraper in place of the affiliate card
+      var card = document.getElementById('promo-card'), disc = promo.querySelector('.promo-disc'), head = promo.querySelector('.promo-head b');
+      if (card) card.remove();
+      if (disc) disc.remove();
+      if (head) head.textContent = 'Sponsored';
+      promo.appendChild(frame(A.side, 160, 600));
+    }
+    if (document.body.classList.contains('coarse') && /^\d{6,}$/.test(A.mobile || '')) {   // phones: 320x100 under the landing views
+      var d = document.createElement('div');
+      d.id = 'admob'; d.className = 'on';
+      d.innerHTML = '<span class="ad-tag">Advertisement</span>';
+      d.appendChild(frame(A.mobile, 320, 100));
+      document.getElementById('panel').appendChild(d);
+    }
+  })();
+</script>
 </body>
 </html>

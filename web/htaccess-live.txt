@@ -1,0 +1,26 @@
+# Cross-origin isolation: WebGPU + SharedArrayBuffer threads need these on every response.
+<IfModule mod_headers.c>
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  Header always set Cross-Origin-Embedder-Policy "require-corp"
+  Header always set Cross-Origin-Resource-Policy "same-origin"
+  Header set Accept-Ranges "bytes"
+  # App shell (html + the top-level js) must always revalidate so updates reach returning players.
+  <FilesMatch "\.(html|json|js)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  # The recompiled engine is big and content-stable: cache it hard (browser + CDN).
+  <FilesMatch "\.wasm$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  # ad.html (Google AdSense units, loaded by index.html in an <iframe credentialless>) must NOT be isolated:
+  # the ad frames Google nests inside it carry no COEP/CORP headers.
+  <Files "ad.html">
+    Header always unset Cross-Origin-Opener-Policy
+    Header always unset Cross-Origin-Embedder-Policy
+    Header always unset Cross-Origin-Resource-Policy
+  </Files>
+</IfModule>
+
+AddType application/wasm .wasm
+AddType text/javascript .js
+DirectoryIndex index.html
