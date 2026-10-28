@@ -32,7 +32,7 @@ const RcControls = (() => {
     jump:       { label: 'Jump',            key: 98 },         // Numpad 0
     peek:       { label: 'Peek',            key: 89 },         // Numpad 1
     bino:       { label: 'Binoculars',      key: 44 },         // Space
-    walk:       { label: 'Walk / run',      key: 26 },         // W (toggles)
+    walk:       { label: 'Walk / run',      key: 26 },         // W (held)
     map:        { label: 'Map computer',    key: 6 },          // C
     menu:       { label: 'Menu',            key: 41 },         // Esc
     none:       { label: 'Nothing' },
@@ -109,32 +109,52 @@ const RcControls = (() => {
     zoomKey = 0;
     press(dir > 0 ? ACTIONS.zoomin : ACTIONS.zoomout, false);
   }
-  function driveStop() {
+  function driveStop(reached) {
     if (!drive) return;
-    clearInterval(drive.timer);
-    zoomKeyUp(drive.dir);
+    const d = drive;
+    clearInterval(d.timer);
+    zoomKeyUp(d.dir);
     drive = null;
     notify();
+    if (d.done && reached !== undefined) d.done(reached, d.moved);   // not when cancelled
   }
-  function zoomTo(target) {   // target: zoom factor (1 = normal view)
+  // target: zoom factor (1 = normal view); patience: ms the zoom may stand still before the drive gives up
+  // (the zoom saturated, or this weapon has no scope); done(reached, moved) runs when the drive lets go.
+  function zoomTo(target, done, patience = 700) {
     driveStop();
     const z = zoom(), dir = target > z ? 1 : -1;
-    if (Math.abs(target - z) < 0.04 * target) return;
+    if (Math.abs(target - z) < 0.04 * target) { if (done) done(true, false); return; }
     const now = performance.now();
-    drive = { dir, target, last: z, lastT: now, t0: now, timer: 0 };
+    drive = { dir, target, last: z, lastT: now, t0: now, timer: 0, done, moved: false };
     zoomKeyDown(dir);
     drive.timer = setInterval(() => {
       const t = performance.now(), cur = zoom();
       const reached = dir > 0 ? cur >= target * 0.97 : cur <= Math.max(1.02, target * 1.03);
-      if (Math.abs(cur - drive.last) > 0.005 * cur) { drive.last = cur; drive.lastT = t; }
-      // stuck for 700 ms (the zoom saturated, or this weapon has no scope) or 4 s overall: let go
-      if (reached || t - drive.lastT > 700 || t - drive.t0 > 4000) driveStop();
+      if (Math.abs(cur - drive.last) > 0.005 * cur) { drive.last = cur; drive.lastT = t; drive.moved = true; }
+      if (reached) driveStop(true);
+      else if (t - drive.lastT > patience || t - drive.t0 > 4000) driveStop(false);
     }, 16);
   }
+  // The scope button. Only the sniper rifles and the binoculars can zoom in this game: with any other weapon
+  // the zoom keys do nothing, so when the view doesn't respond the toggle brings up the binoculars (the game
+  // toggles them on each press of their key) and zooms through those; the next tap zooms back out and puts
+  // them away again. A player who opened the binoculars themselves keeps them.
+  let viaBino = false, binoWait = 0;
   function scopeToggle() {
     if (!inMission()) return;
+    if (binoWait) { clearTimeout(binoWait); binoWait = 0; }
     if (drive) { driveStop(); return; }   // a tap while it's still zooming: stop where it is
-    zoomTo(scoped() ? 1 : S.scopeZoom);
+    if (scoped()) {
+      zoomTo(1, () => { if (viaBino) { viaBino = false; tap(ACTIONS.bino); } });
+      return;
+    }
+    zoomTo(S.scopeZoom, (reached, moved) => {
+      if (reached || moved || viaBino) return;
+      viaBino = true;
+      tap(ACTIONS.bino);
+      // the binoculars take a few frames to come up (longer on a slow phone), then zoom through them
+      binoWait = setTimeout(() => { binoWait = 0; zoomTo(S.scopeZoom, null, 1500); }, 350);
+    }, 500);
   }
   function weaponChanged() { driveStop(); }   // the game drops the zoom itself; the readout follows
   // the scope button's state follows the real zoom, polled a few times a second
@@ -154,6 +174,7 @@ const RcControls = (() => {
       return;
     }
     if (down && (name === 'nextweapon' || name === 'prevweapon')) weaponChanged();
+    if (down && name === 'bino') viaBino = false;   // the player handles the binoculars themselves
     press(a, down);
   }
   // which action a physical mouse button does right now: in mouse-look mode the player's binding, in the

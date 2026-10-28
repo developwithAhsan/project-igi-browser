@@ -14,12 +14,12 @@ const RcTouch = (() => {
     ['fire2', 'FIRE', { act: 'fire' }, 'b-fire2'],
     ['scope', '<i class="eye"></i><small>SCOPE</small>', { act: 'scope' }, 'b-scope', 'scope'],
     ['jump', 'JUMP', { act: 'jump' }, 'b-jump'],
-    ['crouch', 'CROUCH', { act: 'crouch' }, 'b-crouch', 'latch'],
+    ['crouch', 'CROUCH', { act: 'crouch' }, 'b-crouch', 'hold'],
     ['use', 'USE', { act: 'use' }, 'b-use'],
     ['reload', 'RELOAD', { act: 'reload' }, 'b-reload'],
     ['peek', 'PEEK', { act: 'peek' }, 'b-peek'],
     ['weapon', 'WEAPON<small>next</small>', { act: 'nextweapon' }, 'b-weapon'],
-    ['walk', 'WALK<small>run</small>', { act: 'walk' }, 'b-walk', 'latch'],
+    ['walk', 'WALK<small>run</small>', { act: 'walk' }, 'b-walk', 'hold'],
     ['bino', 'BINO', { act: 'bino' }, 'b-bino', 'latch'],
     ['zin', '+', { act: 'zoomin' }, 'b-zin'],
     ['zout', '−', { act: 'zoomout' }, 'b-zout'],
@@ -52,8 +52,10 @@ const RcTouch = (() => {
     document.body.classList.add('touch');
     const byId = (id) => root.querySelector(`.t-btn[data-id="${id}"]`);
 
-    // Latching buttons mirror a state the game toggles on each press (crouch, walk/run, binoculars): the
-    // button stays lit while the state is on. The scope button follows the real zoom (controls.js) and shows it.
+    // Crouch and walk are held keys in the game (let go and you stand up / run again), which a thumb can't do
+    // while it also steers and fires: a tap on those buttons holds the key until the next tap ('hold'). The
+    // binoculars are a toggle in the game, so that button just mirrors the state ('latch'). The scope button
+    // follows the real zoom (controls.js) and shows it.
     const latched = {};
     const press = (what, down) => {
       if (what.act) C.act(what.act, down);
@@ -126,9 +128,12 @@ const RcTouch = (() => {
         f.what = def[2];
         if (f.what.settings) { f.kind = 'ui'; openSettings(); }
         else {
-          if (def[4] === 'latch') { latched[def[0]] = !latched[def[0]]; btn.classList.toggle('on', latched[def[0]]); }
-          else if (def[4] !== 'scope') btn.classList.add('on');
-          press(f.what, true);
+          if (def[4] === 'hold') { latched[def[0]] = !latched[def[0]]; btn.classList.toggle('on', latched[def[0]]); press(f.what, latched[def[0]]); }
+          else {
+            if (def[4] === 'latch') { latched[def[0]] = !latched[def[0]]; btn.classList.toggle('on', latched[def[0]]); }
+            else if (def[4] !== 'scope') btn.classList.add('on');
+            press(f.what, true);
+          }
         }
       } else if (e.target.closest('.t-stick')) {
         f.kind = 'stick';
@@ -157,8 +162,10 @@ const RcTouch = (() => {
       fingers.delete(e.pointerId);
       if (f.kind === 'btn') {
         const def = BUTTONS.find((b) => b[0] === f.btn.dataset.id);
-        if (!def[4]) f.btn.classList.remove('on');
-        press(f.what, false);
+        if (def[4] !== 'hold') {   // a held button's key stays down until its next tap
+          if (!def[4]) f.btn.classList.remove('on');
+          press(f.what, false);
+        }
       } else if (f.kind === 'stick') { knob.style.transform = ''; setArrows(new Set()); }
       // A tap (not a drag) clicks where the finger is: the game steers its cursor there first when its profile
       // says where the cursor is (host/input.c: input_tap; in the menus and the Esc menu). In a mission, with

@@ -20,7 +20,9 @@ Controls on the page: `web/controls.js` holds the game's actions with their defa
 `config.qvm`), the mouse-button bindings, the scope toggle, the sensitivity settings and the gyroscope;
 `web/loader.js` renders the Controls panel (keyboard layout presets, keys, mouse, screen) and `web/touch.js`
 the on-screen buttons, settings sheet and guide. The game's own Configuration menu must stay at its defaults
-for these to match. Project I.G.I. has no prone / crawl: crouch is the lowest stance.
+for these to match. Project I.G.I. has no prone / crawl: crouch is the lowest stance. Crouch and walk are held keys (verified
+natively: a tapped crouch key does nothing lasting, a held one lowers the camera), binoculars a toggle, and
+only the sniper rifles and the binoculars zoom.
 
 Game state the host reads (`profile.h`, found by diffing `RC_MEMSNAP` snapshots of `.data`): the main menus'
 cursor (`PROFILE_CURSOR_X/Y`, ints, 640x480 units), the Esc menu's cursor sprite (`PROFILE_CURSOR2_X/Y`,

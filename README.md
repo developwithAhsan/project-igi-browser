@@ -11,7 +11,7 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
   WebGPU renderer, plus the few extra Windows calls the game makes (`host/mm.c`, registry, timers, threads).
 - **Phones and tablets**: on-screen stick and buttons laid out like mobile shooters (`web/touch.js`: a big
   FIRE with jump / crouch / scope around it, a second FIRE above the stick, walk/run and binoculars toggles),
-  a scope button that snaps to a chosen zoom and back, gyroscope aiming (turn the phone to fine-aim while
+  a scope button that snaps to a chosen zoom and back (through the binoculars when the weapon has no scope), tap-to-hold crouch and walk, gyroscope aiming (turn the phone to fine-aim while
   scoped, or always), swipe / scope / gyro sensitivity settings, a first-start controls guide, taps that work
   in the game's menus including the Esc menu, fullscreen and landscape, the stage following the visual
   viewport so a zoomed or scrolled page never crops the picture.
