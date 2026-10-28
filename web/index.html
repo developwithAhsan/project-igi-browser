@@ -223,6 +223,9 @@
     border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); color: var(--fg); }
   #kbd select option { background: #0f1a13; color: var(--fg); }
   #kbd .kbd-range { display: block; width: 100%; box-sizing: border-box; accent-color: var(--accent); margin: 0 0 6px; }
+  #kbd .kbd-preset { margin: 2px 0 6px; }
+  #kbd .kbd-preset button { padding: 6px 4px; font-size: 11px; }
+  #kbd .kbd-note { margin: 0 0 4px; color: var(--faint); font-size: 11px; line-height: 1.4; }
   #kbd output { color: var(--fg); font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
   #kbd .kbd-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px;
     margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
@@ -309,37 +312,53 @@
   #touch { position: absolute; inset: 0; z-index: 3; touch-action: none; user-select: none; -webkit-user-select: none;
     -webkit-touch-callout: none; }
   #touch .t-look { position: absolute; inset: 0; }
-  #touch .t-stick { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: 18px;
-    width: clamp(110px, 32vmin, 160px); aspect-ratio: 1; border-radius: 50%;
+  /* Layout in the style of mobile shooters (PUBG): the stick bottom-left with WALK above it and a second FIRE
+     above-right of it; a big FIRE bottom-right with JUMP above, CROUCH / SCOPE to its left, USE / RELOAD further
+     in, PEEK up the right edge, WEAPON at the bottom centre; MENU, MAP top-left and the gear, BINO, +/- top-right.
+     --u is the button unit, --f the fire button, --g the gap, --sr/--sl the safe-area margins. */
+  #touch { --u: clamp(48px, 14vmin, 64px); --f: clamp(80px, 24vmin, 108px); --g: 10px;
+    --sr: max(18px, env(safe-area-inset-right)); --sl: max(18px, env(safe-area-inset-left)); --sb: 20px;
+    --st: max(10px, env(safe-area-inset-top)); }
+  #touch .t-stick { position: absolute; left: var(--sl); bottom: var(--sb);
+    width: clamp(120px, 36vmin, 170px); aspect-ratio: 1; border-radius: 50%;
     background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .22); }
   #touch .t-knob { position: absolute; inset: 30%; border-radius: 50%; background: rgba(255, 255, 255, .35);
     border: 2px solid rgba(255, 255, 255, .5); pointer-events: none; }
   #touch .t-btn { position: absolute; display: grid; place-items: center; align-content: center; padding: 0;
-    width: clamp(50px, 14vmin, 64px); aspect-ratio: 1; border-radius: 50%; touch-action: none;
+    width: var(--u); aspect-ratio: 1; border-radius: 50%; touch-action: none;
     border: 2px solid rgba(255, 255, 255, .3); background: rgba(0, 0, 0, .35); color: rgba(255, 255, 255, .9);
-    font: 700 clamp(9px, 2.6vmin, 11px)/1.1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .03em; }
+    font: 700 clamp(9px, 2.6vmin, 11px)/1.1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .03em;
+    transition: opacity .25s ease; }
   #touch .t-btn small { font-size: .8em; font-weight: 600; opacity: .7; }
   #touch .t-btn.on { background: rgba(52, 184, 102, .55); border-color: rgba(120, 230, 160, .8); }
-  #touch .b-fire { --s: clamp(76px, 22vmin, 100px); width: var(--s); right: max(22px, env(safe-area-inset-right)); bottom: 26px;
-    background: rgba(210, 58, 47, .4); font-size: clamp(12px, 3.4vmin, 15px); }
-  #touch .b-reload { right: calc(max(22px, env(safe-area-inset-right)) + clamp(86px, 25vmin, 112px)); bottom: 18px; }
-  #touch .b-weapon { right: calc(max(22px, env(safe-area-inset-right)) + clamp(70px, 20vmin, 92px)); bottom: calc(18px + clamp(64px, 18vmin, 82px)); }
-  #touch .b-jump { right: max(22px, env(safe-area-inset-right)); bottom: calc(34px + clamp(76px, 22vmin, 100px)); }
-  #touch .b-crouch { right: calc(max(22px, env(safe-area-inset-right)) + clamp(4px, 2vmin, 10px)); bottom: calc(40px + clamp(130px, 38vmin, 172px)); }
-  #touch .b-use { right: calc(max(22px, env(safe-area-inset-right)) + clamp(76px, 22vmin, 100px)); bottom: calc(46px + clamp(120px, 34vmin, 160px)); }
-  #touch .b-bino, #touch .b-zin, #touch .b-zout, #touch .b-map, #touch .b-menu {
-    top: max(10px, env(safe-area-inset-top)); width: clamp(46px, 12vmin, 56px); }
-  #touch .b-menu { left: max(12px, env(safe-area-inset-left)); }
-  #touch .b-map { right: max(12px, env(safe-area-inset-right)); }
-  #touch .b-bino { right: calc(max(12px, env(safe-area-inset-right)) + clamp(52px, 13.5vmin, 62px)); }
-  #touch .b-zin { right: calc(max(12px, env(safe-area-inset-right)) + 2 * clamp(52px, 13.5vmin, 62px)); }
-  #touch .b-zout { right: calc(max(12px, env(safe-area-inset-right)) + 3 * clamp(52px, 13.5vmin, 62px)); }
-  #touch .b-gear { top: max(10px, env(safe-area-inset-top)); width: clamp(46px, 12vmin, 56px);
-    left: calc(max(12px, env(safe-area-inset-left)) + clamp(52px, 13.5vmin, 62px)); font-size: clamp(16px, 4.5vmin, 20px); }
-  #touch .b-scope { width: clamp(54px, 15vmin, 68px); right: calc(max(22px, env(safe-area-inset-right)) + clamp(150px, 44vmin, 200px));
-    bottom: calc(26px + clamp(20px, 6vmin, 30px)); border-color: rgba(255, 255, 255, .45); }
+  #touch.menus .t-btn:not(.b-menu):not(.b-gear), #touch.menus .t-stick { opacity: .35; }
+  /* right cluster */
+  #touch .b-fire { width: var(--f); right: var(--sr); bottom: var(--sb);
+    background: rgba(210, 58, 47, .4); border-color: rgba(255, 150, 140, .5); font-size: clamp(12px, 3.4vmin, 15px); }
+  #touch .b-jump { right: calc(var(--sr) + (var(--f) - var(--u)) / 2); bottom: calc(var(--sb) + var(--f) + var(--g)); }
+  #touch .b-peek { right: calc(var(--sr) + (var(--f) - var(--u)) / 2); bottom: calc(var(--sb) + var(--f) + 2 * var(--g) + var(--u)); }
+  #touch .b-crouch { right: calc(var(--sr) + var(--f) + var(--g)); bottom: var(--sb); }
+  #touch .b-scope { --s: calc(var(--u) * 1.15); width: var(--s); right: calc(var(--sr) + var(--f) + var(--g) - (var(--s) - var(--u)) / 2);
+    bottom: calc(var(--sb) + var(--u) + var(--g) + 6px); border-color: rgba(255, 255, 255, .5); font-size: clamp(8px, 2.3vmin, 10px); }
+  #touch .b-scope .eye { display: block; width: 46%; height: 46%; border-radius: 50%; border: 2.5px solid currentColor; position: relative; margin-bottom: 2px; }
+  #touch .b-scope .eye::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; background: currentColor; }
   #touch .b-scope.on { background: rgba(69, 150, 220, .55); border-color: rgba(140, 200, 255, .9); }
-  #touch .b-walk { left: calc(max(18px, env(safe-area-inset-left)) + clamp(130px, 36vmin, 180px)); bottom: 30px; }
+  #touch .b-use { right: calc(var(--sr) + var(--f) + 2 * var(--g) + var(--u)); bottom: var(--sb); }
+  #touch .b-reload { right: calc(var(--sr) + var(--f) + 2 * var(--g) + var(--u)); bottom: calc(var(--sb) + var(--u) + var(--g) + 6px); }
+  #touch .b-weapon { left: 50%; transform: translateX(-50%); bottom: var(--sb); }
+  /* left cluster */
+  #touch .b-walk { left: calc(var(--sl) + (clamp(120px, 36vmin, 170px) - var(--u)) / 2); bottom: calc(var(--sb) + clamp(120px, 36vmin, 170px) + var(--g)); }
+  #touch .b-fire2 { --s: calc(var(--u) * 1.2); width: var(--s); left: calc(var(--sl) + clamp(120px, 36vmin, 170px) + var(--g));
+    bottom: calc(var(--sb) + clamp(120px, 36vmin, 170px) * 0.55); background: rgba(210, 58, 47, .3); border-color: rgba(255, 150, 140, .45); }
+  /* top bar */
+  #touch .b-bino, #touch .b-zin, #touch .b-zout, #touch .b-map, #touch .b-menu, #touch .b-gear {
+    top: var(--st); width: clamp(44px, 12vmin, 56px); }
+  #touch .b-menu { left: max(12px, env(safe-area-inset-left)); }
+  #touch .b-map { left: calc(max(12px, env(safe-area-inset-left)) + clamp(50px, 13.5vmin, 62px)); }
+  #touch .b-gear { right: max(12px, env(safe-area-inset-right)); font-size: clamp(16px, 4.5vmin, 20px); }
+  #touch .b-bino { right: calc(max(12px, env(safe-area-inset-right)) + clamp(50px, 13.5vmin, 62px)); }
+  #touch .b-zin { right: calc(max(12px, env(safe-area-inset-right)) + 2 * clamp(50px, 13.5vmin, 62px)); font-size: clamp(16px, 4.5vmin, 20px); }
+  #touch .b-zout { right: calc(max(12px, env(safe-area-inset-right)) + 3 * clamp(50px, 13.5vmin, 62px)); font-size: clamp(16px, 4.5vmin, 20px); }
   /* settings sheet and the first-start guide (touch.js); both live inside #stage so they show in fullscreen */
   #tsettings, #tguide { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; padding: 12px;
     background: rgba(0, 0, 0, .55); -webkit-user-select: none; user-select: none; }
@@ -356,9 +375,14 @@
   .ts-row > span { display: flex; justify-content: space-between; color: var(--muted); font-size: 12.5px; margin-bottom: 3px; }
   .ts-row output { color: var(--fg); font-variant-numeric: tabular-nums; }
   .ts-row input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); }
-  .ts-seg { display: flex; gap: 0; border: 1px solid rgba(255, 255, 255, .22); border-radius: 8px; overflow: hidden; }
-  .ts-seg button { flex: 1; padding: 7px 4px; border: 0; background: transparent; color: var(--muted); font: 600 12px ui-sans-serif, system-ui, sans-serif; }
-  .ts-seg button.on { background: var(--accent); color: #04140a; }
+  .ts-seg, .seg { display: flex; gap: 0; border: 1px solid rgba(255, 255, 255, .22); border-radius: 8px; overflow: hidden; }
+  .ts-seg button, .seg button { flex: 1; padding: 7px 4px; border: 0; border-radius: 0; background: transparent; color: var(--muted); font: 600 12px ui-sans-serif, system-ui, sans-serif; }
+  .ts-seg button.on, .seg button.on { background: var(--accent); color: #04140a; }
+  /* the device choice on the landing screen */
+  .device { margin: 18px auto 0; width: min(100%, 360px); }
+  .device-label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 13px; }
+  .device .seg { background: rgba(0, 0, 0, .25); }
+  .device .seg button { padding: 9px 6px; font-size: 13px; }
   .ts-note { display: block; color: var(--faint); font-size: 11px; margin-top: 4px; min-height: 1.2em; }
   .ts-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
   .ts-foot button { padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .22); background: transparent; color: var(--fg);
@@ -370,7 +394,9 @@
     background: rgba(255, 255, 255, .1); color: var(--accent-hi); font-size: 13px; }
   .tg-grid span { font-size: 12px; line-height: 1.35; color: var(--muted); }
   .tg-grid span b { color: var(--fg); }
-  .tg-ok { margin-top: 12px; width: 100%; padding: 9px; }
+  .tg-switch { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--fg); }
+  .tg-switch input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+  .tg-ok { margin-top: 10px; width: 100%; padding: 9px; }
   @media (max-height: 420px) { .tg-grid { gap: 3px 12px; } .tg-grid span { font-size: 11px; } .tg-card { padding: 10px 14px; } .tg-ok { margin-top: 8px; padding: 7px; } }
 
   /* --- loading & boot flourish --- */
@@ -456,14 +482,15 @@
       <div class="tg-card">
         <b class="tg-title">How to play</b>
         <div class="tg-grid">
-          <div><i>✥</i><span><b>Move</b> — the stick on the left. Up/down also move through menus.</span></div>
-          <div><i>⌖</i><span><b>Aim</b> — swipe anywhere on the right. Hold FIRE and drag to aim while shooting.</span></div>
-          <div><i>◎</i><span><b>Scope</b> — SCOPE toggles the sniper scope and binocular zoom; ZOOM+ / ZOOM− fine-tune it.</span></div>
-          <div><i>⇅</i><span><b>Walk / crouch</b> — WALK and CROUCH toggle (lit = on). Project I.G.I. has no prone.</span></div>
-          <div><i>⚙</i><span><b>Settings</b> — swipe sensitivity, scope sensitivity, gyroscope aiming (turn the phone to aim).</span></div>
-          <div><i>☰</i><span><b>Menu</b> — MENU opens the game menu. Leave its Configuration keys at default, the buttons depend on them.</span></div>
+          <div><i>✥</i><span><b>Move</b> — the stick on the left. WALK above it toggles walk / run.</span></div>
+          <div><i>⌖</i><span><b>Aim</b> — swipe anywhere in the middle. Hold either FIRE and drag to aim while shooting.</span></div>
+          <div><i>◎</i><span><b>Scope</b> — tap the eye to snap the sniper scope or binoculars to 4× and back; + / − fine-tune.</span></div>
+          <div><i>⇅</i><span><b>Crouch / jump / peek</b> — around FIRE. CROUCH stays lit while crouched. There is no prone in this game.</span></div>
+          <div><i>⚙</i><span><b>Settings</b> — sensitivity, scope zoom, gyroscope. MENU pauses; tap the menu items as usual.</span></div>
+          <div><i>⟲</i><span><b>Gyroscope</b> — turn the phone to fine-aim while scoped, like PUBG. Your browser may ask for motion access.</span></div>
         </div>
-        <button type="button" class="tg-ok btn">Got it</button>
+        <label class="tg-switch"><input type="checkbox" id="tg-gyro" checked> Gyroscope aiming while scoped</label>
+        <button type="button" class="tg-ok btn">Let's go</button>
       </div>
     </div>
     <div id="fstip" class="hidden">Press <kbd>Alt</kbd> + <kbd>Enter</kbd> for fullscreen</div>
@@ -502,7 +529,16 @@
           </button>
           <button id="go-online" class="choice hidden"></button>
         </div>
-        <p class="small desk" style="margin-top:22px">Keys, mouse buttons and sensitivity: the Controls panel on the right (leave the game's own Configuration at its defaults).<br>
+        <!-- Which controls to set up (loader.js: device choice, remembered). Phones get the touch layout and the
+             gyroscope, computers the keyboard and mouse; the detection is only the preselected default. -->
+        <div id="device" class="device" role="radiogroup" aria-label="Playing on">
+          <span class="device-label">I'm playing on</span>
+          <div class="seg">
+            <button type="button" data-device="touch" role="radio" aria-checked="false">📱 Phone / tablet</button>
+            <button type="button" data-device="pc" role="radio" aria-checked="false">🖥️ Keyboard &amp; mouse</button>
+          </div>
+        </div>
+        <p class="small desk" style="margin-top:18px">Keys, mouse buttons and sensitivity: the Controls panel on the right (leave the game's own Configuration at its defaults).<br>
           Fullscreen: <kbd>Alt</kbd> + <kbd>Enter</kbd> (<kbd>⌥</kbd> + <kbd>Enter</kbd> on Mac) or the button in the corner.</p>
         <p class="small"><a href="#" id="reset">Use a different game folder</a></p>
       </section>
@@ -633,7 +669,7 @@
     <div class="row"><span class="label">Menu</span><div class="keys"><kbd>Esc</kbd></div></div>
     <div class="row"><span class="label">Fullscreen</span><div class="keys"><kbd>Alt</kbd>+<kbd>Enter</kbd></div></div>
     <div class="kbd-foot">
-      <span class="small">Click a key, then press the new one (<kbd>Esc</kbd> cancels). Walk/run and crouch toggle on each press. This game has no prone.</span>
+      <span class="small">Click a key, then press the new one (<kbd>Esc</kbd> cancels, <kbd>Backspace</kbd> unbinds). Walk/run and crouch toggle on each press. This game has no prone.</span>
       <button id="kbd-reset" type="button" class="btn ghost">Reset</button>
     </div>
   </aside>
@@ -708,9 +744,9 @@
   })();
 </script>
 <script src="netplay.js"></script>
-<script src="controls.js?v=1"></script>
-<script src="touch.js?v=4"></script>
-<script src="loader.js?v=13"></script>
+<script src="controls.js?v=2"></script>
+<script src="touch.js?v=5"></script>
+<script src="loader.js?v=14"></script>
 <script>
   // Ads (slots switched on in RC_ADS; the network tags are in ad.html). The page is cross-origin isolated,
   // which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>: that

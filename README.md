@@ -9,14 +9,26 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
 
 - **DirectDraw 7 / Direct3D 7** (`host/ddraw7.c`), which this game uses instead of Direct3D 8, on the same
   WebGPU renderer, plus the few extra Windows calls the game makes (`host/mm.c`, registry, timers, threads).
-- **Phones and tablets**: on-screen stick and buttons (`web/touch.js`), a scope toggle, walk and crouch
-  toggles, gyroscope aiming (turn the phone to aim), swipe and scope sensitivity settings, a first-start
-  controls guide, fullscreen and landscape, the stage following the visual viewport so a zoomed or scrolled
-  page never crops the picture.
-- **Keyboard and mouse**: WASD defaults with every key rebindable from the page, mouse buttons bindable to any
-  action (right click toggles the sniper scope by default), a mouse sensitivity setting; all saved in the
-  browser (`web/controls.js`). The game only has hold-to-zoom keys, so the scope toggle holds Zoom In for a
-  moment and later holds Zoom Out for as long as the view was zoomed.
+- **Phones and tablets**: on-screen stick and buttons laid out like mobile shooters (`web/touch.js`: a big
+  FIRE with jump / crouch / scope around it, a second FIRE above the stick, walk/run and binoculars toggles),
+  a scope button that snaps to a chosen zoom and back, gyroscope aiming (turn the phone to fine-aim while
+  scoped, or always), swipe / scope / gyro sensitivity settings, a first-start controls guide, taps that work
+  in the game's menus including the Esc menu, fullscreen and landscape, the stage following the visual
+  viewport so a zoomed or scrolled page never crops the picture.
+- **Keyboard and mouse**: the game's original keys by default with a one-click Modern (WASD) layout, every key
+  rebindable from the page, mouse buttons bindable to any action (right click toggles the sniper scope), a
+  mouse sensitivity setting; all saved in the browser (`web/controls.js`). The landing screen asks whether
+  you play on a phone or with keyboard and mouse (remembered).
+- **Input fidelity** (`host/dinput.c`, `host/render_rec.c`): the game accelerates the mouse (a slow move turns
+  half as far per count as a fast one, and the feel changed with the frame rate); the host sends the inverse
+  curve so the response is linear (0.21° per count), carries motion beyond the game's per-frame limit into the
+  next frame, and keeps every press until the game has sampled it, so taps are never lost at a phone's frame
+  rate. The scope toggle reads the real zoom of the view (the world's projection) and holds the game's Zoom
+  keys until the view is there. The Esc menu over a paused mission is told apart from play by the game's
+  clock standing still, so its cursor is never inverted and phone taps reach its items.
+- **Widescreen**: the 3D world fills a 16:9 (or any) screen with a wider field of view, while the game's 2D
+  menus, HUD and scope masks keep their 4:3 proportions in the middle (`host/render_wgpu.c`, `rc_set_wide`;
+  a setting on the page, on by default).
 - **Safari / iOS**: WebKit keeps far more memory per page than Chromium (its baseline WebAssembly JIT alone
   holds about 1.6 GB for this game) and iPhones kill a tab near 2 GB. The guest memory is laid out
   compactly and grown on demand, host thread stacks are small, and GPU uploads are coalesced per batch

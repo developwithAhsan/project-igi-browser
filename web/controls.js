@@ -2,22 +2,25 @@
 //  - the game's actions and the default key each one has in its config.qvm (the game's own bindings stay at
 //    their defaults; everything here translates onto them in the browser)
 //  - mouse button bindings (which action left / right / middle click does, saved per browser)
-//  - the scope toggle: the game only has stepped Zoom In / Zoom Out keys (sniper scope, binoculars); one
-//    button that toggles the scope on and off is what players expect
+//  - the scope toggle: the game only has Zoom In / Zoom Out keys that zoom continuously while held (sniper
+//    scope, binoculars); one button that snaps to a scope zoom and back is what players expect. The host
+//    reports the actual zoom of the view (input_zoom: the projection's y scale, 2.31 at the normal view, up
+//    to ~21 fully zoomed), so the toggle holds the key until the view really is there, at any frame rate.
 //  - look settings: touch swipe sensitivity, a scope multiplier, PC mouse sensitivity
 //  - the gyroscope on phones: turning the phone turns the view, like mobile shooters do
-// Everything reaches the game as the keys and mouse it already reads (host/input.c), only in a mission
-// (host input_in_mission): the 2D menus always get a plain click and an unscaled cursor.
+// Everything reaches the game as the keys and mouse it already reads (host/input.c), only in mouse-look mode
+// (host input_in_mission: a mission with the game running): the 2D menus, and the Esc menu over a paused
+// mission, always get a plain click and an unscaled cursor.
 'use strict';
 
 const RcControls = (() => {
   const STORE = 'igi-settings';
-  const HOLD_MS = 70;   // the game samples input once a frame (30 fps in missions): hold taps at least this long
+  const HOLD_MS = 70;   // the game samples input once a frame: hold taps at least this long (the host also keeps a press until sampled)
 
   // what the game does and the key it reads for it (HID usage; the game's defaults from config.qvm)
   const ACTIONS = {
     fire:       { label: 'Fire',            mouse: 0 },
-    scope:      { label: 'Scope (toggle)',  scope: true },     // Zoom In once / Zoom Out back to normal view
+    scope:      { label: 'Scope (toggle)',  scope: true },     // zoom to the scope level / back to the normal view
     zoomin:     { label: 'Zoom in',         key: 75 },         // Page Up
     zoomout:    { label: 'Zoom out',        key: 78 },         // Page Down
     nextweapon: { label: 'Next weapon',     mouse: 1 },        // the game's right click
@@ -39,31 +42,36 @@ const RcControls = (() => {
 
   const DEFAULTS = {
     mouse: { 0: 'fire', 1: 'altfire', 2: 'scope' },   // left, middle, right (MouseEvent.button)
-    mouseSens: 1,       // PC: multiplier on mouse motion
+    mouseSens: 0.6,     // PC: multiplier on mouse motion (the host makes the game's response linear, 0.212 deg per count)
     look: 1,            // touch: swipe sensitivity
-    scopeSens: 0.6,     // touch and gyro: multiplier while the scope is on
-    gyro: 'off',        // 'off' | 'on' | 'scope'
+    scopeSens: 1,       // touch, mouse and gyro while scoped: on top of the automatic slow-down by the zoom
+    scopeZoom: 4,       // the zoom the scope button snaps to (x the normal view)
+    gyro: 'scope',      // 'off' | 'on' | 'scope'
     gyroSens: 1,
+    wide: true,         // widescreen: the 3D world fills the whole screen (host rc_set_wide); false = 4:3 letterboxed
   };
   let S = load();
   function load() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch { saved = {}; }
     const s = { ...DEFAULTS, mouse: { ...DEFAULTS.mouse } };
-    for (const k of ['mouseSens', 'look', 'scopeSens', 'gyroSens']) if (typeof saved[k] === 'number' && saved[k] > 0) s[k] = saved[k];
+    for (const k of ['mouseSens', 'look', 'scopeSens', 'scopeZoom', 'gyroSens']) if (typeof saved[k] === 'number' && saved[k] > 0) s[k] = saved[k];
     if (['off', 'on', 'scope'].includes(saved.gyro)) s.gyro = saved.gyro;
+    if (typeof saved.wide === 'boolean') s.wide = saved.wide;
     if (saved.mouse) for (const b of [0, 1, 2]) if (ACTIONS[saved.mouse[b]]) s.mouse[b] = saved.mouse[b];
     return s;
   }
   function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch { /* storage blocked */ } }
   const get = () => S;
-  function set(k, v) { S[k] = v; save(); if (k === 'gyro') gyroApply(); }
+  function set(k, v) { S[k] = v; save(); if (k === 'gyro') gyroApply(); if (k === 'wide') wideApply(); }
+  const wideApply = () => { if (M && M._rc_set_wide) M._rc_set_wide(S.wide ? 1 : 0); };
   function setMouse(button, action) { S.mouse[button] = ACTIONS[action] ? action : 'none'; save(); }
-  function reset() { S = { ...DEFAULTS, mouse: { ...DEFAULTS.mouse } }; save(); gyroApply(); }
+  function reset() { S = { ...DEFAULTS, mouse: { ...DEFAULTS.mouse } }; save(); gyroApply(); wideApply(); }
 
   // ---- sending input: a key or mouse button held at least HOLD_MS so a quick tap still lasts a game frame
   let M = null;
   const inMission = () => !!(M && M._input_in_mission && M._input_in_mission());
+  const paused = () => !!(M && M._input_paused && M._input_paused());
   const downAt = new Map();
   function press(what, down) {
     if (!M) return;
@@ -76,72 +84,85 @@ const RcControls = (() => {
   }
   const tap = (what) => { press(what, true); press(what, false); };
 
-  // ---- the scope. The game's Zoom In / Zoom Out keys zoom continuously while held (the sniper scope and
-  // the binoculars; it saturates after about 2 s), so a scope toggle holds Zoom In for a moment, and later
-  // holds Zoom Out for as long as the view has been zoomed in, which brings it back to the normal view. The
-  // net zoom-in time is tracked from every zoom key the player uses; a weapon change drops the zoom in the
-  // game, so it resets the count.
-  const SCOPE_IN_MS = 420, ZOOM_MAX_MS = 2600, UNZOOM_EXTRA_MS = 350;
-  let zoomMs = 0;              // net time the view has been zooming in
-  let zoomKey = 0, zoomSince = 0;   // +1 / -1 while a zoom key is down, and since when
-  let seq = 0;                 // a toggle's timer
-  const scoped = () => zoomMs > 0;
+  // ---- the scope. zoom() is the view's zoom as the host saw it last frame (1 = normal view). scoped() is
+  // true once the view is zoomed in at all (the scope or binoculars are up, however it got there: the toggle,
+  // the plain zoom keys, the game). The toggle drives the zoom keys towards a target and lets go when the
+  // view gets there, stops moving (a weapon without a scope: nothing happens) or after a few seconds.
+  const BASE_M11 = 2.3094;   // the projection's y scale at the normal view (fov 47 deg)
+  const zoomRaw = () => (M && M._input_zoom ? M._input_zoom() : 0);
+  const zoom = () => { const z = zoomRaw(); return z > 0 ? z / BASE_M11 : 1; };
+  const scoped = () => zoom() > 1.12;
   const listeners = new Set();
-  const notify = () => { for (const f of listeners) f(scoped()); };
+  let lastScoped = false, lastShown = 0;
+  const notify = () => { for (const f of listeners) f(scoped(), zoom()); };
   function onScope(f) { listeners.add(f); }
-  function zoomSettle() {   // fold the time a zoom key has been held into zoomMs
-    if (!zoomKey) return;
-    const now = performance.now();
-    zoomMs = Math.max(0, Math.min(ZOOM_MAX_MS, zoomMs + zoomKey * (now - zoomSince)));
-    zoomSince = now;
-  }
-  function zoomKeyDown(dir) {   // the plain zoom keys, held from a button or a binding
-    zoomSettle();
-    if (zoomKey && zoomKey !== dir) press(zoomKey > 0 ? ACTIONS.zoomin : ACTIONS.zoomout, false);
-    zoomKey = dir; zoomSince = performance.now();
+  let zoomKey = 0;          // +1 / -1 while a zoom key is held (by the toggle or the player), 0 otherwise
+  let drive = null;         // the toggle's run: { dir, target, last, lastT, t0, timer }
+  function zoomKeyDown(dir) {
+    if (zoomKey === dir) return;
+    if (zoomKey) press(zoomKey > 0 ? ACTIONS.zoomin : ACTIONS.zoomout, false);
+    zoomKey = dir;
     press(dir > 0 ? ACTIONS.zoomin : ACTIONS.zoomout, true);
-    notify();
   }
   function zoomKeyUp(dir) {
     if (zoomKey !== dir) return;
-    zoomSettle();
     zoomKey = 0;
     press(dir > 0 ? ACTIONS.zoomin : ACTIONS.zoomout, false);
+  }
+  function driveStop() {
+    if (!drive) return;
+    clearInterval(drive.timer);
+    zoomKeyUp(drive.dir);
+    drive = null;
     notify();
   }
+  function zoomTo(target) {   // target: zoom factor (1 = normal view)
+    driveStop();
+    const z = zoom(), dir = target > z ? 1 : -1;
+    if (Math.abs(target - z) < 0.04 * target) return;
+    const now = performance.now();
+    drive = { dir, target, last: z, lastT: now, t0: now, timer: 0 };
+    zoomKeyDown(dir);
+    drive.timer = setInterval(() => {
+      const t = performance.now(), cur = zoom();
+      const reached = dir > 0 ? cur >= target * 0.97 : cur <= Math.max(1.02, target * 1.03);
+      if (Math.abs(cur - drive.last) > 0.005 * cur) { drive.last = cur; drive.lastT = t; }
+      // stuck for 700 ms (the zoom saturated, or this weapon has no scope) or 4 s overall: let go
+      if (reached || t - drive.lastT > 700 || t - drive.t0 > 4000) driveStop();
+    }, 16);
+  }
   function scopeToggle() {
-    if (seq) { clearTimeout(seq); seq = 0; if (zoomKey) zoomKeyUp(zoomKey); }
-    if (!scoped()) {
-      zoomKeyDown(1);
-      seq = setTimeout(() => { seq = 0; zoomKeyUp(1); }, SCOPE_IN_MS);
-    } else {
-      const hold = zoomMs + UNZOOM_EXTRA_MS;
-      zoomKeyDown(-1);
-      seq = setTimeout(() => { seq = 0; zoomKeyUp(-1); zoomMs = 0; notify(); }, hold);
-    }
+    if (!inMission()) return;
+    if (drive) { driveStop(); return; }   // a tap while it's still zooming: stop where it is
+    zoomTo(scoped() ? 1 : S.scopeZoom);
   }
-  function weaponChanged() {
-    if (seq) { clearTimeout(seq); seq = 0; }
-    if (zoomKey) { press(zoomKey > 0 ? ACTIONS.zoomin : ACTIONS.zoomout, false); zoomKey = 0; }
-    zoomMs = 0; notify();
-  }
+  function weaponChanged() { driveStop(); }   // the game drops the zoom itself; the readout follows
+  // the scope button's state follows the real zoom, polled a few times a second
+  setInterval(() => {
+    if (!M) return;
+    const s = scoped(), z = zoom();
+    if (s !== lastScoped || (s && Math.abs(z - lastShown) > 0.15)) { lastScoped = s; lastShown = z; notify(); }
+  }, 120);
 
   // ---- an action pressed / released (a mouse button or a touch button)
   function act(name, down) {
     const a = ACTIONS[name];
     if (!a) return;
     if (a.scope) { if (down) scopeToggle(); return; }
-    if (name === 'zoomin' || name === 'zoomout') { (down ? zoomKeyDown : zoomKeyUp)(name === 'zoomin' ? 1 : -1); return; }
+    if (name === 'zoomin' || name === 'zoomout') {
+      if (down) { driveStop(); zoomKeyDown(name === 'zoomin' ? 1 : -1); } else zoomKeyUp(name === 'zoomin' ? 1 : -1);
+      return;
+    }
     if (down && (name === 'nextweapon' || name === 'prevweapon')) weaponChanged();
     press(a, down);
   }
-  // which action a physical mouse button does right now: in a mission the player's binding, in the menus the
-  // plain button (left click must always click)
+  // which action a physical mouse button does right now: in mouse-look mode the player's binding, in the
+  // menus (and the Esc menu over a paused mission) the plain button, so left click always clicks
   function mouseAction(button) {
     if (!inMission()) return button === 0 ? 'fire' : button === 2 ? 'nextweapon' : 'none';
     return S.mouse[button] || 'none';
   }
-  // key events that change the weapon (the game's own keys: O, the weapon rows 1-9) drop the scope count
+  // key events that change the weapon (the game's own keys: O, the weapon rows 1-9) end a scope toggle in progress
   function keyUsage(usage, down) {
     if (down && (usage === 18 || (usage >= 30 && usage <= 38))) weaponChanged();
   }
@@ -154,14 +175,16 @@ const RcControls = (() => {
     const ix = Math.trunc(fx), iy = Math.trunc(fy);
     if (ix || iy) { M._input_mouse_move(ix, iy); fx -= ix; fy -= iy; }
   }
-  const lookScale = () => (scoped() ? S.scopeSens : 1);
+  // While scoped the view turns slower, in step with the zoom (at 4x a swipe turns about a third as far),
+  // times the player's own scope multiplier; mobile shooters do the same.
+  const lookScale = () => { const z = zoom(); return z > 1.12 ? S.scopeSens * Math.pow(1 / z, 0.75) : 1; };
 
   // ---- gyroscope (devicemotion): the rotation rate about the vertical axis turns the view, about the screen's
   // horizontal axis tilts it. Gravity (low-passed accelerationIncludingGravity) gives both axes in the device's
   // frame whatever way the phone is held, so the mapping holds in either landscape and when the phone is
   // tilted back. iOS reports the acceleration with the opposite sign to the spec, and needs permission.
   const webkit = /AppleWebKit\//.test(navigator.userAgent) && !/Chrome\/|Chromium\/|Edg\//.test(navigator.userAgent);
-  const DEG = 4.0;   // mouse counts per degree of phone rotation at sensitivity 1
+  const DEG = 4.7;   // mouse counts per degree of phone rotation at sensitivity 1 (the game turns 0.212 deg per count)
   let g = null, gyroOn = false, gyroLast = 0, gyroStatus = 'idle';   // idle | on | denied | none
   const gyroState = () => gyroStatus;
   function onMotion(e) {
@@ -182,9 +205,12 @@ const RcControls = (() => {
     const rn = Math.hypot(right[0], right[1]);
     if (rn < 0.3) return;                                      // phone lying flat: no horizontal reference
     right[0] /= rn; right[1] /= rn;
-    const w = [r.beta, r.gamma, r.alpha];                      // deg/s about device x, y, z (right-hand rule)
+    // deg/s about device x, y, z. The spec names alpha the rate about z, but Chromium AND WebKit both fill
+    // alpha/beta/gamma straight from the gyroscope's x/y/z (device_motion_event_pump.cc, WebCoreMotionManager.mm).
+    const w = [r.alpha, r.beta, r.gamma];
     const yaw = w[0] * up[0] + w[1] * up[1] + w[2] * up[2];    // turning left = positive
     const pitch = w[0] * right[0] + w[1] * right[1];           // tilting the top edge back (looking up) = negative
+    if (Math.abs(yaw) < 0.4 && Math.abs(pitch) < 0.4) return;  // hand tremor: a small dead zone
     const k = DEG * S.gyroSens * lookScale() * dt;
     look(-yaw * k, pitch * k);
   }
@@ -220,8 +246,8 @@ const RcControls = (() => {
     window.addEventListener('touchend', once, true);
   }
 
-  function attach(module) { M = module; gyroApply(); }
+  function attach(module) { M = module; gyroApply(); wideApply(); }
 
   return { ACTIONS, MOUSE_CHOICES, DEFAULTS, get, set, setMouse, reset, attach, press, tap, act, mouseAction, keyUsage,
-    look, lookScale, scoped, onScope, weaponChanged, inMission, gyroEnable, gyroState };
+    look, lookScale, scoped, zoom, zoomTo, onScope, weaponChanged, inMission, paused, gyroEnable, gyroState };
 })();

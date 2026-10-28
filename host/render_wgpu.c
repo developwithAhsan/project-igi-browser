@@ -35,7 +35,7 @@ static const char *WGSL_COMMON =
 "  st1: vec4<u32>,\n"
 "  st1b: vec4<u32>,\n"
 "  tfactor: vec4<f32>,\n"
-"  misc: vec4<f32>,      // x: alpha ref (0..1)\n"
+"  misc: vec4<f32>,      // x: alpha ref (0..1), y: clip x scale (1, or less on a widescreen target)\n"
 "  mat_diffuse: vec4<f32>,\n"
 "  ambient: vec4<f32>,\n"
 "  psc: array<vec4<f32>, 8>,   // pixel shader constants c0-c7\n"
@@ -67,6 +67,7 @@ static const char *WGSL_COMMON =
 "  } else {\n"
 "    var p = u.mvp * vec4<f32>(v.pos.xyz, 1.0);\n"
 "    if (u.flags.x == 2u) { p = v.pos; }   // vertex shader output: already in clip space\n"
+"    p.x = p.x * u.misc.y;                 // widescreen: the 4:3 projection spread over a wider target\n"
 "    p.x = p.x + p.w / u.vp.z;\n"
 "    p.y = p.y - p.w / u.vp.w;\n"
 "    o.pos = p;\n"
@@ -247,11 +248,24 @@ static void make_depth(void) {
     g_depth_view = wgpuTextureCreateView(g_depth, NULL);
 }
 
+/* Widescreen (rc_set_wide, RC_WIDE natively): the back buffer is the whole window and the 3D world is drawn
+   across all of it with a wider horizontal field of view (the game's 4:3 projection scaled in x), while the
+   game's 2D drawing (menus, HUD, the scope overlays) keeps a 4:3 box in the middle. Off: the whole picture is
+   the largest 4:3 box that fits, letterboxed. */
+int g_wide;
+static int g_wide_cfg;
+static int g_world_frame;   /* a 3D draw reached the back buffer this frame */
+/* How much of the game's screen its 2D drawing covered last frame (sum of the quads' areas): the sniper scope
+   and binocular masks are tiled 2D quads covering all of it, and then the world must stay inside the 4:3 box
+   (the mask can't be stretched), so such frames are letterboxed. The HUD and the Esc menu cover far less. */
+static float g_cover, g_overlay_prev;
 static void configure_surface(void) {
     g_win_w = g_window_w > 0 ? g_window_w : 1024;
     g_win_h = g_window_h > 0 ? g_window_h : 768;
+    g_wide_cfg = g_wide;
+    if (g_wide) { g_surf_w = g_win_w; g_surf_h = g_win_h; }
     /* the game is 4:3: render at the largest 4:3 size that fits, letterboxed (no stretching) */
-    if (g_win_w * 3 > g_win_h * 4) { g_surf_h = g_win_h; g_surf_w = g_win_h * 4 / 3; }
+    else if (g_win_w * 3 > g_win_h * 4) { g_surf_h = g_win_h; g_surf_w = g_win_h * 4 / 3; }
     else { g_surf_w = g_win_w; g_surf_h = g_win_w * 3 / 4; }
     WGPUSurfaceConfiguration sc = WGPU_SURFACE_CONFIGURATION_INIT;
     sc.device = g_dev;
@@ -361,6 +375,7 @@ static void create_resources(void) {
 
 #ifndef __EMSCRIPTEN__
 int gpu_init_native(void) {
+    if (getenv("RC_WIDE")) g_wide = 1;   /* testing: widescreen from the start */
     if (g_dev) return 1;
     if (!g_metal_layer) { fprintf(stderr, "[wgpu] no window\n"); return 0; }
     g_inst = wgpuCreateInstance(NULL);
@@ -694,15 +709,20 @@ static void submit(void) {
     g_batch++;
 }
 
+static void begin_pass(uint32_t clear, uint32_t color, float z, uint32_t stencil);
 static void begin_frame(void) {
     if (g_frame_open) return;
-    if (g_window_w != g_win_w || g_window_h != g_win_h) {
+    if (g_window_w != g_win_w || g_window_h != g_win_h || g_wide != g_wide_cfg) {
         end_pass();
         configure_surface();
         g_tgt_color = g_tgt_depth = NULL;
         g_tgt_w = (uint32_t)g_surf_w; g_tgt_h = (uint32_t)g_surf_h;
     }
     g_frame_open = 1;
+    g_world_frame = 0;
+    /* widescreen: the sides outside the game's 4:3 box start black every frame, so a 2D screen that doesn't
+       clear never shows the previous frame there */
+    if (g_wide_cfg && !g_tgt_color) begin_pass(1, 0, 1.f, 0);
 }
 
 /* Opens a render pass on the current target; clear flags: 1 color, 2 depth, 4 stencil. */
@@ -962,12 +982,61 @@ static void exec_draw(const CmdDraw *c) {
             views[s] = gs && !gs->depth && gs->view != g_tgt_color ? gs->view : g_black.view;
         }
     }
+    /* Where this draw lands on the target. Plain: the target scaled from the game's logical size. Widescreen
+       back buffer: 3D draws cover the whole target with their clip x scaled down (the same vertical field of
+       view, more to the sides); 2D draws keep a 4:3 box in the middle, except a full-screen quad drawn over
+       the world (the scope and binocular masks, fades), which is scaled up to cover the whole target. */
+    int pre = c->u.flags[0] == 1, bb = !g_tgt_gs && !c->full_viewport;
+    int wide = g_wide_cfg && bb && g_tgt_w * 3 != g_tgt_h * 4 && !(g_overlay_prev > 0.5f);
+    float xscale = 1.f;
+    float vx, vy, vw, vh;
+    if (c->full_viewport) { vx = vy = 0; vw = (float)g_tgt_w; vh = (float)g_tgt_h; }
+    else if (!wide) {
+        float sx = (float)g_tgt_w / (float)g_tgt_lw, sy = (float)g_tgt_h / (float)g_tgt_lh;
+        vx = c->vp[0] * sx; vy = c->vp[1] * sy; vw = c->vp[2] * sx; vh = c->vp[3] * sy;
+        if (pre && bb && n <= 8) {
+            const CVert *v = (const CVert *)(c + 1);
+            float lw = (float)g_tgt_lw, lh = (float)g_tgt_lh, x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+            for (uint32_t i = 0; i < n; i++) { x0 = fminf(x0, v[i].x); y0 = fminf(y0, v[i].y); x1 = fmaxf(x1, v[i].x); y1 = fmaxf(y1, v[i].y); }
+            g_cover += fminf(1.f, fmaxf(0.f, fminf(x1, lw) - fmaxf(x0, 0.f)) * fmaxf(0.f, fminf(y1, lh) - fmaxf(y0, 0.f)) / (lw * lh));
+        }
+    } else {
+        float W = (float)g_tgt_w, H = (float)g_tgt_h, lw = (float)g_tgt_lw, lh = (float)g_tgt_lh;
+        float sbox = fminf(W / lw, H / lh);                      /* the 4:3 box: the largest that fits */
+        float bx = (W - lw * sbox) / 2, by = (H - lh * sbox) / 2;
+        if (!pre) {
+            g_world_frame = 1;
+            vx = c->vp[0] * (W / lw); vy = c->vp[1] * (H / lh); vw = c->vp[2] * (W / lw); vh = c->vp[3] * (H / lh);
+            xscale = (lw * H) / (lh * W);
+        } else {
+            int full = 0;
+            if (n <= 8) {   /* a quad: how much of the screen it covers, and does it span the full width (a fade, a cutscene bar)? */
+                const CVert *v = (const CVert *)(c + 1);
+                float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+                for (uint32_t i = 0; i < n; i++) { x0 = fminf(x0, v[i].x); y0 = fminf(y0, v[i].y); x1 = fmaxf(x1, v[i].x); y1 = fmaxf(y1, v[i].y); }
+                float a = fmaxf(0.f, fminf(x1, lw) - fmaxf(x0, 0.f)) * fmaxf(0.f, fminf(y1, lh) - fmaxf(y0, 0.f)) / (lw * lh);
+                g_cover += fminf(1.f, a);
+                full = g_world_frame && x0 <= 1.f && x1 >= lw - 1.f;
+            }
+            float sc = full ? fmaxf(W / lw, H / lh) : sbox;     /* cover the target, or the 4:3 box */
+            float ox = full ? (W - lw * sc) / 2 : bx, oy = full ? (H - lh * sc) / 2 : by;
+            vx = ox + c->vp[0] * sc; vy = oy + c->vp[1] * sc; vw = c->vp[2] * sc; vh = c->vp[3] * sc;
+        }
+    }
+    if (vx < 0) { vw += vx; vx = 0; }
+    if (vy < 0) { vh += vy; vy = 0; }
+    if (vx + vw > g_tgt_w) vw = g_tgt_w - vx;
+    if (vy + vh > g_tgt_h) vh = g_tgt_h - vy;
+    if (vw <= 0 || vh <= 0) return;
+    Uniforms u;
+    memcpy(&u, &c->u, sizeof u);
+    u.misc[1] = xscale;
     if (g_coalesce) {
         memcpy(g_vstage + g_vpos, c + 1, bytes);
-        memcpy(g_ustage + g_upos, &c->u, sizeof c->u);
+        memcpy(g_ustage + g_upos, &u, sizeof u);
     } else {
         wgpuQueueWriteBuffer(g_queue, g_vbuf, g_vpos, c + 1, bytes);
-        wgpuQueueWriteBuffer(g_queue, g_ubuf, g_upos, &c->u, sizeof c->u);
+        wgpuQueueWriteBuffer(g_queue, g_ubuf, g_upos, &u, sizeof u);
     }
 
     WGPUBindGroupEntry te[8];
@@ -1001,15 +1070,6 @@ static void exec_draw(const CmdDraw *c) {
     if (!ps) k.ps = 0;
     WGPURenderPipeline p = pipeline_for(&k);
 
-    float vx, vy, vw, vh;
-    if (c->full_viewport) { vx = vy = 0; vw = (float)g_tgt_w; vh = (float)g_tgt_h; }
-    else {
-        float sx = (float)g_tgt_w / (float)g_tgt_lw, sy = (float)g_tgt_h / (float)g_tgt_lh;
-        vx = c->vp[0] * sx; vy = c->vp[1] * sy; vw = c->vp[2] * sx; vh = c->vp[3] * sy;
-        if (vx + vw > g_tgt_w) vw = g_tgt_w - vx;
-        if (vy + vh > g_tgt_h) vh = g_tgt_h - vy;
-    }
-    if (vw <= 0 || vh <= 0) return;
     wgpuRenderPassEncoderSetViewport(g_pass, vx, vy, vw, vh, c->minz, c->maxz);
     wgpuRenderPassEncoderSetPipeline(g_pass, p);
     uint32_t off = g_upos;
@@ -1047,6 +1107,7 @@ static void pace_60hz(void) {
 
 static void exec_present(const CmdPresent *c) {
     begin_frame();
+    g_overlay_prev = g_cover; g_cover = 0;
     use_backbuffer();
     if (!g_pass && !g_enc) begin_pass(1, 0, 1.f, 0);   /* nothing drawn: present black */
     submit();
@@ -1234,6 +1295,8 @@ EMSCRIPTEN_KEEPALIVE int rc_gpu_pump(int allow_present) {
 }
 
 EMSCRIPTEN_KEEPALIVE void rc_set_canvas_size(int w, int h) { g_window_w = w; g_window_h = h; }
+/* widescreen on / off (see configure_surface); takes effect at the next frame */
+EMSCRIPTEN_KEEPALIVE void rc_set_wide(int on) { g_wide = on ? 1 : 0; }
 
 static void on_web_device(WGPURequestDeviceStatus st, WGPUDevice d, WGPUStringView msg, void *u1, void *u2) {
     (void)u1; (void)u2;

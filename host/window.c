@@ -124,6 +124,8 @@ int window_create(const char *title) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         return 0;
     }
+    /* testing: RC_WINDOW=WxH opens the window at that size (e.g. a 16:9 window for the widescreen view) */
+    if (getenv("RC_WINDOW")) { int ww, wh; if (sscanf(getenv("RC_WINDOW"), "%dx%d", &ww, &wh) == 2) { g_window_w = ww; g_window_h = wh; } }
     g_window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, g_window_w, g_window_h,
                                 SDL_WINDOW_METAL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
                                 (getenv("RC_FULLSCREEN") ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));

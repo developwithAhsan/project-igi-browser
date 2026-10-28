@@ -2,6 +2,7 @@
  * window backend; until there is a real window everything reads as "nothing pressed". */
 #include "com.h"
 
+#include <math.h>
 #include <pthread.h>
 
 #define W(name) static void name(CPU *c)
@@ -21,6 +22,9 @@ int32_t g_mouse_dx, g_mouse_dy, g_mouse_buttons;
 /* A press counts as held for at least 50 ms: the game samples state once per frame, so a very quick
    tap (or an automated click) would otherwise fall between two samples. */
 static double g_dik_down_at[256], g_button_down_at[4];
+/* and in any case until the game has sampled it once: on a phone running a mission at 10-15 fps a tap
+   shorter than a frame would otherwise never be seen */
+static uint8_t g_dik_pending[256], g_button_pending[4];
 #define MIN_HOLD (deterministic() ? 0.0 : 0.05)   /* deterministic runs: state is exactly what was pressed */
 
 /* Buffered input (GetDeviceData): DIDEVICEOBJECTDATA records per device kind. */
@@ -94,11 +98,11 @@ static void push(int kind, uint32_t ofs, uint32_t data) {
 }
 void dinput_key(uint8_t dik, int down) {
     g_dik[dik] = (uint8_t)down;
-    if (down) g_dik_down_at[dik] = host_seconds();
+    if (down) { g_dik_down_at[dik] = host_seconds(); if (!deterministic()) g_dik_pending[dik] = 1; }
     push(1, dik, down ? 0x80 : 0);
 }
 void dinput_mouse_button(int b, int down) {
-    if (down) { g_mouse_buttons |= 1 << b; if (b < 4) g_button_down_at[b] = host_seconds(); }
+    if (down) { g_mouse_buttons |= 1 << b; if (b < 4) { g_button_down_at[b] = host_seconds(); if (!deterministic()) g_button_pending[b] = 1; } }
     else g_mouse_buttons &= ~(1 << b);
     push(2, 12u + (uint32_t)b, down ? 0x80 : 0);
 }
@@ -109,6 +113,20 @@ void dinput_mouse_move(int dx, int dy) {
 }
 
 static ComInterface IDirectInputDevice_i;
+
+/* The game's mouse response, in "linear counts" (0.212 degrees each) for n counts in one frame, and its
+   inverse (bisection; the curve is monotonic). */
+static double mouse_curve(double n) {
+    double a = fabs(n), f = a < 50 ? a * (0.52 + 0.48 * (a / 50) * (a / 50)) : a;
+    return n < 0 ? -f : f;
+}
+static double mouse_linear(double want) {
+    double a = fabs(want);
+    if (a >= 50) return want;
+    double lo = 0, hi = 50;
+    for (int i = 0; i < 30; i++) { double m = (lo + hi) / 2; if (mouse_curve(m) < a) lo = m; else hi = m; }
+    return want < 0 ? -lo : lo;
+}
 
 /* ------------------------------------------------------------------ joystick objects */
 
@@ -260,20 +278,48 @@ W(dev_GetDeviceState) {
     memset(HP(p), 0, n);
     if (d && d->kind == DEV_KEYBOARD) {
         double now = host_seconds();
-        for (uint32_t i = 0; i < n && i < 256; i++)
-            W8(p + i, g_dik[i] || now - g_dik_down_at[i] < MIN_HOLD ? 0x80 : 0);
+        for (uint32_t i = 0; i < n && i < 256; i++) {
+            W8(p + i, g_dik[i] || now - g_dik_down_at[i] < MIN_HOLD || g_dik_pending[i] ? 0x80 : 0);
+            g_dik_pending[i] = 0;
+        }
     } else if (d && d->kind == DEV_JOYSTICK) {
         pad_write_state(d, p, n);
     } else if (d && d->kind == DEV_MOUSE && n >= 16) {
         /* Browser movement is +down; IGI's mission look treats that as look-up, so invert Y to match the
            Windows original (push the mouse down -> aim down). Only in a mission: the 2D menus drive their
            cursor from the same axis the other way, so inverting there would reverse menu navigation. */
-        extern int g_in_mission;
-        W32(p, (uint32_t)g_mouse_dx); W32(p + 4, (uint32_t)(g_in_mission ? -g_mouse_dy : g_mouse_dy));
-        g_mouse_dx = g_mouse_dy = 0;
+        extern int g_in_mission, g_paused;
+        int look = g_in_mission && !g_paused;   /* the Esc menu over the world drives a cursor, not the view */
+        /* The game turns the view at most so far in one frame (about 250 counts): what a frame can't take is
+           carried into the next one, so a fast swipe on a slow phone still turns all the way (a frame late)
+           instead of being cut short. In cursor mode the motion goes through as it is. */
+        int32_t dx = g_mouse_dx, dy = g_mouse_dy;
+        if (look && !deterministic()) {
+            const int32_t lim = 240;
+            if (dx > lim) dx = lim; else if (dx < -lim) dx = -lim;
+            if (dy > lim) dy = lim; else if (dy < -lim) dy = -lim;
+            g_mouse_dx -= dx; g_mouse_dy -= dy;
+            /* The game accelerates the mouse: a frame's motion of n counts turns the view by about
+               0.212 * n * (0.52 + 0.48 * min(1, (n/50)^2)) degrees (measured, mission 1), so slow aiming moves
+               only half as far per count as a fast turn, and the feel changes with the frame rate (a phone
+               at 15 fps sums more counts into a frame than a PC at 60). Sending the inverse makes the
+               response linear: every count turns 0.212 degrees whatever the speed or frame rate. Fractions
+               carry over to the next frame. */
+            static double cx, cy;
+            cx += dx; cy += dy;
+            double ox = mouse_linear(cx), oy = mouse_linear(cy);
+            dx = (int32_t)(ox < 0 ? -floor(-ox) : floor(ox)); dy = (int32_t)(oy < 0 ? -floor(-oy) : floor(oy));
+            /* what was sent, in input counts: the forward curve of the sent counts */
+            cx -= mouse_curve(dx); cy -= mouse_curve(dy);
+            if (fabs(cx) < 1e-6) cx = 0; if (fabs(cy) < 1e-6) cy = 0;
+        } else { g_mouse_dx -= dx; g_mouse_dy -= dy; }
+        W32(p, (uint32_t)dx); W32(p + 4, (uint32_t)(look ? -dy : dy));
         double now = host_seconds();
-        for (int b = 0; b < 4; b++)
-            W8(p + 12 + b, ((g_mouse_buttons >> b) & 1) || now - g_button_down_at[b] < MIN_HOLD ? 0x80 : 0);
+        for (int b = 0; b < 4; b++) {
+            int down = ((g_mouse_buttons >> b) & 1) || now - g_button_down_at[b] < MIN_HOLD || g_button_pending[b];
+            g_button_pending[b] = 0;
+            W8(p + 12 + b, down ? 0x80 : 0);
+        }
     }
     RET(3, S_OK);
 }

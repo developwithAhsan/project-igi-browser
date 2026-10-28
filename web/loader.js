@@ -77,7 +77,9 @@ function showBoot() {
   showBoot.t2 = setTimeout(() => { phase.textContent = 'The first launch is the slow one — almost there…'; }, 45000);
   showBoot.t3 = setTimeout(() => { phase.textContent = 'Still working — a slow phone can take a couple of minutes…'; }, 90000);
   showBoot.t4 = setTimeout(hideBoot, 300000);   // safety: never trap the player behind the cover
-  b.onpointerdown = () => hideBoot();            // escape hatch: tap to dismiss
+  // A tap or click on the cover must NOT dismiss it (it used to: the canvas behind is still black, so the
+  // player saw the loading screen "turn black"). It only answers with a reassuring line.
+  b.onpointerdown = () => { phase.textContent = 'Still loading — nothing is stuck, the game is being set up…'; };
 }
 function hideBoot() {
   const b = $('booting');
@@ -351,24 +353,34 @@ let netKeyPressed = 0;   // keys pressed since the last poll, so a tap shorter t
 // player's chosen physical keys onto the game's default key for each action, entirely in the browser
 // and saved per browser (localStorage), so keys can be rebound without touching the game. Netplay is
 // unaffected: online, the keyboard only drives the pad (above), never raw keys.
-// id, label, default physical KeyboardEvent.code, the game's default key for that action (its code), group
+// Two layouts ("presets"): the game's ORIGINAL keys (arrows, Right Shift, Right Ctrl, numpad; what the game's
+// own Configuration screen shows, and what players of the 2000 game remember) and a MODERN WASD layout. The
+// original one is the default for new players, as the game ships; a few extra keys stand in for the numpad
+// and Right Ctrl that laptops don't have. Keys not listed here reach the game unchanged in both layouts.
+// id, label, { original, modern }: default physical KeyboardEvent.code per preset (null = unbound), the game's
+// default key for that action (its code), group
 const CONTROLS = [
-  ['forward', 'Move forward',   'KeyW',        'ArrowUp',      'Movement'],
-  ['back',    'Move backward',  'KeyS',        'ArrowDown',    'Movement'],
-  ['left',    'Strafe left',    'KeyA',        'ArrowLeft',    'Movement'],
-  ['right',   'Strafe right',   'KeyD',        'ArrowRight',   'Movement'],
-  ['walkrun', 'Walk / run',     'ShiftLeft',   'KeyW',         'Movement'],
-  ['crouch',  'Crouch',         'ControlLeft', 'ControlRight', 'Movement'],
-  ['jump',    'Jump',           'Space',       'Numpad0',      'Movement'],
-  ['peek',    'Peek',           'KeyQ',        'Numpad1',      'Movement'],
-  ['peek2',   'Peek (alt)',     'KeyE',        'Numpad1',      'Movement'],
-  ['reload',  'Reload',         'KeyR',        'Enter',        'Weapons & action'],
-  ['zoomin',  'Zoom in',        'Digit1',      'PageUp',       'Weapons & action'],
-  ['zoomout', 'Zoom out',       'Digit3',      'PageDown',     'Weapons & action'],
-  ['use',     'Use / activate', 'Tab',         'ShiftRight',   'Weapons & action'],
-  ['bino',    'Binoculars',     'KeyB',        'Space',        'Weapons & action'],   // Space itself is Jump above
+  ['forward', 'Move forward',   { original: 'ArrowUp',      modern: 'KeyW' },        'ArrowUp',      'Movement'],
+  ['back',    'Move backward',  { original: 'ArrowDown',    modern: 'KeyS' },        'ArrowDown',    'Movement'],
+  ['left',    'Strafe left',    { original: 'ArrowLeft',    modern: 'KeyA' },        'ArrowLeft',    'Movement'],
+  ['right',   'Strafe right',   { original: 'ArrowRight',   modern: 'KeyD' },        'ArrowRight',   'Movement'],
+  ['walkrun', 'Walk / run',     { original: 'KeyW',         modern: 'ShiftLeft' },   'KeyW',         'Movement'],
+  ['crouch',  'Crouch',         { original: 'ControlRight', modern: 'ControlLeft' }, 'ControlRight', 'Movement'],
+  ['crouch2', 'Crouch (alt)',   { original: 'ControlLeft',  modern: null },          'ControlRight', 'Movement'],
+  ['jump',    'Jump',           { original: 'Numpad0',      modern: 'Space' },       'Numpad0',      'Movement'],
+  ['jump2',   'Jump (alt)',     { original: 'KeyX',         modern: null },          'Numpad0',      'Movement'],
+  ['peek',    'Peek',           { original: 'Numpad1',      modern: 'KeyQ' },        'Numpad1',      'Movement'],
+  ['peek2',   'Peek (alt)',     { original: 'KeyQ',         modern: 'KeyE' },        'Numpad1',      'Movement'],
+  ['reload',  'Reload',         { original: 'Enter',        modern: 'KeyR' },        'Enter',        'Weapons & action'],
+  ['zoomin',  'Zoom in',        { original: 'PageUp',       modern: 'Digit1' },      'PageUp',       'Weapons & action'],
+  ['zoomout', 'Zoom out',       { original: 'PageDown',     modern: 'Digit3' },      'PageDown',     'Weapons & action'],
+  ['use',     'Use / activate', { original: 'ShiftRight',   modern: 'Tab' },         'ShiftRight',   'Weapons & action'],
+  ['bino',    'Binoculars',     { original: 'Space',        modern: 'KeyB' },        'Space',        'Weapons & action'],   // in the modern layout Space is Jump
 ];
+const PRESETS = { original: 'Original (as the game ships)', modern: 'Modern (WASD)' };
 const CONTROL_STORE = 'igi-controls';
+const PRESET_STORE = 'igi-preset';
+let preset = 'original';
 // how a KeyboardEvent.code reads on screen
 function keyLabel(code) {
   if (!code) return '—';
@@ -398,11 +410,33 @@ function rebuildRemap() {
 function loadControls() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(CONTROL_STORE) || '{}') || {}; } catch { saved = {}; }
+  try { if (PRESETS[localStorage.getItem(PRESET_STORE)]) preset = localStorage.getItem(PRESET_STORE); } catch { /* storage blocked */ }
   userKeys = {};
-  for (const [id, , def] of CONTROLS) userKeys[id] = typeof saved[id] === 'string' ? saved[id] : def;
+  for (const [id, , def] of CONTROLS) userKeys[id] = typeof saved[id] === 'string' || saved[id] === null ? saved[id] : def[preset];
   rebuildRemap();
 }
-function saveControls() { try { localStorage.setItem(CONTROL_STORE, JSON.stringify(userKeys)); } catch { /* storage blocked */ } }
+function saveControls() {
+  try { localStorage.setItem(CONTROL_STORE, JSON.stringify(userKeys)); localStorage.setItem(PRESET_STORE, preset); } catch { /* storage blocked */ }
+}
+function applyPreset(name) {
+  preset = PRESETS[name] ? name : 'original';
+  for (const [id, , def] of CONTROLS) userKeys[id] = def[preset];
+  saveControls(); rebuildRemap();
+}
+// Players from before the layouts existed (the site remapped to WASD then, with no choice) keep WASD: their
+// saved keys, or, with none saved, the modern preset when the game was already installed in this browser
+// (boot() calls this once it knows). New players get the game's own keys.
+function migratePreset(installed) {
+  let had = false;
+  try { had = localStorage.getItem(PRESET_STORE) !== null; } catch { /* storage blocked */ }
+  if (had) return;
+  let custom = false;
+  try { custom = localStorage.getItem(CONTROL_STORE) !== null; } catch { /* storage blocked */ }
+  if (custom) { preset = 'modern'; saveControls(); loadControls(); }
+  else if (installed) applyPreset('modern');
+  else applyPreset('original');
+  setupControls.render?.();
+}
 loadControls();
 
 // The keyboard panel (index.html #kbd) doubles as the rebind UI: click a key, then press the new one.
@@ -417,7 +451,12 @@ function setupControls() {
     g.items.push(c);
   }
   const render = () => {
-    host.innerHTML = groups.map((g) =>
+    host.innerHTML = '<h3>Keyboard layout</h3><div class="seg kbd-preset">' +
+      Object.entries(PRESETS).map(([k, label]) => `<button type="button" data-preset="${k}"${preset === k ? ' class="on"' : ''}>${label}</button>`).join('') +
+      '</div><p class="kbd-note">' + (preset === 'original'
+        ? 'The keys the game ships with. No numpad or right Ctrl on your laptop? X jumps, left Ctrl crouches, Q peeks — or click any key to change it.'
+        : 'WASD, Shift walk, Ctrl crouch, Space jump, R reload. Click any key to change it.') + '</p>' +
+      groups.map((g) =>
       `<h3>${g.name}</h3>` + g.items.map(([id, label]) =>
         `<div class="row"><span class="label">${label}</span>` +
         `<button class="kbd-rebind${capturing === id ? ' capturing' : ''}" data-id="${id}">` +
@@ -425,12 +464,17 @@ function setupControls() {
     host.querySelectorAll('.kbd-rebind').forEach((b) => {
       b.onclick = () => { capturing = capturing === b.dataset.id ? null : b.dataset.id; render(); };
     });
+    host.querySelectorAll('.kbd-preset button').forEach((b) => {
+      b.onclick = () => { applyPreset(b.dataset.preset); capturing = null; render(); };
+    });
   };
+  setupControls.render = render;
   // While rebinding, grab the next key in the capture phase so it reaches neither the page nor the game.
   window.addEventListener('keydown', (e) => {
     if (!capturing) return;
     e.preventDefault(); e.stopPropagation();
-    if (e.code !== 'Escape' && HID[e.code] !== undefined) { userKeys[capturing] = e.code; saveControls(); rebuildRemap(); }
+    if (e.code === 'Backspace' || e.code === 'Delete') { userKeys[capturing] = null; saveControls(); rebuildRemap(); }   // unbind
+    else if (e.code !== 'Escape' && HID[e.code] !== undefined) { userKeys[capturing] = e.code; saveControls(); rebuildRemap(); }
     capturing = null; render();
   }, true);
   // Mouse buttons and sensitivity (controls.js): which action each button does in a mission, and a multiplier
@@ -441,7 +485,11 @@ function setupControls() {
     const C = RcControls, s = C.get();
     const sel = (btn) => `<select data-btn="${btn}">` + C.MOUSE_CHOICES.map((a) =>
       `<option value="${a}"${s.mouse[btn] === a ? ' selected' : ''}>${C.ACTIONS[a].label}</option>`).join('') + '</select>';
-    mouseHost.innerHTML = '<h3>Mouse</h3>' +
+    mouseHost.innerHTML = '<h3>Screen</h3><div class="seg kbd-preset kbd-wide">' +
+      `<button type="button" data-wide="1"${s.wide ? ' class="on"' : ''}>Full screen (wide)</button>` +
+      `<button type="button" data-wide="0"${!s.wide ? ' class="on"' : ''}>Original 4:3</button></div>` +
+      '<p class="kbd-note">Wide: the 3D view fills a widescreen display with a wider field of view; menus stay 4:3.</p>' +
+      '<h3>Mouse</h3>' +
       `<div class="row"><span class="label">Left</span>${sel(0)}</div>` +
       `<div class="row"><span class="label">Right</span>${sel(2)}</div>` +
       `<div class="row"><span class="label">Middle</span>${sel(1)}</div>` +
@@ -449,13 +497,13 @@ function setupControls() {
       `<div class="row"><span class="label">Sensitivity</span><output>${s.mouseSens.toFixed(1)}×</output></div>` +
       `<input class="kbd-range" type="range" min="0.2" max="3" step="0.1" value="${s.mouseSens}" aria-label="Mouse sensitivity">`;
     mouseHost.querySelectorAll('select').forEach((e) => { e.onchange = () => RcControls.setMouse(Number(e.dataset.btn), e.value); });
+    mouseHost.querySelectorAll('.kbd-wide button').forEach((b) => { b.onclick = () => { RcControls.set('wide', b.dataset.wide === '1'); renderMouse(); }; });
     const range = mouseHost.querySelector('input[type=range]');
     range.oninput = () => { RcControls.set('mouseSens', Number(range.value)); mouseHost.querySelector('output').textContent = Number(range.value).toFixed(1) + '×'; };
   };
   const reset = $('kbd-reset');
   if (reset) reset.onclick = () => {
-    for (const [id, , def] of CONTROLS) userKeys[id] = def;
-    saveControls(); rebuildRemap(); capturing = null; render();
+    applyPreset(preset); capturing = null; render();
     RcControls.reset(); renderMouse();
   };
   render();
@@ -510,7 +558,7 @@ function hookInput(M, net) {
   // their normal cursor direction.
   canvas.addEventListener('mousemove', (e) => {
     if (!C.inMission()) { M._input_mouse_move(e.movementX, e.movementY); return; }
-    const k = C.get().mouseSens;
+    const k = C.get().mouseSens * C.lookScale();   // slower while scoped, in step with the zoom
     C.look(e.movementX * k, e.movementY * k);
   });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -729,7 +777,7 @@ async function run(session) {
   if (session) await clearNetSaves(session);
   sizeCanvas();
   const script = document.createElement('script');
-  script.src = 'build/recomp.js?v=7';
+  script.src = 'build/recomp.js?v=8';
   await new Promise((ok, fail) => { script.onload = ok; script.onerror = fail; document.head.appendChild(script); });
   const M = await createRecomp({
     arguments: ['/opfs/' + OPFS_DIR],
@@ -856,6 +904,7 @@ async function boot() {
     if (params.get('join')) goOnline();   // an invite link goes straight to joining
     if (params.has('autoplay')) $('play').click();
   };
+  migratePreset(!!(await readMarker()));   // the keyboard layout for players from before the layouts existed
   $('play').onclick = () => followGate(() => run().catch(fail));
   $('go-online').onclick = () => followGate(goOnline);
   for (const b of document.querySelectorAll('[data-go]')) b.onclick = () => show(b.dataset.go);
@@ -960,7 +1009,10 @@ function controlsTip() {
   const tip = $('ctltip');
   if (!tip) return;
   const C = RcControls.get(), right = RcControls.ACTIONS[C.mouse[2]]?.label || 'nothing';
-  tip.innerHTML = `Right click: <b>${right}</b> · scroll: weapon · <kbd>Shift</kbd> walk/run · <kbd>Ctrl</kbd> crouch — change them in the Controls panel`;
+  const k = (id) => `<kbd>${keyLabel(userKeys[id])}</kbd>`;
+  tip.innerHTML = preset === 'original'
+    ? `Original keys: arrows move · ${k('walkrun')} walk/run · ${k('crouch')} crouch · ${k('jump')} jump · ${k('zoomin')}/${k('zoomout')} zoom · right click: <b>${right}</b> — WASD and more in the Controls panel`
+    : `Right click: <b>${right}</b> · scroll: weapon · ${k('walkrun')} walk/run · ${k('crouch')} crouch · ${k('jump')} jump — change them in the Controls panel`;
   setTimeout(() => { tip.classList.remove('hidden'); tip.style.opacity = '1'; }, 6000);
   setTimeout(() => { tip.style.opacity = '0'; }, 16000);
   setTimeout(() => tip.classList.add('hidden'), 16500);
@@ -971,7 +1023,7 @@ function controlsTip() {
 async function buildVersion() {
   // peers must run the same build and game files, or their simulations diverge
   const marker = await readMarker();
-  const wasm = await fetch('build/recomp7.wasm', { method: 'HEAD' }).catch(() => null);
+  const wasm = await fetch('build/recomp8.wasm', { method: 'HEAD' }).catch(() => null);
   // the ETag comes back weak (W/"...") when the response is compressed: compare only its value
   const etag = (wasm?.headers.get('ETag') || '').replace(/^W\//, '').replace(/"/g, '');
   return `${marker?.version || 'local'}:${etag || wasm?.headers.get('Content-Length') || '?'}`;
@@ -1099,7 +1151,28 @@ function setupKbdHelp() {
   apply();
 }
 
-if (RcTouch.wanted()) document.body.classList.add('coarse');   // phone / tablet layout (index.html)
+// The device choice on the landing screen (index.html #device): touch controls + gyroscope, or keyboard and
+// mouse. Preselected from the browser (a coarse pointer on a touch screen), remembered in this browser, and
+// applied right away: the page's phone layout (body.coarse) and the hints follow it, and run() asks
+// RcTouch.wanted() when the game starts.
+function setupDevice() {
+  const box = $('device');
+  if (!box) return;
+  const sync = () => {
+    const touch = RcTouch.wanted();
+    document.body.classList.toggle('coarse', touch);
+    for (const b of box.querySelectorAll('button')) {
+      const on = (b.dataset.device === 'touch') === touch;
+      b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+  };
+  for (const b of box.querySelectorAll('button')) b.onclick = () => {
+    try { localStorage.setItem('igi-device', b.dataset.device); } catch { /* storage blocked */ }
+    sync();
+  };
+  sync();
+}
+setupDevice();
 setupFullscreen();
 setupKbdHelp();
 setupControls();

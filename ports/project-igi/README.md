@@ -18,6 +18,17 @@ Useful switches: `?log` (host log in the console), `?input=500:tap=320:200,...` 
 
 Controls on the page: `web/controls.js` holds the game's actions with their default keys (from its
 `config.qvm`), the mouse-button bindings, the scope toggle, the sensitivity settings and the gyroscope;
-`web/loader.js` renders the Controls panel (keys, mouse, sensitivity) and `web/touch.js` the on-screen
-buttons, settings sheet and guide. The game's own Configuration menu must stay at its defaults for these to
-match. Project I.G.I. has no prone / crawl: crouch is the lowest stance.
+`web/loader.js` renders the Controls panel (keyboard layout presets, keys, mouse, screen) and `web/touch.js`
+the on-screen buttons, settings sheet and guide. The game's own Configuration menu must stay at its defaults
+for these to match. Project I.G.I. has no prone / crawl: crouch is the lowest stance.
+
+Game state the host reads (`profile.h`, found by diffing `RC_MEMSNAP` snapshots of `.data`): the main menus'
+cursor (`PROFILE_CURSOR_X/Y`, ints, 640x480 units), the Esc menu's cursor sprite (`PROFILE_CURSOR2_X/Y`,
+floats in display-mode pixels, valid while paused) and the game clock (`PROFILE_TICK`, frozen while the Esc
+menu is up). The zoom of the view comes from the projection matrix of the world draws (`input_zoom`).
+Measured (native, `RC_DUMP` of the camera matrix at 0x5ca140): the view turns 0.212° per mouse count at speed,
+only ~0.11° per count below 50 counts a frame, and at most ~54° a frame; `host/dinput.c` undoes that curve.
+
+Testing switches: `RC_MEMSNAP=frame:addr:len:path`, `RC_POKE=frame:addr:hexbytes`, `RC_DUMP`, `RC_ZOOM_LOG=1`
+(the projection's zoom whenever it changes), `RC_PROJ_LOG=frame`, `RC_WINDOW=WxH` and `RC_WIDE=1` (native
+widescreen), `RC_FORCE_MODE=WxH` (override the display mode the game asks for).

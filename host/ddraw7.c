@@ -389,10 +389,14 @@ W(dd_SetCooperativeLevel) {
 W(dd_SetDisplayMode) {
     fprintf(stderr, "[ddraw] SetDisplayMode(%ux%u, %u bpp)\n", ARG(1), ARG(2), ARG(3));
     g_disp_w = ARG(1); g_disp_h = ARG(2); g_disp_bpp = ARG(3) ? ARG(3) : 32;
+    /* testing: RC_FORCE_MODE=WxH makes the display mode this size whatever the game asked for */
+    if (getenv("RC_FORCE_MODE")) { unsigned fw, fh; if (sscanf(getenv("RC_FORCE_MODE"), "%ux%u", &fw, &fh) == 2) { g_disp_w = fw; g_disp_h = fh; } }
     g_screen_w = (int)g_disp_w; g_screen_h = (int)g_disp_h;   /* what GetSystemMetrics reports from now on */
     RET(6, DD_OK);
 }
 W(dd_RestoreDisplayMode) { RET(1, DD_OK); }
+/* the display mode the game set (input.c: the Esc menu's cursor is in these pixels) */
+void dd_display_size(int *w, int *h) { *w = (int)g_disp_w; *h = (int)g_disp_h; }
 
 static void write_mode_desc(uint32_t p, uint32_t w, uint32_t h, uint32_t bpp) {
     memset(HP(p), 0, 124);

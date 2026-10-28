@@ -110,6 +110,16 @@ static uint32_t g_f_drawn;
    same relative mouse-Y drives the cursor the other way). */
 int g_in_mission;
 static int g_world_this_frame;
+/* Paused: the game's clock (PROFILE_TICK) has not moved for a few frames while a world is being drawn: the
+   Esc menu is up over the frozen world, and the mouse drives its cursor, not the view. */
+int g_paused;
+static uint32_t g_tick_last; static int g_tick_still;
+/* The zoom: the projection the world is drawn with. m11 (y scale = 1 / tan(fov_y / 2)) grows as the sniper
+   scope or the binoculars zoom in. Latched per frame like g_in_mission; the page's scope toggle reads it
+   (input.c input_zoom) and holds the game's Zoom keys until the view actually reaches the zoom it wants. */
+float g_zoom;                       /* last frame's projection m11, 0 when no world was drawn */
+static float g_zoom_this_frame;
+static uint32_t g_proj_log_frame;   /* RC_PROJ_LOG=frame: log every distinct world projection of that frame */
 static uint32_t g_trace_vs;
 
 static int want_screenshot(uint32_t frame) {
@@ -481,6 +491,16 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
     FvfLayout L;
     fvf_layout(sh ? 0x2 /* XYZ: transformed by the shader */ : st->vs, &L);
     if (L.pos_type != 0x4) g_world_this_frame = 1;   /* non-RHW = 3D world: we're in a mission, not a menu */
+    if (!sh && L.pos_type != 0x4) {
+        float m11 = fabsf(st->transform[3][5]);   /* the game may bake a y flip in: the magnitude is the zoom */
+        if (m11 > g_zoom_this_frame) g_zoom_this_frame = m11;   /* the most zoomed projection of the frame */
+        if (d->frame == g_proj_log_frame) {
+            static float seen[32]; static int nseen;
+            int dup = 0;
+            for (int i = 0; i < nseen; i++) if (seen[i] == m11) dup = 1;
+            if (!dup && nseen < 32) { seen[nseen++] = m11; fprintf(stderr, "[proj] frame %u: m00 %.4f m11 %.4f (draw #%u)\n", d->frame, st->transform[3][0], m11, g_f_drawn - 1); }
+        }
+    }
     const uint8_t *vb = NULL;
     uint32_t stride;
     if (vertices_up) { vb = vertices_up; stride = up_stride; }
@@ -671,6 +691,16 @@ static void rec_present_impl(Device *d) {
     g_f_drawn = 0;
     g_in_mission = g_world_this_frame;   /* latch for this frame's input; reset for the next */
     g_world_this_frame = 0;
+#ifdef PROFILE_TICK
+    { uint32_t t = R32(PROFILE_TICK);
+      g_tick_still = (t == g_tick_last) ? g_tick_still + 1 : 0;
+      g_tick_last = t;
+      g_paused = g_in_mission && g_tick_still >= 3; }
+#endif
+    if (getenv("RC_ZOOM_LOG") && g_zoom_this_frame != g_zoom) fprintf(stderr, "[zoom] frame %u: m11 %.5f\n", d->frame, g_zoom_this_frame);
+    g_zoom = g_zoom_this_frame;
+    g_zoom_this_frame = 0;
+    if (g_proj_log_frame == 0 && getenv("RC_PROJ_LOG")) g_proj_log_frame = (uint32_t)atoi(getenv("RC_PROJ_LOG"));
 #ifdef __EMSCRIPTEN__
     /* Don't run ahead of the display: two frames queued (a slow frame doesn't skip a vsync). Online every
        queued frame is a frame of input latency on top of the lockstep delay, so RC_QUEUE=1 (?queue=1 on

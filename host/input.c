@@ -25,7 +25,13 @@ EXPORT void input_mouse_move(int dx, int dy) { if (!netplay_on()) dinput_mouse_m
 /* 1 while the game draws a 3D world (a mission), 0 in its 2D menus (render_rec.c latches it per frame). The
    page's controls layer (web/controls.js) remaps mouse buttons and scales the look only in a mission, so the
    menus always get a plain click and cursor. */
-EXPORT int input_in_mission(void) { extern int g_in_mission; return g_in_mission; }
+EXPORT int input_in_mission(void) { extern int g_in_mission, g_paused; return g_in_mission && !g_paused; }
+/* 1 while the Esc menu is up over a mission (the game's clock stands still; render_rec.c) */
+EXPORT int input_paused(void) { extern int g_paused; return g_paused; }
+/* The zoom of the world as drawn last frame: the projection's y scale (1 / tan(fov_y / 2)), larger when the
+   sniper scope or binoculars are zoomed in; 0 in the 2D menus (render_rec.c). The page's scope toggle holds
+   the game's Zoom keys until this reaches what it wants, so the toggle is exact at any frame rate. */
+EXPORT float input_zoom(void) { extern float g_zoom; return g_zoom; }
 /* Touch screens: a tap clicks at (x, y) of the game's screen. The game moves its cursor by relative motion
    through its own acceleration and shows a move a few frames late, so a jump can't be computed up front:
    tap_tick() moves the cursor, waits for it to settle, reads back where it landed (PROFILE_CURSOR_X / _Y,
@@ -53,7 +59,20 @@ static int clampi(int v, int lim) { return v > lim ? lim : v < -lim ? -lim : v; 
 static void tap_tick(void) {
 #ifdef PROFILE_CURSOR_X
     if (g_tap.release && --g_tap.release == 0) dinput_mouse_button(0, 0);
-    int cx = (int)R32(PROFILE_CURSOR_X), cy = (int)R32(PROFILE_CURSOR_Y);
+    int cx, cy;
+    {   /* the main menus' cursor, or the Esc menu's while the game is paused (PROFILE_CURSOR2: its sprite's corner) */
+        extern int g_paused;
+#ifdef PROFILE_CURSOR2_X
+        if (g_paused) {   /* in display-mode pixels (800x600 in a mission): read back in the 640x480 units taps use */
+            extern void dd_display_size(int *, int *);
+            int dw, dh; dd_display_size(&dw, &dh);
+            float fx, fy; memcpy(&fx, HP(PROFILE_CURSOR2_X), 4); memcpy(&fy, HP(PROFILE_CURSOR2_Y), 4);
+            cx = (int)lroundf(fx * 640.f / (float)(dw > 0 ? dw : 640)); cy = (int)lroundf(fy * 480.f / (float)(dh > 0 ? dh : 480));
+        }
+        else
+#endif
+        { cx = (int)R32(PROFILE_CURSOR_X); cy = (int)R32(PROFILE_CURSOR_Y); }
+    }
     if (__atomic_exchange_n(&g_tap.req, 0, __ATOMIC_ACQUIRE)) {
         g_tap.state = TAP_SETTLE; g_tap.tries = 0; g_tap.frames = 0; g_tap.still = 9;   /* plan right away */
         g_tap.sentx = g_tap.senty = 0; g_tap.lx = g_tap.ox = cx; g_tap.ly = g_tap.oy = cy;
@@ -309,8 +328,54 @@ void input_script_tick(uint32_t frame) {
     }
 }
 
+/* Debugging: RC_MEMSNAP="frame:addr:len:path,..." writes guest memory at that frame to a file (addr/len in
+   hex), for diffing game state between frames (finding a flag or a value's address). */
+static void snap_tick(uint32_t frame) {
+    static const char *spec = (const char *)1;
+    if (spec == (const char *)1) spec = getenv("RC_MEMSNAP");
+    if (!spec) return;
+    for (const char *p = spec; *p;) {
+        uint32_t f = (uint32_t)strtoul(p, (char **)&p, 10);
+        if (*p == ':') p++;
+        uint32_t a = (uint32_t)strtoul(p, (char **)&p, 16);
+        if (*p == ':') p++;
+        uint32_t n = (uint32_t)strtoul(p, (char **)&p, 16);
+        if (*p == ':') p++;
+        char path[512]; size_t k = 0;
+        while (*p && *p != ',' && k + 1 < sizeof path) path[k++] = *p++;
+        path[k] = 0;
+        if (f == frame) {
+            FILE *o = fopen(path, "wb");
+            if (o) { fwrite(HP(a), 1, n, o); fclose(o); fprintf(stderr, "[snap] frame %u: %08x+%x -> %s\n", frame, a, n, path); }
+        }
+        if (*p == ',') p++;
+    }
+}
+/* Debugging: RC_POKE="frame:addr:hexbytes,..." writes bytes into guest memory at that frame (testing: e.g.
+   selecting another mission than the profile allows). */
+static void poke_tick(uint32_t frame) {
+    static const char *spec = (const char *)1;
+    if (spec == (const char *)1) spec = getenv("RC_POKE");
+    if (!spec) return;
+    for (const char *p = spec; *p;) {
+        uint32_t f = (uint32_t)strtoul(p, (char **)&p, 10);
+        if (*p == ':') p++;
+        uint32_t a = (uint32_t)strtoul(p, (char **)&p, 16);
+        if (*p == ':') p++;
+        uint32_t n = 0;
+        for (; p[0] && p[1] && p[0] != ','; p += 2, n++) {
+            char hx[3] = { p[0], p[1], 0 };
+            if (f == frame) W8(a + n, (uint8_t)strtoul(hx, NULL, 16));
+        }
+        if (f == frame) fprintf(stderr, "[poke] frame %u: %u bytes at %08x\n", frame, n, a);
+        while (*p && *p != ',') p++;
+        if (*p == ',') p++;
+    }
+}
 /* Debugging: RC_DUMP="frame:addr:len,..." hex-dumps guest memory at that frame (addr/len in hex). */
 void dump_tick(uint32_t frame) {
+    snap_tick(frame);
+    poke_tick(frame);
     static const char *spec = (const char *)1;
     if (spec == (const char *)1) spec = getenv("RC_DUMP");
     if (!spec) return;
