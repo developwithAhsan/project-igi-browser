@@ -797,9 +797,29 @@ W(DuplicateHandle) {
     if (ARG(3)) W32(ARG(3), ARG(1) == 0xFFFFFFFEu ? 0x1FFFFFFCu : ARG(1));
     RET(7, 1);
 }
-W(CloseHandle) { handle_close(ARG(0)); RET(1, 1); }
+/* I/O accounting (see the files section) */
+static struct { uint64_t opens, reads, bytes, cached_bytes, ns, now_cached, peak_cached; } g_io;
+W(CloseHandle) {
+    WinHandle *x = handle_get(ARG(0), H_FILE);
+    if (x && x->buf) g_io.now_cached -= x->size;
+    handle_close(ARG(0));
+    RET(1, 1);
+}
 
 /* ------------------------------------------------------------------ files */
+
+/* I/O accounting, reported with the log every 200 opens: how much of a load is spent in the file system. */
+static uint64_t io_now(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+}
+static void io_report(void) {
+    LOG("[file] io: %llu opens, %llu reads, %llu KB read (%llu KB cached whole, %llu KB held now, %llu KB peak), %llu ms in the file system\n",
+        (unsigned long long)g_io.opens, (unsigned long long)g_io.reads, (unsigned long long)(g_io.bytes >> 10),
+        (unsigned long long)(g_io.cached_bytes >> 10), (unsigned long long)(g_io.now_cached >> 10),
+        (unsigned long long)(g_io.peak_cached >> 10), (unsigned long long)(g_io.ns / 1000000ull));
+}
 
 W(CreateFileA) {
     const char *name = GSTR(ARG(0));
@@ -822,13 +842,35 @@ W(CreateFileA) {
         snprintf(dir, sizeof dir, "%s", host);
         for (char *p = dir + 1; *p; p++) if (*p == '/') { *p = 0; mkdir(dir, 0755); *p = '/'; }
     }
+    uint64_t t0 = io_now();
     int fd = open(host, fl, 0644);
+    if (fl & O_CREAT) dircache_flush();   /* the listing may have a new entry now */
     LOG("[file] CreateFileA(%s -> %s, disp %u) = %s\n", name, host, disp, fd >= 0 ? "ok" : strerror(errno));
     if (fd < 0) { set_error(exists ? ERROR_ACCESS_DENIED : ERROR_FILE_NOT_FOUND); RET(7, 0xFFFFFFFFu); }
     uint32_t h = handle_new(H_FILE);
     WinHandle *x = handle_get(h, H_FILE);
     x->fd = fd;
+    x->buf = NULL;
     snprintf(x->path, sizeof x->path, "%s", host);
+    /* A file opened for reading is read whole, once, and served from memory: the game reads its data in
+       thousands of small pieces, and in the browser every read is a round trip to the OPFS thread. */
+    if (fl == O_RDONLY) {
+        struct stat st;
+        if (!fstat(fd, &st) && st.st_size > 0 && st.st_size <= 48 * 1024 * 1024 && (x->buf = malloc((size_t)st.st_size))) {
+            uint32_t got = 0;
+            ssize_t n;
+            while (got < (uint32_t)st.st_size && (n = read(fd, x->buf + got, (size_t)st.st_size - got)) > 0) got += (uint32_t)n;
+            if (got == (uint32_t)st.st_size) {
+                x->size = got; x->pos = 0;
+                g_io.cached_bytes += got; g_io.now_cached += got;
+                if (g_io.now_cached > g_io.peak_cached) g_io.peak_cached = g_io.now_cached;
+            }
+            else { free(x->buf); x->buf = NULL; lseek(fd, 0, SEEK_SET); }
+        }
+    }
+    g_io.opens++;
+    g_io.ns += io_now() - t0;
+    if (g_io.opens % 200 == 0) io_report();
     set_error((disp == 4 || disp == 2) && exists ? ERROR_ALREADY_EXISTS : 0);
     RET(7, h);
 }
@@ -848,10 +890,22 @@ W(CreateFileW) {
 W(ReadFile) {
     WinHandle *x = handle_get(ARG(0), H_FILE);
     if (!x) { set_error(ERROR_INVALID_HANDLE); RET(5, 0); }
-    /* Windows only returns short reads at end of file; host reads can stop early, so loop */
     uint32_t want = ARG(2), got = 0;
+    g_io.reads++;
+    if (x->buf) {
+        got = x->pos < x->size ? (x->size - x->pos < want ? x->size - x->pos : want) : 0;
+        if (got) memcpy(HP(ARG(1)), x->buf + x->pos, got);
+        x->pos += got;
+        g_io.bytes += got;
+        if (ARG(3)) W32(ARG(3), got);
+        RET(5, 1);
+    }
+    /* Windows only returns short reads at end of file; host reads can stop early, so loop */
+    uint64_t t0 = io_now();
     ssize_t n = 0;
     while (got < want && (n = read(x->fd, HP(ARG(1) + got), want - got)) > 0) got += (uint32_t)n;
+    g_io.ns += io_now() - t0;
+    g_io.bytes += got;
     if (ARG(3)) W32(ARG(3), got);
     RET(5, n >= 0);
 }
@@ -873,6 +927,13 @@ W(SetFilePointer) {
     if (!x) { set_error(ERROR_INVALID_HANDLE); RET(4, 0xFFFFFFFFu); }
     int64_t off = (int32_t)ARG(1);
     if (ARG(2)) off = (int64_t)(((uint64_t)R32(ARG(2)) << 32) | ARG(1));
+    if (x->buf) {
+        int64_t base = ARG(3) == 0 ? 0 : ARG(3) == 1 ? (int64_t)x->pos : (int64_t)x->size, np = base + off;
+        if (np < 0) { set_error(131 /* ERROR_NEGATIVE_SEEK */); RET(4, 0xFFFFFFFFu); }
+        x->pos = (uint32_t)np;   /* past the end is allowed: reads there return 0 bytes */
+        if (ARG(2)) W32(ARG(2), 0);
+        RET(4, x->pos);
+    }
     off_t r = lseek(x->fd, off, ARG(3) == 0 ? SEEK_SET : ARG(3) == 1 ? SEEK_CUR : SEEK_END);
     if (ARG(2)) W32(ARG(2), (uint32_t)((uint64_t)r >> 32));
     RET(4, (uint32_t)r);
@@ -880,6 +941,7 @@ W(SetFilePointer) {
 W(GetFileSize) {
     WinHandle *x = handle_get(ARG(0), H_FILE);
     if (!x) RET(2, 0xFFFFFFFFu);
+    if (x->buf) { if (ARG(1)) W32(ARG(1), 0); RET(2, x->size); }
     struct stat st;
     fstat(x->fd, &st);
     if (ARG(1)) W32(ARG(1), (uint32_t)((uint64_t)st.st_size >> 32));
@@ -903,25 +965,32 @@ W(SetEndOfFile) {
 W(DeleteFileA) {
     char host[1024];
     map_path(GSTR(ARG(0)), host, sizeof host);
-    RET(1, unlink(host) == 0);
+    int r = unlink(host);
+    dircache_flush();
+    RET(1, r == 0);
 }
 W(MoveFileA) {
     char a[1024], b[1024];
     map_path(GSTR(ARG(0)), a, sizeof a);
     map_path(GSTR(ARG(1)), b, sizeof b);
-    RET(2, rename(a, b) == 0);
+    int r = rename(a, b);
+    dircache_flush();
+    RET(2, r == 0);
 }
 W(CreateDirectoryA) {
     char host[1024];
     map_path(GSTR(ARG(0)), host, sizeof host);
     int r = mkdir(host, 0755);
+    dircache_flush();
     if (r && errno == EEXIST) set_error(ERROR_ALREADY_EXISTS);
     RET(2, r == 0);
 }
 W(RemoveDirectoryA) {
     char host[1024];
     map_path(GSTR(ARG(0)), host, sizeof host);
-    RET(1, rmdir(host) == 0);
+    int r = rmdir(host);
+    dircache_flush();
+    RET(1, r == 0);
 }
 
 typedef struct { char dir[1024]; char pattern[256]; DIR *d; } FindState;

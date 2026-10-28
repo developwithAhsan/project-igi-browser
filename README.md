@@ -29,6 +29,10 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
 - **Widescreen**: the 3D world fills a 16:9 (or any) screen with a wider field of view, while the game's 2D
   menus, HUD and scope masks keep their 4:3 proportions in the middle (`host/render_wgpu.c`, `rc_set_wide`;
   a setting on the page, on by default).
+- **Loading time**: the game reads thousands of files per mission and maps every path case-insensitively, and
+  in the browser each file-system call is a round trip to the OPFS thread. The host reads each file whole on
+  open and serves it from memory, and keeps directory listings (`host/kernel32.c`, `host/core.c`), which cut
+  the mission load (and the reload after a death) from 4-7 s to 1.5 s in headless Chrome.
 - **Safari / iOS**: WebKit keeps far more memory per page than Chromium (its baseline WebAssembly JIT alone
   holds about 1.6 GB for this game) and iPhones kill a tab near 2 GB. The guest memory is laid out
   compactly and grown on demand, host thread stacks are small, and GPU uploads are coalesced per batch

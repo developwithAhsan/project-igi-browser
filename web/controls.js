@@ -44,7 +44,8 @@ const RcControls = (() => {
     mouse: { 0: 'fire', 1: 'altfire', 2: 'scope' },   // left, middle, right (MouseEvent.button)
     mouseSens: 0.6,     // PC: multiplier on mouse motion (the host makes the game's response linear, 0.212 deg per count)
     look: 1,            // touch: swipe sensitivity
-    scopeSens: 1,       // touch, mouse and gyro while scoped: on top of the automatic slow-down by the zoom
+    scopeSens: 1,       // touch, mouse and gyro while scoped. The game itself already slows the view by the zoom
+                        // (measured: 0.7x at the binoculars' 1x, 0.11x at 5x), so this is the only extra factor
     scopeZoom: 4,       // the zoom the scope button snaps to (x the normal view)
     gyro: 'scope',      // 'off' | 'on' | 'scope'
     gyroSens: 1,
@@ -198,7 +199,7 @@ const RcControls = (() => {
   }
   // While scoped the view turns slower, in step with the zoom (at 4x a swipe turns about a third as far),
   // times the player's own scope multiplier; mobile shooters do the same.
-  const lookScale = () => { const z = zoom(); return z > 1.12 ? S.scopeSens * Math.pow(1 / z, 0.75) : 1; };
+  const lookScale = () => (zoom() > 1.12 ? S.scopeSens : 1);
 
   // ---- gyroscope (devicemotion): the rotation rate about the vertical axis turns the view, about the screen's
   // horizontal axis tilts it. Gravity (low-passed accelerationIncludingGravity) gives both axes in the device's

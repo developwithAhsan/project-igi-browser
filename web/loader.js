@@ -494,12 +494,16 @@ function setupControls() {
       `<div class="row"><span class="label">Right</span>${sel(2)}</div>` +
       `<div class="row"><span class="label">Middle</span>${sel(1)}</div>` +
       '<div class="row"><span class="label">Scroll</span><div class="keys">next / prev weapon</div></div>' +
-      `<div class="row"><span class="label">Sensitivity</span><output>${s.mouseSens.toFixed(1)}×</output></div>` +
-      `<input class="kbd-range" type="range" min="0.2" max="3" step="0.1" value="${s.mouseSens}" aria-label="Mouse sensitivity">`;
+      `<div class="row"><span class="label">Sensitivity</span><output data-for="mouseSens">${s.mouseSens.toFixed(1)}×</output></div>` +
+      `<input class="kbd-range" type="range" min="0.2" max="3" step="0.1" value="${s.mouseSens}" data-k="mouseSens" aria-label="Mouse sensitivity">` +
+      `<div class="row"><span class="label">Scoped</span><output data-for="scopeSens">${s.scopeSens.toFixed(1)}×</output></div>` +
+      `<input class="kbd-range" type="range" min="0.3" max="3" step="0.1" value="${s.scopeSens}" data-k="scopeSens" aria-label="Scoped sensitivity">` +
+      '<p class="kbd-note">Scoped: while zoomed in (scope or binoculars), on top of the game\'s own slow-down by the zoom.</p>';
     mouseHost.querySelectorAll('select').forEach((e) => { e.onchange = () => RcControls.setMouse(Number(e.dataset.btn), e.value); });
     mouseHost.querySelectorAll('.kbd-wide button').forEach((b) => { b.onclick = () => { RcControls.set('wide', b.dataset.wide === '1'); renderMouse(); }; });
-    const range = mouseHost.querySelector('input[type=range]');
-    range.oninput = () => { RcControls.set('mouseSens', Number(range.value)); mouseHost.querySelector('output').textContent = Number(range.value).toFixed(1) + '×'; };
+    mouseHost.querySelectorAll('input[type=range]').forEach((range) => {
+      range.oninput = () => { RcControls.set(range.dataset.k, Number(range.value)); mouseHost.querySelector(`output[data-for="${range.dataset.k}"]`).textContent = Number(range.value).toFixed(1) + '×'; };
+    });
   };
   const reset = $('kbd-reset');
   if (reset) reset.onclick = () => {
@@ -777,7 +781,7 @@ async function run(session) {
   if (session) await clearNetSaves(session);
   sizeCanvas();
   const script = document.createElement('script');
-  script.src = 'build/recomp.js?v=8';
+  script.src = 'build/recomp.js?v=9';
   await new Promise((ok, fail) => { script.onload = ok; script.onerror = fail; document.head.appendChild(script); });
   const M = await createRecomp({
     arguments: ['/opfs/' + OPFS_DIR],
@@ -1023,7 +1027,7 @@ function controlsTip() {
 async function buildVersion() {
   // peers must run the same build and game files, or their simulations diverge
   const marker = await readMarker();
-  const wasm = await fetch('build/recomp8.wasm', { method: 'HEAD' }).catch(() => null);
+  const wasm = await fetch('build/recomp9.wasm', { method: 'HEAD' }).catch(() => null);
   // the ETag comes back weak (W/"...") when the response is compressed: compare only its value
   const etag = (wasm?.headers.get('ETag') || '').replace(/^W\//, '').replace(/"/g, '');
   return `${marker?.version || 'local'}:${etag || wasm?.headers.get('Content-Length') || '?'}`;

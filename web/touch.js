@@ -194,8 +194,8 @@ const RcTouch = (() => {
         <div class="ts-head"><b>Controls &amp; settings</b><button type="button" class="ts-close" aria-label="Close">×</button></div>
         <label class="ts-row"><span>Swipe sensitivity <output data-for="look"></output></span>
           <input type="range" min="0.3" max="3" step="0.1" data-k="look"></label>
-        <label class="ts-row"><span>Scoped sensitivity (on top of the automatic slow-down) <output data-for="scopeSens"></output></span>
-          <input type="range" min="0.3" max="2" step="0.1" data-k="scopeSens"></label>
+        <label class="ts-row"><span>Scoped sensitivity (swipes and gyro while zoomed) <output data-for="scopeSens"></output></span>
+          <input type="range" min="0.3" max="3" step="0.1" data-k="scopeSens"></label>
         <div class="ts-row"><span>SCOPE button zooms to</span>
           <div class="ts-seg" data-k="scopeZoom">
             <button type="button" data-v="2">2×</button><button type="button" data-v="4">4×</button><button type="button" data-v="6">6×</button><button type="button" data-v="8">8×</button>

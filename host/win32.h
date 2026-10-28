@@ -56,6 +56,8 @@ typedef struct {
     int fd;              /* H_FILE */
     void *ptr;           /* H_FIND: directory search state; sync objects: their host object */
     char path[1024];
+    uint8_t *buf;        /* H_FILE opened for reading: the whole file, read once (see kernel32.c) */
+    uint32_t size, pos;
 } WinHandle;
 
 uint32_t handle_new(int type);
@@ -71,6 +73,7 @@ extern char g_user_root[1024];   /* host folder for files the game writes outsid
 /* Maps a Windows path from the game to a host path, matching path components case-insensitively.
    Returns 1 if the host path exists. */
 int map_path(const char *guest, char *host, size_t n);
+void dircache_flush(void);   /* after creating, deleting or renaming anything in the game or user folders */
 
 /* ------------------------------------------------------------------ threads */
 

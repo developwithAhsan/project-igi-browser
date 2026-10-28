@@ -166,18 +166,68 @@ void handle_close(uint32_t h) {
     WinHandle *x = handle_get(h, -1);
     if (!x) return;
     if (x->type == H_FILE && x->fd >= 0) close(x->fd);
+    if (x->type == H_FILE && x->buf) { free(x->buf); x->buf = NULL; }
     if (x->type == H_FIND && x->ptr) free(x->ptr);
     x->type = H_FREE;
 }
 
 /* ------------------------------------------------------------------ paths */
 
+/* Directory listings, read once and kept: every path the game opens is mapped case-insensitively one
+   component at a time, and in the browser each listing is a round trip to the OPFS thread. The game's
+   folder only changes through this host (profiles, saves), and those calls flush the cache. */
+typedef struct { char *dir; char **names; int n; } DirList;
+static DirList g_dirs[1024];
+static int g_ndirs;
+static pthread_mutex_t g_dirs_mu = PTHREAD_MUTEX_INITIALIZER;
+static DirList *dir_list(const char *dir) {
+    for (int i = 0; i < g_ndirs; i++) if (!strcmp(g_dirs[i].dir, dir)) return &g_dirs[i];
+    if (g_ndirs == (int)(sizeof g_dirs / sizeof g_dirs[0])) return NULL;
+    DIR *d = opendir(*dir ? dir : ".");
+    if (!d) return NULL;
+    DirList *L = &g_dirs[g_ndirs];
+    L->dir = strdup(dir);
+    L->names = NULL;
+    L->n = 0;
+    int cap = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (L->n == cap) { cap = cap ? cap * 2 : 64; L->names = realloc(L->names, (size_t)cap * sizeof *L->names); }
+        L->names[L->n++] = strdup(e->d_name);
+    }
+    closedir(d);
+    g_ndirs++;
+    return L;
+}
+void dircache_flush(void) {
+    pthread_mutex_lock(&g_dirs_mu);
+    for (int i = 0; i < g_ndirs; i++) {
+        for (int k = 0; k < g_dirs[i].n; k++) free(g_dirs[i].names[k]);
+        free(g_dirs[i].names);
+        free(g_dirs[i].dir);
+    }
+    g_ndirs = 0;
+    pthread_mutex_unlock(&g_dirs_mu);
+}
+
 /* Finds `name` in directory `dir` ignoring case; writes the real name into `out`. */
 static int find_ci(const char *dir, const char *name, char *out, size_t n) {
+    pthread_mutex_lock(&g_dirs_mu);
+    DirList *L = dir_list(dir);
+    int found = 0;
+    if (L) for (int i = 0; i < L->n; i++) {
+        if (!strcasecmp(L->names[i], name)) {
+            snprintf(out, n, "%s", L->names[i]);
+            found = 1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_dirs_mu);
+    if (L) return found;
+    /* a directory the cache couldn't hold: scan it directly */
     DIR *d = opendir(*dir ? dir : ".");
     if (!d) return 0;
     struct dirent *e;
-    int found = 0;
     while ((e = readdir(d))) {
         if (!strcasecmp(e->d_name, name)) {
             snprintf(out, n, "%s", e->d_name);

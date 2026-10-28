@@ -30,6 +30,10 @@ floats in display-mode pixels, valid while paused) and the game clock (`PROFILE_
 menu is up). The zoom of the view comes from the projection matrix of the world draws (`input_zoom`).
 Measured (native, `RC_DUMP` of the camera matrix at 0x5ca140): the view turns 0.212° per mouse count at speed,
 only ~0.11° per count below 50 counts a frame, and at most ~54° a frame; `host/dinput.c` undoes that curve.
+While zoomed the game already scales turning by the zoom (0.7x in the binoculars at 1x, 0.11x at 5x), so the
+page adds only the player's "scoped sensitivity" factor, nothing automatic. All missions are selectable in the
+mission list (`tap=380:218+16*n` on the 640x480 screen, n = 0 Trainyard ... 4 Radar Base ...); the four
+one-byte `.AFP` files in the game folder are the player profiles.
 
 Testing switches: `RC_MEMSNAP=frame:addr:len:path`, `RC_POKE=frame:addr:hexbytes`, `RC_DUMP`, `RC_ZOOM_LOG=1`
 (the projection's zoom whenever it changes), `RC_PROJ_LOG=frame`, `RC_WINDOW=WxH` and `RC_WIDE=1` (native
