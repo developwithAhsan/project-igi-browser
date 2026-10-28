@@ -801,6 +801,24 @@ async function run(session) {
   window.recomp = M;
 }
 
+// Follow gate (index.html #iggate): the first Play shows a prompt to follow the site's Instagram; Play is
+// enabled once the Follow link has been tapped (or "already following"), and the choice is remembered in
+// this browser. A follow can't be checked from a website, so this is a prompt, not a lock. Test runs
+// (?autoplay) skip it.
+const FOLLOW_STORE = 'igi-ig-follow';
+function followGate(next) {
+  let done = false;
+  try { done = localStorage.getItem(FOLLOW_STORE) === '1' || params.has('autoplay'); } catch { done = params.has('autoplay'); }
+  const gate = $('iggate');
+  if (done || !gate) { next(); return; }
+  const play = $('ig-play');
+  const unlock = () => { try { localStorage.setItem(FOLLOW_STORE, '1'); } catch { /* storage blocked */ } gate.classList.add('hidden'); next(); };
+  $('ig-follow').onclick = () => { setTimeout(() => { play.disabled = false; play.focus(); }, 1500); };   // link opens in a new tab
+  $('ig-already').onclick = (e) => { e.preventDefault(); unlock(); };
+  play.onclick = unlock;
+  gate.classList.remove('hidden');
+}
+
 async function boot() {
   // Friendly, device-specific message when the browser can't run the game (WebGPU + cross-origin isolation
   // arrived on iPhone/iPad in iOS 26). Avoids developer jargon the tester would read as an error.
@@ -838,8 +856,8 @@ async function boot() {
     if (params.get('join')) goOnline();   // an invite link goes straight to joining
     if (params.has('autoplay')) $('play').click();
   };
-  $('play').onclick = () => run().catch(fail);
-  $('go-online').onclick = goOnline;
+  $('play').onclick = () => followGate(() => run().catch(fail));
+  $('go-online').onclick = () => followGate(goOnline);
   for (const b of document.querySelectorAll('[data-go]')) b.onclick = () => show(b.dataset.go);
   $('folder').onchange = async (e) => {
     $('pick').classList.add('hidden');
