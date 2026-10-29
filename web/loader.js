@@ -1126,11 +1126,19 @@ async function boot() {
     $('download').textContent = 'Download the game (one time)';
     $('download').classList.remove('hidden');
   };
+  // The browser's private storage refused: Safari's private windows and some locked-down profiles have none
+  // ("The operation failed for an unknown transient reason", QuotaExceededError), and the game can't be kept.
+  const storageProblem = (err) => {
+    const m = String(err && err.message || ''), n = err && err.name || '';
+    if (!/transient|quota|storage|NotAllowed|Security|UnknownError/i.test(m + ' ' + n)) return '';
+    return 'This browser window can\'t store the game (a private window, or the browser\'s storage is full or blocked). ' +
+           'Open the site in a normal window with some free space and try again.';
+  };
   $('download').onclick = async () => {
     $('download').classList.add('hidden');
     $('pick').classList.add('hidden');
     try { await importFromServer(hosted); ready(); }
-    catch (err) { offerDownload(err.message); }
+    catch (err) { offerDownload(storageProblem(err) || err.message); }
   };
   $('reset').onclick = (e) => {
     e.preventDefault();

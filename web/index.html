@@ -257,7 +257,8 @@
     background: rgba(10, 18, 12, .78); color: var(--fg); font-size: 13px; line-height: 1.45;
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
     box-shadow: 0 20px 50px rgba(0, 0, 0, .5); display: none; }
-  @media (min-width: 1120px) { #stage:not(:fullscreen) ~ #promo { display: block; } }
+  /* shown only once the ads script has put a unit in it (.on): browsers without credentialless iframes never see it */
+  @media (min-width: 1120px) { #stage:not(:fullscreen) ~ #promo.on { display: block; } }
   #promo .promo-head { display: flex; justify-content: space-between; align-items: center;
     margin: -4px 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
   #promo .promo-head b { font-size: 13px; letter-spacing: .02em; }
@@ -603,7 +604,7 @@
           <button id="home-controls" type="button" class="link-btn">Controls &amp; layout</button>
           <a href="#" id="reset" class="link-btn">Use a different game folder</a>
         </div>
-        <p class="home-foot" id="updated">Updated <b>30 Oct 2026, 04:22 IST</b> · fixes land often: reload before reporting an old issue</p>
+        <p class="home-foot" id="updated">Updated <b>30 Oct 2026, 04:30 IST</b> · fixes land often: reload before reporting an old issue</p>
       </section>
 
       <!-- multiplayer: host or join -->
@@ -757,7 +758,7 @@
 <script src="netplay.js"></script>
 <script src="controls.js?v=8"></script>
 <script src="touch.js?v=12"></script>
-<script src="loader.js?v=26"></script>
+<script src="loader.js?v=27"></script>
 <script>
   // Ads (Adsterra; slots switched on in RC_ADS, the network's tags in ad.html). The page is cross-origin
   // isolated, which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>:
@@ -779,7 +780,7 @@
       return f;
     };
     var coarse = document.body.classList.contains('coarse');
-    if (promo) { if (A.side && !coarse) promo.appendChild(frame('side', 160, 600)); else promo.remove(); }
+    if (promo) { if (A.side && !coarse) { promo.appendChild(frame('side', 160, 600)); promo.classList.add('on'); } else promo.remove(); }
     var units = coarse ? (A.mobile ? [['mobile', 320, 50]] : [])
                        : [].concat(A.lead ? [['lead', 728, 90]] : [], A.native ? [['native', 728, 300]] : []);
     if (A.social) units.push(['social', 320, 160]);
