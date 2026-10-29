@@ -101,10 +101,17 @@ function showLoading() {
   stopLoadTips = startTips(b.querySelector('.tips'));
   showLoading.t1 = setTimeout(() => { phase.textContent = 'Loading mission… a phone can take a minute or two.'; }, 15000);
   showLoading.t2 = setTimeout(() => { phase.textContent = 'Still loading — hang tight, almost there…'; }, 50000);
+  // No mission load takes this long: the game has stopped (a browser out of memory, a stuck file read).
+  // Rather than a black screen that never ends, say so and offer the way out.
+  showLoading.t3 = setTimeout(() => {
+    phase.innerHTML = 'The game has stopped responding. <button id="stuck-reload" style="font:inherit;padding:6px 16px;' +
+      'border-radius:8px;border:0;background:#45cf79;color:#000;font-weight:700;margin-left:8px">Reload the game</button>';
+    $('stuck-reload').onclick = () => location.reload();
+  }, 150000);
 }
 function hideLoading() {
   const b = $('booting');
-  for (const k of ['t1', 't2']) clearTimeout(showLoading[k]);
+  for (const k of ['t1', 't2', 't3']) clearTimeout(showLoading[k]);
   if (stopLoadTips) { stopLoadTips(); stopLoadTips = null; }
   if (b) b.classList.add('hidden');
 }
@@ -952,7 +959,26 @@ async function boot() {
     showPicker('Choose your Project I.G.I. folder to start.');
     return;
   }
+  if (hosted) await refreshConfig(hosted);
   ready();
+}
+
+// config.qvm holds the game's own key bindings. The game rewrites it when a mission ends, and a tap or two in
+// its Controls menu rebinds keys by accident (a phone's tap is a mouse click to it), which then came back on
+// every visit and fought the page's own key layout. On every start the shipped copy is fetched again (3.7 KB)
+// over the one in storage, so the game always starts with its default bindings; keys are changed in the
+// page's panel. A failed fetch keeps whatever is there, so an offline start still works.
+async function refreshConfig(list) {
+  const e = list.find((f) => f.path.toLowerCase() === 'config.qvm');   // the root one (LANGUAGE/* has its own)
+  if (!e) return;
+  try {
+    const r = await fetch('game/' + e.path.split('/').map(encodeURIComponent).join('/'), { cache: 'no-cache' });
+    if (!r.ok) return;
+    const buf = await r.arrayBuffer();
+    if (buf.byteLength !== e.size) return;
+    const w = await (await fileHandle(await gameDir(true), e.path, true)).createWritable();
+    await w.write(buf); await w.close();
+  } catch (err) { console.warn('config.qvm refresh skipped:', err.message); }
 }
 
 // ------------------------------------------------------------------ fullscreen
