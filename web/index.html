@@ -84,7 +84,7 @@
   @media (prefers-reduced-motion: reduce) { .view { animation: none; } }
 
   .brand { margin: 0 auto 10px; font-size: 34px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
-  .tagline { margin: 0 0 26px; color: var(--muted); }
+  .tagline { margin: 0 0 30px; color: var(--muted); }
   .small { font-size: 13px; color: var(--faint); }
   p { margin: 8px 0; }
 
@@ -333,18 +333,17 @@
     background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .22); }
   #touch .t-knob { position: absolute; inset: 30%; border-radius: 50%; background: rgba(255, 255, 255, .35);
     border: 2px solid rgba(255, 255, 255, .5); pointer-events: none; }
-  /* the movement lock: a dashed ring just outside the stick and a marker riding on it at the thumb's angle,
-     shown only while the stick is held; pushing past the ring locks that direction (touch.js), lit while locked */
-  #touch .t-stick::before { content: ""; position: absolute; inset: -32%; border-radius: 50%; border: 2px dashed rgba(255, 255, 255, .45);
-    opacity: 0; transition: opacity .15s ease; pointer-events: none; }
-  #touch .t-lock { position: absolute; left: 50%; top: 50%; width: calc(var(--sk) * .26); height: calc(var(--sk) * .26);
-    transform: translate(-50%, -50%) translate(0, calc(var(--sk) * -.66));
-    display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .5); background: rgba(0, 0, 0, .55);
-    color: #fff; font-size: calc(var(--sk) * .15); line-height: 1; opacity: 0; transition: opacity .15s ease; pointer-events: none; }
-  #touch .t-stick.held::before, #touch .t-stick.held .t-lock { opacity: .8; }
-  #touch .t-stick.locked::before, #touch .t-stick.locked .t-lock { opacity: 1; }
-  #touch .t-stick.locked::before { border-style: solid; border-color: rgba(120, 230, 160, .9); }
-  #touch .t-stick.locked .t-lock { background: rgba(52, 184, 102, .7); border-color: rgba(120, 230, 160, .95); }
+  /* the sprint lock: a running figure well above the stick with a dotted line up to it, shown while the stick
+     is pushed forward; the thumb sliding onto it locks running (touch.js), and it stays lit while locked */
+  #touch .t-lock { position: absolute; left: 50%; top: calc(-1 * var(--sk) * .8); transform: translateX(-50%); width: calc(var(--sk) * .5); height: calc(var(--sk) * .5);
+    display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .45); background: rgba(0, 0, 0, .5);
+    opacity: 0; transition: opacity .15s ease, transform .15s ease; pointer-events: none; }
+  #touch .t-lock span { font-size: calc(var(--sk) * .26); line-height: 1; filter: grayscale(1) brightness(1.7); }
+  #touch .t-stick::before { content: ""; position: absolute; left: 50%; top: calc(-1 * var(--sk) * .3); height: calc(var(--sk) * .3);
+    border-left: 3px dotted rgba(255, 255, 255, .55); opacity: 0; transition: opacity .15s ease; }
+  #touch .t-stick.fwd .t-lock, #touch .t-stick.fwd::before { opacity: .85; }
+  #touch .t-stick.locked .t-lock, #touch .t-stick.locked::before { opacity: 1; }
+  #touch .t-stick.locked .t-lock { background: rgba(52, 184, 102, .65); border-color: rgba(120, 230, 160, .95); transform: translateX(-50%) scale(1.1); }
   #touch .t-stick.locked { border-color: rgba(120, 230, 160, .6); }
   #touch .t-stick.locked .t-knob { background: rgba(52, 184, 102, .55); }
   #touch .t-btn { position: absolute; display: grid; place-items: center; align-content: center; padding: 0;
@@ -419,11 +418,22 @@
   .ts-seg, .seg { display: flex; gap: 0; border: 1px solid rgba(255, 255, 255, .22); border-radius: 8px; overflow: hidden; }
   .ts-seg button, .seg button { flex: 1; padding: 7px 4px; border: 0; border-radius: 0; background: transparent; color: var(--muted); font: 600 12px ui-sans-serif, system-ui, sans-serif; }
   .ts-seg button.on, .seg button.on { background: var(--accent); color: #04140a; }
-  /* the device choice on the landing screen */
-  .device { margin: 18px auto 0; width: min(100%, 360px); }
-  .device-label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 13px; }
-  .device .seg { background: rgba(0, 0, 0, .25); }
-  .device .seg button { padding: 9px 6px; font-size: 13px; }
+  /* the landing screen: one big Play, the device choice under it, two quiet links, one footnote */
+  .play-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: min(100%, 300px); margin: 6px auto 0;
+    padding: 15px 24px; border: 0; border-radius: 16px; background: var(--accent); color: #04110a; font: 700 18px/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .01em; box-shadow: 0 12px 30px rgba(52, 184, 102, .28); transition: transform .12s ease, background .12s ease, box-shadow .12s ease; }
+  .play-btn:hover { background: var(--accent-hi); transform: translateY(-1px); box-shadow: 0 16px 36px rgba(52, 184, 102, .34); }
+  .play-btn:active { transform: translateY(0); }
+  .play-btn svg { width: 22px; height: 22px; }
+  .device { margin: 22px auto 0; width: min(100%, 300px); }
+  .device .seg { background: rgba(0, 0, 0, .3); border-color: rgba(255, 255, 255, .14); border-radius: 10px; }
+  .device .seg button { padding: 8px 6px; font-size: 12.5px; }
+  .home-links { display: flex; justify-content: center; align-items: center; gap: 22px; margin-top: 18px; }
+  .link-btn { background: transparent; border: 0; padding: 4px 2px; color: var(--muted); font: 500 13px ui-sans-serif, system-ui, sans-serif;
+    text-decoration: none; cursor: pointer; }
+  .link-btn:hover { color: var(--fg); }
+  .home-foot { margin: 26px 0 0; color: var(--faint); font-size: 12px; }
+  .home-foot b { color: var(--muted); font-weight: 600; }
   .ts-note { display: block; color: var(--faint); font-size: 11px; margin-top: 4px; min-height: 1.2em; }
   .ts-checks { display: flex; flex-wrap: wrap; gap: 4px 16px; }
   .ts-checks label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
@@ -432,7 +442,7 @@
     color: var(--fg); font: 600 12.5px ui-sans-serif, system-ui, sans-serif; text-align: left; }
   /* set up the controls before the game is ready: on the landing screen and the boot cover (phones) */
   #home-controls, #boot-controls { display: none; }
-  body.coarse #home-controls { display: inline-flex; margin-top: 14px; }
+  body.coarse #home-controls { display: inline-block; }
   body.coarse #boot-controls { display: inline-flex; margin-top: 18px; }
   #crashnote { margin: 0 auto 16px; max-width: 46ch; padding: 10px 14px; border-radius: 10px; text-align: left; font-size: 13px; line-height: 1.45;
     background: rgba(210, 58, 47, .18); border: 1px solid rgba(255, 150, 140, .4); color: var(--fg); }
@@ -534,7 +544,7 @@
       <div class="tg-card">
         <b class="tg-title">How to play</b>
         <div class="tg-grid">
-          <div><i>✥</i><span><b>Move</b> — the stick on the left. Push the stick out past its dashed ring to lock that direction (keep running with your thumb off); tap the stick to stop. WALK: tap to walk, tap again to run.</span></div>
+          <div><i>✥</i><span><b>Move</b> — the stick on the left. Push forward and slide your thumb up onto the runner to lock running; tap the stick to stop. WALK: tap to walk, tap again to run.</span></div>
           <div><i>⌖</i><span><b>Aim</b> — swipe anywhere in the middle. Hold either FIRE and drag to aim while shooting.</span></div>
           <div><i>◎</i><span><b>Scope</b> — tap the eye to snap the sniper scope or binoculars to 4× and back; + / − fine-tune.</span></div>
           <div><i>⇅</i><span><b>Crouch / jump / peek</b> — around FIRE. Tap CROUCH to crouch, tap again to stand. There is no prone in this game.</span></div>
@@ -574,31 +584,25 @@
         <p class="tagline">I'm Going In.</p>
         <div id="crashnote" class="hidden" role="status">The game stopped and the browser reloaded the page. On a phone that almost always
           means it ran out of memory: close other apps and tabs before playing, and keep the game in one tab.</div>
-        <div class="choices">
-          <button id="play" class="choice">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg>
-            <b>Play</b>
-            <span class="desk">Click the game to capture the mouse; Esc releases it. Right click = scope, scroll = weapon, Shift = walk, Ctrl = crouch.</span>
-            <span class="mob">Stick to move, swipe to aim, SCOPE to zoom. ⚙ sets sensitivity and gyro aiming. Play sideways.</span>
-          </button>
-          <button id="go-online" class="choice hidden"></button>
-        </div>
+        <button id="play" class="play-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg>
+          Play
+        </button>
+        <button id="go-online" class="choice hidden"></button>
         <!-- Which controls to set up (loader.js: device choice, remembered). Phones get the touch layout and the
              gyroscope, computers the keyboard and mouse; the detection is only the preselected default. -->
         <div id="device" class="device" role="radiogroup" aria-label="Playing on">
-          <span class="device-label">I'm playing on</span>
           <div class="seg">
-            <button type="button" data-device="touch" role="radio" aria-checked="false">📱 Phone / tablet</button>
-            <button type="button" data-device="pc" role="radio" aria-checked="false">🖥️ Keyboard &amp; mouse</button>
+            <button type="button" data-device="touch" role="radio" aria-checked="false">Phone / tablet</button>
+            <button type="button" data-device="pc" role="radio" aria-checked="false">Keyboard &amp; mouse</button>
           </div>
         </div>
-        <button id="home-controls" type="button" class="btn ghost">⚙ Controls, layout &amp; gyroscope</button>
-        <p class="small desk" style="margin-top:18px">Keys, mouse buttons and sensitivity: the Controls panel on the right, which applies at once, mid-mission too. Don't rebind in the game's own Controls menu: those bindings are reset to the game's defaults on every reload.<br>
-          Fullscreen: <kbd>Alt</kbd> + <kbd>Enter</kbd> (<kbd>⌥</kbd> + <kbd>Enter</kbd> on Mac) or the button in the corner.</p>
-        <p class="small" id="updated">Sagar Joshi is actively fixing issues and smoothing the game. Last update: <b>29 Oct 2026, 20:21 IST</b>.
-          Seeing a problem you reported before? Reload the page and try again first: it may already be fixed.</p>
-        <p class="small"><a href="#" id="reset">Use a different game folder</a></p>
+        <div class="home-links">
+          <button id="home-controls" type="button" class="link-btn">Controls &amp; layout</button>
+          <a href="#" id="reset" class="link-btn">Use a different game folder</a>
+        </div>
+        <p class="home-foot" id="updated">Updated <b>29 Oct 2026, 21:09 IST</b> · fixes land often: reload before reporting an old issue</p>
       </section>
 
       <!-- multiplayer: host or join -->
@@ -804,7 +808,7 @@
 </script>
 <script src="netplay.js"></script>
 <script src="controls.js?v=8"></script>
-<script src="touch.js?v=11"></script>
+<script src="touch.js?v=12"></script>
 <script src="loader.js?v=21"></script>
 <script>
   // Ads (slots switched on in RC_ADS; the network tags are in ad.html). The page is cross-origin isolated,

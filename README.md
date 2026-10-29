@@ -11,8 +11,8 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
   WebGPU renderer, plus the few extra Windows calls the game makes (`host/mm.c`, registry, timers, threads).
 - **Phones and tablets**: on-screen stick and buttons laid out like mobile shooters (`web/touch.js`: a big
   FIRE with jump / crouch / scope around it, a second FIRE above the stick, walk/run and binoculars toggles),
-  a movement lock on the stick (push out past the dashed ring that shows while it is held to keep moving in
-  that direction with the thumb off the screen, tap the stick to stop), a layout editor (drag any button or
+  a sprint lock on the stick (push forward and slide the thumb onto the runner above it to keep running with
+  the thumb off the screen, tap the stick to stop), a layout editor (drag any button or
   the stick where you want it, size overall and per button, opacity, saved in the browser, usable on the
   landing screen and while the game loads), a scope button that raises the sniper rifle's
   scope and snaps it to a chosen zoom and back (through the binoculars when the weapon has no scope), a

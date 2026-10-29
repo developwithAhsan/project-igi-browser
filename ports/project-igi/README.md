@@ -25,9 +25,10 @@ signs (right-hand rule in the device frame, `rotationRate.alpha/beta/gamma` = ra
 Chromium and WebKit): turning left is a positive yaw, tilting the camera up a positive pitch, both sent as
 negative mouse counts (+x looks right, +y looks down); the first version had the pitch backwards. The touch
 layout is saved as fractions of the stage per control (`igi-layout`), with a size factor (`--k`), per-control
-factors (`--bk` on the element) and opacity (`--a`) the stylesheet multiplies in. The stick's movement lock
-engages when the thumb passes 1.28 stick radii (or the screen's edge) in a mission and holds that
-8-direction set of arrows until the next touch on the stick. `?gyrotest` shows a gyroscope readout. Project I.G.I. has no prone / crawl: crouch is the lowest stance. Crouch and walk are held keys (verified
+factors (`--bk` on the element) and opacity (`--a`) the stylesheet multiplies in. The stick's sprint lock
+engages when, pushing forward in a mission, the thumb reaches the runner icon 2.1 stick radii above the stick's
+centre, and holds the forward arrow until the next touch on the stick (a lock in every direction, with a
+ring around the stick, was tried on 2026-10-29 and players preferred this). `?gyrotest` shows a gyroscope readout. Project I.G.I. has no prone / crawl: crouch is the lowest stance. Crouch and walk are held keys (verified
 natively: a tapped crouch key does nothing lasting, a held one lowers the camera), binoculars a toggle, and
 only the sniper rifle's scope and the binoculars zoom: the zoom keys do nothing on their own, even with the
 Dragunov. Alternate fire (Backspace) raises the rifle's scope (the view zooms to 1.18x within 4 frames, then

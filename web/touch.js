@@ -54,7 +54,7 @@ const RcTouch = (() => {
     const root = document.createElement('div');
     root.id = 'touch';
     root.className = 'off';   // hidden until the game runs (attach), except while the layout is being edited
-    root.innerHTML = '<div class="t-look"></div><div class="t-stick"><div class="t-lock" aria-hidden="true"><span>⇧</span></div><div class="t-knob"></div></div>' +
+    root.innerHTML = '<div class="t-look"></div><div class="t-stick"><div class="t-lock" aria-hidden="true"><span>🏃</span></div><div class="t-knob"></div></div>' +
       BUTTONS.map(([id, label, , cls]) => `<button class="t-btn ${cls}" data-id="${id}">${label}</button>`).join('') +
       '<div class="t-edit"><b>Drag any button or the stick where you want it. Tap one to size it.</b>' +
       '<label>All sizes <input type="range" min="0.7" max="1.5" step="0.05" data-k="size"></label>' +
@@ -124,55 +124,50 @@ const RcTouch = (() => {
       for (const a of next) if (!arrows.has(a)) C.press({ key: ARROWS[a] }, true);
       arrows = next;
     };
-    // The movement lock, in every direction: while the stick is held a dashed ring shows just outside it with
-    // a marker riding on the ring at the thumb's angle; pushing the thumb out past the ring locks the direction
-    // it was pointing (those arrows stay down, the knob pinned, the ring and marker lit) and the thumb can leave
-    // the screen. The next touch on the stick frees it. Only in a mission (the menus use the stick for their
-    // items). Forward follows the view: turning with the other thumb turns the run, as in PUBG. Nothing is
-    // drawn while the stick is idle, so the buttons around it stay uncluttered.
+    // The sprint lock, as mobile shooters do it: pushing the stick forward shows a running figure well above
+    // the stick (with a dotted line up to it); sliding the thumb up onto that figure locks running forward
+    // (the forward arrow stays down, the knob pinned at the top, the figure lit) and the thumb can leave the
+    // screen. The next touch on the stick frees it. Only in a mission (the menus use the stick for their
+    // items). Running "forward" follows the view: turning with the other thumb turns the run, as in PUBG.
+    // (A lock in every direction, with a ring around the stick, was tried and players preferred this.)
     let locked = false;
     const unlock = () => {
       locked = false;
-      stick.classList.remove('locked', 'held');
+      stick.classList.remove('locked', 'fwd');
       knob.style.transform = '';
       setArrows(new Set());
     };
-    const dirs = (dx, dy, len, R) => {   // 8 directions with a dead zone; diagonals press two arrows, as on a keyboard
+    const lock = (f) => {
+      locked = true;
+      stick.classList.add('locked');
+      const R = stick.getBoundingClientRect().width / 2;
+      knob.style.transform = `translate(0px, ${-R * 0.6}px)`;
+      setArrows(new Set(['up']));
+      f.kind = 'lockedstick';   // the rest of this touch does nothing
+    };
+    const steer = (f, x, y) => {
+      const r = stick.getBoundingClientRect(), R = r.width / 2;
+      let dx = x - (r.left + R), dy = y - (r.top + R);
+      const len = Math.hypot(dx, dy), lim = R * 0.6;
+      // the thumb reached the running figure: lock
+      if (C.inMission() && stick.classList.contains('fwd')) {
+        const l = lockEl.getBoundingClientRect();
+        if (Math.hypot(x - (l.left + l.width / 2), y - (l.top + l.height / 2)) < l.width * 0.6) { lock(f); return; }
+      }
+      if (len > lim) { dx *= lim / len; dy *= lim / len; }
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      // 8 directions with a dead zone; diagonals press two arrows, as on a keyboard
       const next = new Set();
       if (len > R * 0.22) {
         const a = Math.atan2(dy, dx), s = Math.sin(a), c = Math.cos(a);
         if (s < -0.38) next.add('up'); if (s > 0.38) next.add('down');
         if (c < -0.38) next.add('left'); if (c > 0.38) next.add('right');
       }
-      return next;
-    };
-    const lock = (f, dx, dy, len, R) => {
-      const next = dirs(dx, dy, len, R);
-      if (!next.size) return false;
-      locked = true;
-      stick.classList.add('locked');
-      const lim = R * 0.6;
-      knob.style.transform = `translate(${(dx * lim) / len}px, ${(dy * lim) / len}px)`;
-      lockEl.style.transform = `translate(-50%, -50%) rotate(${Math.atan2(dy, dx) + Math.PI / 2}rad) translate(0, ${-R * 1.32}px)`;
+      stick.classList.toggle('fwd', next.has('up') && C.inMission());
       setArrows(next);
-      f.kind = 'lockedstick';   // the rest of this touch does nothing
-      return true;
-    };
-    const steer = (f, x, y) => {
-      const r = stick.getBoundingClientRect(), R = r.width / 2, S = root.getBoundingClientRect();
-      let dx = x - (r.left + R), dy = y - (r.top + R);
-      const len = Math.hypot(dx, dy), lim = R * 0.6;
-      stick.classList.add('held');
-      if (len > R * 0.22) lockEl.style.transform = `translate(-50%, -50%) rotate(${Math.atan2(dy, dx) + Math.PI / 2}rad) translate(0, ${-R * 1.32}px)`;
-      // past the ring (or at the screen's edge, where the ring may not fit): lock
-      const edge = x <= S.left + 4 || y >= S.bottom - 4 || x >= S.right - 4 || y <= S.top + 4;
-      if (C.inMission() && (len > R * 1.28 || (edge && len > R * 0.9)) && lock(f, dx, dy, len, R)) return;
-      if (len > lim) { dx *= lim / len; dy *= lim / len; }
-      knob.style.transform = `translate(${dx}px, ${dy}px)`;
-      setArrows(dirs(dx, dy, len, R));
     };
     const release = () => {
-      knob.style.transform = ''; stick.classList.remove('held');
+      knob.style.transform = ''; stick.classList.remove('fwd');
       setArrows(new Set());
     };
 
