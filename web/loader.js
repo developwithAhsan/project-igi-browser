@@ -101,17 +101,29 @@ function showLoading() {
   stopLoadTips = startTips(b.querySelector('.tips'));
   showLoading.t1 = setTimeout(() => { phase.textContent = 'Loading mission… a phone can take a minute or two.'; }, 15000);
   showLoading.t2 = setTimeout(() => { phase.textContent = 'Still loading — hang tight, almost there…'; }, 50000);
-  // No mission load takes this long: the game has stopped (a browser out of memory, a stuck file read).
-  // Rather than a black screen that never ends, say so and offer the way out.
-  showLoading.t3 = setTimeout(() => {
+  // A load that long is suspicious, but a slow phone loading a big level can take it: the game is only called
+  // stuck once it has also opened or read no file for a minute (rc_io_activity, kernel32.c), which no load
+  // does. Then, rather than a black screen that never ends, say so and offer the way out.
+  let lastIo = -1, lastIoAt = performance.now();
+  const t0 = performance.now();
+  showLoading.t3 = setInterval(() => {
+    const M = window.recomp, io = M && M._rc_io_activity ? M._rc_io_activity() : -1;
+    const now = performance.now();
+    if (io !== lastIo) { lastIo = io; lastIoAt = now; }
+    if (now - t0 < 150000 || now - lastIoAt < 60000) {
+      if (now - t0 > 150000) phase.textContent = 'Still loading — a big level on a slow phone. Hang tight…';
+      return;
+    }
+    clearInterval(showLoading.t3);
     phase.innerHTML = 'The game has stopped responding. <button id="stuck-reload" style="font:inherit;padding:6px 16px;' +
       'border-radius:8px;border:0;background:#45cf79;color:#000;font-weight:700;margin-left:8px">Reload the game</button>';
     $('stuck-reload').onclick = () => location.reload();
-  }, 150000);
+  }, 10000);
 }
 function hideLoading() {
   const b = $('booting');
-  for (const k of ['t1', 't2', 't3']) clearTimeout(showLoading[k]);
+  for (const k of ['t1', 't2']) clearTimeout(showLoading[k]);
+  clearInterval(showLoading.t3);
   if (stopLoadTips) { stopLoadTips(); stopLoadTips = null; }
   if (b) b.classList.add('hidden');
 }
@@ -564,6 +576,20 @@ function hookInput(M, net) {
     C.act(held[e.button], true);
   });
   window.addEventListener('mouseup', (e) => { if (held[e.button]) { C.act(held[e.button], false); held[e.button] = null; } });
+  // Without the pointer lock the mouse stops at the window's edge, so the view can only turn so far ("the
+  // mouse only works 180 degrees"). Esc (the game's menu) always releases the lock, and not every player
+  // clicks again afterwards: take it back on the next key press (a user gesture, which the lock needs) while
+  // a mission is running, and say so on screen meanwhile.
+  const relock = () => {
+    if (!C.inMission() || C.paused() || document.pointerLockElement === canvas) return;
+    const p = canvas.requestPointerLock?.();
+    if (p && p.catch) p.catch(() => {});
+  };
+  window.addEventListener('keydown', (e) => { if (!e.repeat && e.code !== 'Escape') relock(); });
+  const locktip = $('locktip');
+  if (locktip && !RcTouch.wanted()) setInterval(() => {
+    locktip.classList.toggle('hidden', !(C.inMission() && !C.paused() && document.pointerLockElement !== canvas && document.hasFocus()));
+  }, 500);
   // Relative motion, scaled by the mouse sensitivity setting in a mission (fractions carry over, so 1 = the
   // raw counts as before). The engine (dinput.c) inverts look-Y only during a mission, so the 2D menus keep
   // their normal cursor direction.
@@ -788,7 +814,7 @@ async function run(session) {
   if (session) await clearNetSaves(session);
   sizeCanvas();
   const script = document.createElement('script');
-  script.src = 'build/recomp.js?v=11';
+  script.src = 'build/recomp.js?v=12';
   await new Promise((ok, fail) => { script.onload = ok; script.onerror = fail; document.head.appendChild(script); });
   const M = await createRecomp({
     arguments: ['/opfs/' + OPFS_DIR],
@@ -1088,7 +1114,7 @@ function controlsTip() {
 async function buildVersion() {
   // peers must run the same build and game files, or their simulations diverge
   const marker = await readMarker();
-  const wasm = await fetch('build/recomp11.wasm', { method: 'HEAD' }).catch(() => null);
+  const wasm = await fetch('build/recomp12.wasm', { method: 'HEAD' }).catch(() => null);
   // the ETag comes back weak (W/"...") when the response is compressed: compare only its value
   const etag = (wasm?.headers.get('ETag') || '').replace(/^W\//, '').replace(/"/g, '');
   return `${marker?.version || 'local'}:${etag || wasm?.headers.get('Content-Length') || '?'}`;

@@ -799,6 +799,13 @@ W(DuplicateHandle) {
 }
 /* I/O accounting (see the files section) */
 static struct { uint64_t opens, reads, bytes, cached_bytes, ns, now_cached, peak_cached; } g_io;
+/* The page's stall detector (loader.js): a mission load presents no frames for a while, but keeps opening
+   and reading files; only a game thread that does neither for a long time has stopped. */
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+EMSCRIPTEN_KEEPALIVE
+#endif
+unsigned rc_io_activity(void) { return (unsigned)(g_io.opens + g_io.reads); }
 W(CloseHandle) {
     WinHandle *x = handle_get(ARG(0), H_FILE);
     if (x && x->buf) g_io.now_cached -= x->size;

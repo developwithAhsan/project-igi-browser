@@ -11,9 +11,10 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
   WebGPU renderer, plus the few extra Windows calls the game makes (`host/mm.c`, registry, timers, threads).
 - **Phones and tablets**: on-screen stick and buttons laid out like mobile shooters (`web/touch.js`: a big
   FIRE with jump / crouch / scope around it, a second FIRE above the stick, walk/run and binoculars toggles),
-  a forward lock on the stick (push past its top edge and let go to keep running, tap the stick to stop), a
-  layout editor (drag any button or the stick where you want it, size and opacity, saved in the browser,
-  usable on the landing screen and while the game loads), a scope button that raises the sniper rifle's
+  a movement lock on the stick (push out past the dashed ring that shows while it is held to keep moving in
+  that direction with the thumb off the screen, tap the stick to stop), a layout editor (drag any button or
+  the stick where you want it, size overall and per button, opacity, saved in the browser, usable on the
+  landing screen and while the game loads), a scope button that raises the sniper rifle's
   scope and snaps it to a chosen zoom and back (through the binoculars when the weapon has no scope), a
   "mission failed, tap Restart Mission" note when the game's menu opens on its own, tap-to-hold crouch and
   walk, gyroscope aiming (turn the phone to fine-aim while scoped, or always; invert either axis), swipe /
@@ -49,6 +50,10 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
 - A hosted-game flow (`web/serve.py --manifest`, `?devgame`), scripted input for headless testing
   (`host/input.c`), and the site's own extras (visitor counter, affiliate card, and an AdSense slot that
   works inside the cross-origin-isolated page through an `<iframe credentialless>` around `web/ad.html`).
+- **Stall detection**: a mission load presents no frames for a while; the loading cover shows meanwhile, and
+  the game is only called stuck (with a reload button) once it has also opened or read no file for a minute
+  (`rc_io_activity`). On a PC the pointer lock is taken back on the next key press after Esc released it, so
+  the view keeps turning all the way round.
 - **Crash reports**: a browser that runs out of memory kills the page and reloads it (a black screen, then
   the landing page). The running game keeps a heartbeat in `sessionStorage`, cleared on an orderly unload;
   a start that finds one tells the player what happened and posts the device, memory, time played and

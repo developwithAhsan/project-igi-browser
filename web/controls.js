@@ -268,11 +268,38 @@ const RcControls = (() => {
     // pitch sign was the wrong way round. Mouse counts: +x looks right, +y looks down.
     const yaw = w[0] * up[0] + w[1] * up[1] + w[2] * up[2];
     const pitch = w[0] * right[0] + w[1] * right[1];
+    if (gyroDbg) gyroDbg(raw, up, yaw, pitch, dt);
     if (Math.abs(yaw) < 0.3 && Math.abs(pitch) < 0.3) return;  // hand tremor: a small dead zone
+    if (Math.abs(yaw) > 720 || Math.abs(pitch) > 720) return;   // a sensor glitch, not a hand
     const k = DEG * S.gyroSens * lookScale() * dt;
     look(-yaw * k * (S.gyroInvX ? -1 : 1), -pitch * k * (S.gyroInvY ? -1 : 1));
   }
   const gyroActive = () => S.gyro === 'on' || (S.gyro === 'scope' && scoped());
+  // ?gyrotest: a readout of what the sensor says and what reaches the game, for a screen recording when the
+  // gyroscope misbehaves on a phone we don't have (rates in deg/s in the device frame, the up vector, the
+  // yaw / pitch rates, the event interval, the events per second and the counts sent per second).
+  let gyroDbg = null;
+  if (new URLSearchParams(location.search).has('gyrotest')) {
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:50%;top:40%;transform:translateX(-50%);z-index:9999;pointer-events:none;' +
+      'background:rgba(0,0,0,.7);color:#9fe6b0;font:12px/1.4 ui-monospace,Menlo,monospace;padding:6px 10px;border-radius:8px;white-space:pre';
+    document.body.appendChild(box);
+    let shown = 0, events = 0, sentX = 0, sentY = 0, t0 = performance.now();
+    const look0 = look;
+    gyroDbg = (raw, up, yaw, pitch, dt) => {
+      events++;
+      const now = performance.now();
+      if (now - shown < 100) return;
+      shown = now;
+      const secs = (now - t0) / 1000;
+      box.textContent = `gyro raw ${raw.map((v) => v.toFixed(1).padStart(7)).join(' ')} deg/s\n` +
+        `up   ${up.map((v) => v.toFixed(2).padStart(6)).join(' ')}   dt ${(dt * 1000).toFixed(1)} ms\n` +
+        `yaw ${yaw.toFixed(1).padStart(7)}  pitch ${pitch.toFixed(1).padStart(7)} deg/s\n` +
+        `${(events / secs).toFixed(0)} ev/s   sent ${(sentX / secs).toFixed(0)} ${(sentY / secs).toFixed(0)} counts/s   mode ${S.gyro} sens ${S.gyroSens}`;
+      if (secs > 5) { t0 = now; events = 0; sentX = sentY = 0; }
+    };
+    look = (dx, dy) => { sentX += Math.abs(dx); sentY += Math.abs(dy); look0(dx, dy); };
+  }
   // Starts listening (once): on iOS this must be called from a user gesture (a click). One request at a time.
   let gyroPending = null;
   function gyroEnable() {

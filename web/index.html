@@ -164,7 +164,7 @@
   #fs svg { width: 20px; height: 20px; }
   #stage.awake #fs, #fs:focus-visible { opacity: 1; }
   #fs:hover { background: rgba(0, 0, 0, .75); }
-  #fstip, #ctltip { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; padding: 6px 14px; border-radius: 99px;
+  #fstip, #ctltip, #locktip { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; padding: 6px 14px; border-radius: 99px;
     background: rgba(0, 0, 0, .65); color: #fff; font-size: 13px; pointer-events: none; transition: opacity .4s ease; white-space: nowrap; }
   #ctltip { opacity: 0; }
   #soundtip { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); z-index: 2; padding: 6px 14px; border-radius: 99px;
@@ -329,25 +329,26 @@
     --st: max(10px, env(safe-area-inset-top)); }
   #touch.off { display: none; }
   #touch .t-stick { position: absolute; left: var(--sl); bottom: var(--sb);
-    width: var(--sk); aspect-ratio: 1; border-radius: 50%; opacity: var(--a);
+    width: calc(var(--sk) * var(--bk, 1)); aspect-ratio: 1; border-radius: 50%; opacity: var(--a);
     background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .22); }
   #touch .t-knob { position: absolute; inset: 30%; border-radius: 50%; background: rgba(255, 255, 255, .35);
     border: 2px solid rgba(255, 255, 255, .5); pointer-events: none; }
-  /* the sprint lock: a running figure well above the stick with a dotted line up to it, shown while the stick
-     is pushed forward; the thumb sliding onto it locks running (touch.js), and it stays lit while locked */
-  #touch .t-lock { position: absolute; left: 50%; top: calc(-1 * var(--sk) * .8); transform: translateX(-50%); width: calc(var(--sk) * .5); height: calc(var(--sk) * .5);
-    display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .45); background: rgba(0, 0, 0, .5);
-    opacity: 0; transition: opacity .15s ease, transform .15s ease; pointer-events: none; }
-  #touch .t-lock span { font-size: calc(var(--sk) * .26); line-height: 1; filter: grayscale(1) brightness(1.7); }
-  #touch .t-stick::before { content: ""; position: absolute; left: 50%; top: calc(-1 * var(--sk) * .3); height: calc(var(--sk) * .3);
-    border-left: 3px dotted rgba(255, 255, 255, .55); opacity: 0; transition: opacity .15s ease; }
-  #touch .t-stick.fwd .t-lock, #touch .t-stick.fwd::before { opacity: .85; }
-  #touch .t-stick.locked .t-lock, #touch .t-stick.locked::before { opacity: 1; }
-  #touch .t-stick.locked .t-lock { background: rgba(52, 184, 102, .65); border-color: rgba(120, 230, 160, .95); transform: translateX(-50%) scale(1.1); }
+  /* the movement lock: a dashed ring just outside the stick and a marker riding on it at the thumb's angle,
+     shown only while the stick is held; pushing past the ring locks that direction (touch.js), lit while locked */
+  #touch .t-stick::before { content: ""; position: absolute; inset: -32%; border-radius: 50%; border: 2px dashed rgba(255, 255, 255, .45);
+    opacity: 0; transition: opacity .15s ease; pointer-events: none; }
+  #touch .t-lock { position: absolute; left: 50%; top: 50%; width: calc(var(--sk) * .26); height: calc(var(--sk) * .26);
+    transform: translate(-50%, -50%) translate(0, calc(var(--sk) * -.66));
+    display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .5); background: rgba(0, 0, 0, .55);
+    color: #fff; font-size: calc(var(--sk) * .15); line-height: 1; opacity: 0; transition: opacity .15s ease; pointer-events: none; }
+  #touch .t-stick.held::before, #touch .t-stick.held .t-lock { opacity: .8; }
+  #touch .t-stick.locked::before, #touch .t-stick.locked .t-lock { opacity: 1; }
+  #touch .t-stick.locked::before { border-style: solid; border-color: rgba(120, 230, 160, .9); }
+  #touch .t-stick.locked .t-lock { background: rgba(52, 184, 102, .7); border-color: rgba(120, 230, 160, .95); }
   #touch .t-stick.locked { border-color: rgba(120, 230, 160, .6); }
   #touch .t-stick.locked .t-knob { background: rgba(52, 184, 102, .55); }
   #touch .t-btn { position: absolute; display: grid; place-items: center; align-content: center; padding: 0;
-    width: var(--u); aspect-ratio: 1; border-radius: 50%; touch-action: none; opacity: var(--a);
+    width: calc(var(--u) * var(--bk, 1)); aspect-ratio: 1; border-radius: 50%; touch-action: none; opacity: var(--a);
     border: 2px solid rgba(255, 255, 255, .3); background: rgba(0, 0, 0, .35); color: rgba(255, 255, 255, .9);
     font: 700 clamp(9px, 2.6vmin, 11px)/1.1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .03em;
     transition: opacity .25s ease; }
@@ -369,13 +370,15 @@
     font: 600 12px ui-sans-serif, system-ui, sans-serif; }
   #touch .t-edit .te-done { background: var(--accent); color: #04140a; border-color: var(--accent); }
   #touch.edit .t-look { display: none; }
+  #touch.edit .t-btn.sel, #touch.edit .t-stick.sel { outline: 3px solid var(--accent-hi); outline-offset: 3px; }
+  #touch .t-edit .te-one .te-sel { color: var(--accent-hi); font-weight: 700; }
   /* right cluster */
-  #touch .b-fire { width: var(--f); right: var(--sr); bottom: var(--sb);
+  #touch .b-fire { width: calc(var(--f) * var(--bk, 1)); right: var(--sr); bottom: var(--sb);
     background: rgba(210, 58, 47, .4); border-color: rgba(255, 150, 140, .5); font-size: clamp(12px, 3.4vmin, 15px); }
   #touch .b-jump { right: calc(var(--sr) + (var(--f) - var(--u)) / 2); bottom: calc(var(--sb) + var(--f) + var(--g)); }
   #touch .b-peek { right: calc(var(--sr) + (var(--f) - var(--u)) / 2); bottom: calc(var(--sb) + var(--f) + 2 * var(--g) + var(--u)); }
   #touch .b-crouch { right: calc(var(--sr) + var(--f) + var(--g)); bottom: var(--sb); }
-  #touch .b-scope { --s: calc(var(--u) * 1.15); width: var(--s); right: calc(var(--sr) + var(--f) + var(--g) - (var(--s) - var(--u)) / 2);
+  #touch .b-scope { --s: calc(var(--u) * 1.15); width: calc(var(--s) * var(--bk, 1)); right: calc(var(--sr) + var(--f) + var(--g) - (var(--s) - var(--u)) / 2);
     bottom: calc(var(--sb) + var(--u) + var(--g) + 6px); border-color: rgba(255, 255, 255, .5); font-size: clamp(8px, 2.3vmin, 10px); }
   #touch .b-scope .eye { display: block; width: 46%; height: 46%; border-radius: 50%; border: 2.5px solid currentColor; position: relative; margin-bottom: 2px; }
   #touch .b-scope .eye::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; background: currentColor; }
@@ -386,11 +389,11 @@
   /* left cluster */
   /* WALK sits above the second FIRE, to the right of the stick: the lane above the stick is the sprint lock's */
   #touch .b-walk { left: calc(var(--sl) + var(--sk) + var(--g) + var(--u) * .1); bottom: calc(var(--sb) + var(--sk) * .55 + var(--u) * 1.2 + var(--g)); }
-  #touch .b-fire2 { --s: calc(var(--u) * 1.2); width: var(--s); left: calc(var(--sl) + var(--sk) + var(--g));
+  #touch .b-fire2 { --s: calc(var(--u) * 1.2); width: calc(var(--s) * var(--bk, 1)); left: calc(var(--sl) + var(--sk) + var(--g));
     bottom: calc(var(--sb) + var(--sk) * 0.55); background: rgba(210, 58, 47, .3); border-color: rgba(255, 150, 140, .45); }
   /* top bar */
   #touch .b-bino, #touch .b-zin, #touch .b-zout, #touch .b-map, #touch .b-menu, #touch .b-gear {
-    top: var(--st); width: var(--tb); }
+    top: var(--st); width: calc(var(--tb) * var(--bk, 1)); }
   #touch .b-menu { left: max(12px, env(safe-area-inset-left)); }
   #touch .b-map { left: calc(max(12px, env(safe-area-inset-left)) + var(--tb) + 6px); }
   #touch .b-gear { right: max(12px, env(safe-area-inset-right)); font-size: clamp(16px, 4.5vmin, 20px); }
@@ -531,7 +534,7 @@
       <div class="tg-card">
         <b class="tg-title">How to play</b>
         <div class="tg-grid">
-          <div><i>✥</i><span><b>Move</b> — the stick on the left. Push forward and slide your thumb up onto the runner to lock running; tap the stick to stop. WALK: tap to walk, tap again to run.</span></div>
+          <div><i>✥</i><span><b>Move</b> — the stick on the left. Push the stick out past its dashed ring to lock that direction (keep running with your thumb off); tap the stick to stop. WALK: tap to walk, tap again to run.</span></div>
           <div><i>⌖</i><span><b>Aim</b> — swipe anywhere in the middle. Hold either FIRE and drag to aim while shooting.</span></div>
           <div><i>◎</i><span><b>Scope</b> — tap the eye to snap the sniper scope or binoculars to 4× and back; + / − fine-tune.</span></div>
           <div><i>⇅</i><span><b>Crouch / jump / peek</b> — around FIRE. Tap CROUCH to crouch, tap again to stand. There is no prone in this game.</span></div>
@@ -544,6 +547,7 @@
     </div>
     <div id="fstip" class="hidden">Press <kbd>Alt</kbd> + <kbd>Enter</kbd> for fullscreen</div>
     <div id="ctltip" class="hidden"></div>
+    <div id="locktip" class="hidden">Click the game to capture the mouse (full 360° turning)</div>
     <div id="panel">
       <div id="poster-wrap" aria-hidden="true"><img src="poster.jpg" alt="" onerror="this.closest('#poster-wrap').remove()"><span class="scan"></span><span class="scrim"></span></div>
 
@@ -592,6 +596,8 @@
         <button id="home-controls" type="button" class="btn ghost">⚙ Controls, layout &amp; gyroscope</button>
         <p class="small desk" style="margin-top:18px">Keys, mouse buttons and sensitivity: the Controls panel on the right, which applies at once, mid-mission too. Don't rebind in the game's own Controls menu: those bindings are reset to the game's defaults on every reload.<br>
           Fullscreen: <kbd>Alt</kbd> + <kbd>Enter</kbd> (<kbd>⌥</kbd> + <kbd>Enter</kbd> on Mac) or the button in the corner.</p>
+        <p class="small" id="updated">Sagar Joshi is actively fixing issues and smoothing the game. Last update: <b>29 Oct 2026, 20:21 IST</b>.
+          Seeing a problem you reported before? Reload the page and try again first: it may already be fixed.</p>
         <p class="small"><a href="#" id="reset">Use a different game folder</a></p>
       </section>
 
@@ -797,9 +803,9 @@
   })();
 </script>
 <script src="netplay.js"></script>
-<script src="controls.js?v=7"></script>
-<script src="touch.js?v=10"></script>
-<script src="loader.js?v=20"></script>
+<script src="controls.js?v=8"></script>
+<script src="touch.js?v=11"></script>
+<script src="loader.js?v=21"></script>
 <script>
   // Ads (slots switched on in RC_ADS; the network tags are in ad.html). The page is cross-origin isolated,
   // which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>: that

@@ -54,11 +54,12 @@ const RcTouch = (() => {
     const root = document.createElement('div');
     root.id = 'touch';
     root.className = 'off';   // hidden until the game runs (attach), except while the layout is being edited
-    root.innerHTML = '<div class="t-look"></div><div class="t-stick"><div class="t-lock" aria-hidden="true"><span>🏃</span></div><div class="t-knob"></div></div>' +
+    root.innerHTML = '<div class="t-look"></div><div class="t-stick"><div class="t-lock" aria-hidden="true"><span>⇧</span></div><div class="t-knob"></div></div>' +
       BUTTONS.map(([id, label, , cls]) => `<button class="t-btn ${cls}" data-id="${id}">${label}</button>`).join('') +
-      '<div class="t-edit"><b>Drag any button or the stick where you want it</b>' +
-      '<label>Size <input type="range" min="0.7" max="1.5" step="0.05" data-k="size"></label>' +
+      '<div class="t-edit"><b>Drag any button or the stick where you want it. Tap one to size it.</b>' +
+      '<label>All sizes <input type="range" min="0.7" max="1.5" step="0.05" data-k="size"></label>' +
       '<label>Opacity <input type="range" min="0.3" max="1" step="0.05" data-k="alpha"></label>' +
+      '<label class="te-one hidden"><span class="te-sel">Button</span> <input type="range" min="0.6" max="1.8" step="0.05" data-k="one"></label>' +
       '<button type="button" class="te-reset">Reset layout</button><button type="button" class="te-done">Done</button></div>';
     stage.appendChild(root);
     const byId = (id) => root.querySelector(`.t-btn[data-id="${id}"]`);
@@ -123,63 +124,71 @@ const RcTouch = (() => {
       for (const a of next) if (!arrows.has(a)) C.press({ key: ARROWS[a] }, true);
       arrows = next;
     };
-    // The sprint lock, as mobile shooters do it: pushing the stick forward shows a running figure well above
-    // the stick (with a dotted line up to it); sliding the thumb up onto that figure locks running forward
-    // (the forward arrow stays down, the knob pinned at the top, the figure lit) and the thumb can leave the
-    // screen. The next touch on the stick frees it. Only in a mission (the menus use the stick for their
-    // items). Running "forward" follows the view: turning with the other thumb turns the run, as in PUBG.
+    // The movement lock, in every direction: while the stick is held a dashed ring shows just outside it with
+    // a marker riding on the ring at the thumb's angle; pushing the thumb out past the ring locks the direction
+    // it was pointing (those arrows stay down, the knob pinned, the ring and marker lit) and the thumb can leave
+    // the screen. The next touch on the stick frees it. Only in a mission (the menus use the stick for their
+    // items). Forward follows the view: turning with the other thumb turns the run, as in PUBG. Nothing is
+    // drawn while the stick is idle, so the buttons around it stay uncluttered.
     let locked = false;
     const unlock = () => {
       locked = false;
-      stick.classList.remove('locked', 'fwd');
+      stick.classList.remove('locked', 'held');
       knob.style.transform = '';
       setArrows(new Set());
     };
-    const lock = (f) => {
-      locked = true;
-      stick.classList.add('locked');
-      const R = stick.getBoundingClientRect().width / 2;
-      knob.style.transform = `translate(0px, ${-R * 0.6}px)`;
-      setArrows(new Set(['up']));
-      f.kind = 'lockedstick';   // the rest of this touch does nothing
-    };
-    const steer = (f, x, y) => {
-      const r = stick.getBoundingClientRect(), R = r.width / 2;
-      let dx = x - (r.left + R), dy = y - (r.top + R);
-      const len = Math.hypot(dx, dy), lim = R * 0.6;
-      // the thumb reached the running figure: lock
-      if (C.inMission() && stick.classList.contains('fwd')) {
-        const l = lockEl.getBoundingClientRect();
-        if (Math.hypot(x - (l.left + l.width / 2), y - (l.top + l.height / 2)) < l.width * 0.6) { lock(f); return; }
-      }
-      if (len > lim) { dx *= lim / len; dy *= lim / len; }
-      knob.style.transform = `translate(${dx}px, ${dy}px)`;
-      // 8 directions with a dead zone; diagonals press two arrows, as on a keyboard
+    const dirs = (dx, dy, len, R) => {   // 8 directions with a dead zone; diagonals press two arrows, as on a keyboard
       const next = new Set();
       if (len > R * 0.22) {
         const a = Math.atan2(dy, dx), s = Math.sin(a), c = Math.cos(a);
         if (s < -0.38) next.add('up'); if (s > 0.38) next.add('down');
         if (c < -0.38) next.add('left'); if (c > 0.38) next.add('right');
       }
-      stick.classList.toggle('fwd', next.has('up') && C.inMission());
+      return next;
+    };
+    const lock = (f, dx, dy, len, R) => {
+      const next = dirs(dx, dy, len, R);
+      if (!next.size) return false;
+      locked = true;
+      stick.classList.add('locked');
+      const lim = R * 0.6;
+      knob.style.transform = `translate(${(dx * lim) / len}px, ${(dy * lim) / len}px)`;
+      lockEl.style.transform = `translate(-50%, -50%) rotate(${Math.atan2(dy, dx) + Math.PI / 2}rad) translate(0, ${-R * 1.32}px)`;
       setArrows(next);
+      f.kind = 'lockedstick';   // the rest of this touch does nothing
+      return true;
+    };
+    const steer = (f, x, y) => {
+      const r = stick.getBoundingClientRect(), R = r.width / 2, S = root.getBoundingClientRect();
+      let dx = x - (r.left + R), dy = y - (r.top + R);
+      const len = Math.hypot(dx, dy), lim = R * 0.6;
+      stick.classList.add('held');
+      if (len > R * 0.22) lockEl.style.transform = `translate(-50%, -50%) rotate(${Math.atan2(dy, dx) + Math.PI / 2}rad) translate(0, ${-R * 1.32}px)`;
+      // past the ring (or at the screen's edge, where the ring may not fit): lock
+      const edge = x <= S.left + 4 || y >= S.bottom - 4 || x >= S.right - 4 || y <= S.top + 4;
+      if (C.inMission() && (len > R * 1.28 || (edge && len > R * 0.9)) && lock(f, dx, dy, len, R)) return;
+      if (len > lim) { dx *= lim / len; dy *= lim / len; }
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      setArrows(dirs(dx, dy, len, R));
     };
     const release = () => {
-      knob.style.transform = ''; stick.classList.remove('fwd');
+      knob.style.transform = ''; stick.classList.remove('held');
       setArrows(new Set());
     };
 
-    // ---- the layout: positions (fractions of the stage, saved per browser), size and opacity
+    // ---- the layout: positions (fractions of the stage, saved per browser), size (all, and per button) and opacity
     let layout = loadLayout();
     function loadLayout() {
       let s = {};
       try { s = JSON.parse(localStorage.getItem(LAYOUT_STORE) || '{}') || {}; } catch { s = {}; }
-      const l = { pos: {}, size: 1, alpha: 1 };
+      const l = { pos: {}, scale: {}, size: 1, alpha: 1 };
       if (typeof s.size === 'number' && s.size >= 0.5 && s.size <= 2) l.size = s.size;
       if (typeof s.alpha === 'number' && s.alpha >= 0.2 && s.alpha <= 1) l.alpha = s.alpha;
       if (s.pos && typeof s.pos === 'object')
         for (const [id, p] of Object.entries(s.pos))
           if (Array.isArray(p) && p.length === 2 && p.every((v) => typeof v === 'number' && v >= 0 && v <= 1)) l.pos[id] = p;
+      if (s.scale && typeof s.scale === 'object')
+        for (const [id, k] of Object.entries(s.scale)) if (typeof k === 'number' && k >= 0.4 && k <= 2.5) l.scale[id] = k;
       return l;
     }
     const saveLayout = () => { try { localStorage.setItem(LAYOUT_STORE, JSON.stringify(layout)); } catch { /* storage blocked */ } };
@@ -189,34 +198,46 @@ const RcTouch = (() => {
       root.style.setProperty('--k', String(layout.size));
       root.style.setProperty('--a', String(layout.alpha));
       for (const el of placeable()) {
-        const p = layout.pos[idOf(el)];
+        const p = layout.pos[idOf(el)], k = layout.scale[idOf(el)];
         if (p) { el.style.left = `${p[0] * 100}%`; el.style.top = `${p[1] * 100}%`; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.transform = 'translate(-50%, -50%)'; }
         else { el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.transform = ''; }
+        if (k) el.style.setProperty('--bk', String(k)); else el.style.removeProperty('--bk');
       }
     };
     applyLayout();
     // Edit mode: the overlay comes up over everything (the boot cover too), every button and the stick drag,
-    // the bar at the top has the size and opacity sliders. Works before the game runs as well.
+    // a tap on one selects it for its own size slider; the bar at the top has the sliders. Works before the
+    // game runs as well.
     const editBar = root.querySelector('.t-edit');
-    let editing = false;
-    const syncEdit = () => { for (const r of editBar.querySelectorAll('input[type=range]')) r.value = layout[r.dataset.k]; };
-    const openLayout = () => { editing = true; sheet.classList.add('hidden'); syncEdit(); root.classList.add('edit'); };
-    const closeLayout = () => { editing = false; root.classList.remove('edit'); for (const [id] of fingers) end({ pointerId: id }); };
+    let editing = false, selected = null;
+    const syncEdit = () => {
+      for (const r of editBar.querySelectorAll('input[type=range]'))
+        r.value = r.dataset.k === 'one' ? (selected ? layout.scale[selected] || 1 : 1) : layout[r.dataset.k];
+      editBar.querySelector('.te-one').classList.toggle('hidden', !selected);
+      if (selected) editBar.querySelector('.te-sel').textContent = (selected === 'stick' ? 'Stick' : (BUTTONS.find((b) => b[0] === selected)?.[1] || selected).replace(/<[^>]*>/g, ' ').trim()) + ' size';
+      for (const el of placeable()) el.classList.toggle('sel', idOf(el) === selected);
+    };
+    const openLayout = () => { editing = true; selected = null; sheet.classList.add('hidden'); syncEdit(); root.classList.add('edit'); };
+    const closeLayout = () => { editing = false; selected = null; syncEdit(); root.classList.remove('edit'); for (const [id] of fingers) end({ pointerId: id }); };
     for (const r of editBar.querySelectorAll('input[type=range]'))
-      r.addEventListener('input', () => { layout[r.dataset.k] = Number(r.value); applyLayout(); saveLayout(); });
-    editBar.querySelector('.te-reset').addEventListener('click', () => { layout = { pos: {}, size: 1, alpha: 1 }; applyLayout(); saveLayout(); syncEdit(); });
+      r.addEventListener('input', () => {
+        if (r.dataset.k === 'one') { if (selected) layout.scale[selected] = Number(r.value); } else layout[r.dataset.k] = Number(r.value);
+        applyLayout(); saveLayout();
+      });
+    editBar.querySelector('.te-reset').addEventListener('click', () => { layout = { pos: {}, scale: {}, size: 1, alpha: 1 }; selected = null; applyLayout(); saveLayout(); syncEdit(); });
     editBar.querySelector('.te-done').addEventListener('click', closeLayout);
     const editDown = (e) => {
       const el = e.target.closest('.t-btn, .t-stick');
       if (!el) return;
       const r = el.getBoundingClientRect(), R = root.getBoundingClientRect();
-      fingers.set(e.pointerId, { kind: 'edit', el, x: e.clientX, y: e.clientY, cx: r.left + r.width / 2 - R.left, cy: r.top + r.height / 2 - R.top, w: r.width, h: r.height });
+      fingers.set(e.pointerId, { kind: 'edit', el, x: e.clientX, y: e.clientY, moved: 0, cx: r.left + r.width / 2 - R.left, cy: r.top + r.height / 2 - R.top, w: r.width, h: r.height });
       try { root.setPointerCapture?.(e.pointerId); } catch { /* synthetic */ }
     };
     const editMove = (f, e) => {
       const R = root.getBoundingClientRect();
       const cx = Math.max(f.w / 2, Math.min(R.width - f.w / 2, f.cx + e.clientX - f.x));
       const cy = Math.max(f.h / 2, Math.min(R.height - f.h / 2, f.cy + e.clientY - f.y));
+      f.moved = Math.max(f.moved, Math.hypot(e.clientX - f.x, e.clientY - f.y));
       f.pos = [cx / R.width, cy / R.height];
       f.el.style.left = `${f.pos[0] * 100}%`; f.el.style.top = `${f.pos[1] * 100}%`;
       f.el.style.right = 'auto'; f.el.style.bottom = 'auto'; f.el.style.transform = 'translate(-50%, -50%)';
@@ -271,7 +292,11 @@ const RcTouch = (() => {
       const f = fingers.get(e.pointerId);
       if (!f) return;
       fingers.delete(e.pointerId);
-      if (f.kind === 'edit') { if (f.pos) { layout.pos[idOf(f.el)] = f.pos; saveLayout(); } return; }
+      if (f.kind === 'edit') {
+        if (f.pos && f.moved > 6) { layout.pos[idOf(f.el)] = f.pos; saveLayout(); }
+        else { if (f.pos) applyLayout(); selected = idOf(f.el); syncEdit(); }   // a tap: select it for sizing
+        return;
+      }
       if (f.kind === 'btn') {
         const def = BUTTONS.find((b) => b[0] === f.btn.dataset.id);
         if (def[4] !== 'hold') {   // a held button's key stays down until its next tap
