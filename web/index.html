@@ -333,13 +333,17 @@
     background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .22); }
   #touch .t-knob { position: absolute; inset: 30%; border-radius: 50%; background: rgba(255, 255, 255, .35);
     border: 2px solid rgba(255, 255, 255, .5); pointer-events: none; }
-  /* the forward lock above the stick: faint while pushing forward, lit when the thumb is past the edge (letting
-     go there locks) and while locked */
-  #touch .t-lock { position: absolute; left: 50%; top: calc(-1 * var(--u) * .6); transform: translateX(-50%); width: calc(var(--u) * .75); height: calc(var(--u) * .75);
-    display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); background: rgba(0, 0, 0, .35);
-    color: #fff; font-size: calc(var(--u) * .4); opacity: 0; transition: opacity .15s ease, transform .15s ease; pointer-events: none; }
-  #touch .t-stick.fwd .t-lock { opacity: .55; }
-  #touch .t-lock.arm, #touch .t-stick.locked .t-lock { opacity: 1; background: rgba(52, 184, 102, .6); border-color: rgba(120, 230, 160, .9); transform: translateX(-50%) scale(1.15); }
+  /* the sprint lock: a running figure well above the stick with a dotted line up to it, shown while the stick
+     is pushed forward; the thumb sliding onto it locks running (touch.js), and it stays lit while locked */
+  #touch .t-lock { position: absolute; left: 50%; top: calc(-1 * var(--sk) * .8); transform: translateX(-50%); width: calc(var(--sk) * .5); height: calc(var(--sk) * .5);
+    display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .45); background: rgba(0, 0, 0, .5);
+    opacity: 0; transition: opacity .15s ease, transform .15s ease; pointer-events: none; }
+  #touch .t-lock span { font-size: calc(var(--sk) * .26); line-height: 1; filter: grayscale(1) brightness(1.7); }
+  #touch .t-stick::before { content: ""; position: absolute; left: 50%; top: calc(-1 * var(--sk) * .3); height: calc(var(--sk) * .3);
+    border-left: 3px dotted rgba(255, 255, 255, .55); opacity: 0; transition: opacity .15s ease; }
+  #touch .t-stick.fwd .t-lock, #touch .t-stick.fwd::before { opacity: .85; }
+  #touch .t-stick.locked .t-lock, #touch .t-stick.locked::before { opacity: 1; }
+  #touch .t-stick.locked .t-lock { background: rgba(52, 184, 102, .65); border-color: rgba(120, 230, 160, .95); transform: translateX(-50%) scale(1.1); }
   #touch .t-stick.locked { border-color: rgba(120, 230, 160, .6); }
   #touch .t-stick.locked .t-knob { background: rgba(52, 184, 102, .55); }
   #touch .t-btn { position: absolute; display: grid; place-items: center; align-content: center; padding: 0;
@@ -380,7 +384,8 @@
   #touch .b-reload { right: calc(var(--sr) + var(--f) + 2 * var(--g) + var(--u)); bottom: calc(var(--sb) + var(--u) + var(--g) + 6px); }
   #touch .b-weapon { left: 50%; transform: translateX(-50%); bottom: var(--sb); }
   /* left cluster */
-  #touch .b-walk { left: calc(var(--sl) + (var(--sk) - var(--u)) / 2); bottom: calc(var(--sb) + var(--sk) + var(--g) + var(--u) * .55); }
+  /* WALK sits above the second FIRE, to the right of the stick: the lane above the stick is the sprint lock's */
+  #touch .b-walk { left: calc(var(--sl) + var(--sk) + var(--g) + var(--u) * .1); bottom: calc(var(--sb) + var(--sk) * .55 + var(--u) * 1.2 + var(--g)); }
   #touch .b-fire2 { --s: calc(var(--u) * 1.2); width: var(--s); left: calc(var(--sl) + var(--sk) + var(--g));
     bottom: calc(var(--sb) + var(--sk) * 0.55); background: rgba(210, 58, 47, .3); border-color: rgba(255, 150, 140, .45); }
   /* top bar */
@@ -526,7 +531,7 @@
       <div class="tg-card">
         <b class="tg-title">How to play</b>
         <div class="tg-grid">
-          <div><i>✥</i><span><b>Move</b> — the stick on the left. Push it past the top to lock running; tap the stick to stop. WALK above it: tap to walk, tap again to run.</span></div>
+          <div><i>✥</i><span><b>Move</b> — the stick on the left. Push forward and slide your thumb up onto the runner to lock running; tap the stick to stop. WALK: tap to walk, tap again to run.</span></div>
           <div><i>⌖</i><span><b>Aim</b> — swipe anywhere in the middle. Hold either FIRE and drag to aim while shooting.</span></div>
           <div><i>◎</i><span><b>Scope</b> — tap the eye to snap the sniper scope or binoculars to 4× and back; + / − fine-tune.</span></div>
           <div><i>⇅</i><span><b>Crouch / jump / peek</b> — around FIRE. Tap CROUCH to crouch, tap again to stand. There is no prone in this game.</span></div>
@@ -792,9 +797,9 @@
   })();
 </script>
 <script src="netplay.js"></script>
-<script src="controls.js?v=6"></script>
-<script src="touch.js?v=9"></script>
-<script src="loader.js?v=19"></script>
+<script src="controls.js?v=7"></script>
+<script src="touch.js?v=10"></script>
+<script src="loader.js?v=20"></script>
 <script>
   // Ads (slots switched on in RC_ADS; the network tags are in ad.html). The page is cross-origin isolated,
   // which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>: that

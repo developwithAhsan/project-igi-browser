@@ -230,20 +230,29 @@ const RcControls = (() => {
   // tilted back. iOS reports the acceleration with the opposite sign to the spec, and needs permission.
   const webkit = /AppleWebKit\//.test(navigator.userAgent) && !/Chrome\/|Chromium\/|Edg\//.test(navigator.userAgent);
   const DEG = 4.7;   // mouse counts per degree of phone rotation at sensitivity 1 (the game turns 0.212 deg per count)
-  let g = null, gyroOn = false, gyroLast = 0, gyroStatus = 'idle';   // idle | on | denied | none
+  let g = null, wf = null, gyroOn = false, gyroLast = 0, gyroStatus = 'idle';   // idle | on | denied | none
   const gyroState = () => gyroStatus;
   function onMotion(e) {
     const r = e.rotationRate, a = e.accelerationIncludingGravity;
     if (!r || r.alpha == null || !a || a.x == null) { if (gyroStatus === 'on') gyroStatus = 'none'; return; }
     gyroStatus = 'on';
     const now = performance.now();
-    const dt = gyroLast ? Math.min(0.05, (now - gyroLast) / 1000) : 0;
+    // Each event is one sensor sample: integrate over the sensor's own interval (ms; a few WebKits report
+    // seconds), not the time it took to arrive. Browsers deliver these in bursts under load, which with
+    // arrival times made the view stutter. Without an interval, the arrival time, capped.
+    let dt = typeof e.interval === 'number' && e.interval > 0 ? (e.interval < 1 ? e.interval : e.interval / 1000) : 0;
+    if (!dt) dt = gyroLast ? (now - gyroLast) / 1000 : 0;
+    dt = Math.min(dt, 0.05);
+    const first = !gyroLast;
     gyroLast = now;
     const s = webkit ? -1 : 1;
     const ax = a.x * s, ay = a.y * s, az = a.z * s;
     g = g ? [g[0] + (ax - g[0]) * 0.15, g[1] + (ay - g[1]) * 0.15, g[2] + (az - g[2]) * 0.15] : [ax, ay, az];
     const n = Math.hypot(g[0], g[1], g[2]);
-    if (!dt || n < 1) return;
+    // a light two-sample smoothing of the rates takes the sensor noise out without a felt lag
+    const raw = [r.alpha, r.beta, r.gamma];
+    wf = wf && !first ? [wf[0] + (raw[0] - wf[0]) * 0.5, wf[1] + (raw[1] - wf[1]) * 0.5, wf[2] + (raw[2] - wf[2]) * 0.5] : raw;
+    if (!dt || first || n < 1) return;
     if (!gyroActive() || !inMission()) return;
     const up = [g[0] / n, g[1] / n, g[2] / n];                 // world up in device axes (x right, y top, z out of screen)
     const right = [up[1], -up[0], 0];                          // up × z: horizontal, in the screen plane, pointing right
@@ -252,14 +261,14 @@ const RcControls = (() => {
     right[0] /= rn; right[1] /= rn;
     // deg/s about device x, y, z. The spec names alpha the rate about z, but Chromium AND WebKit both fill
     // alpha/beta/gamma straight from the gyroscope's x/y/z (device_motion_event_pump.cc, WebCoreMotionManager.mm).
-    const w = [r.alpha, r.beta, r.gamma];
+    const w = wf;
     // right-hand rule about each axis: turning left (counter-clockwise seen from above) is a positive yaw,
     // and tilting the phone so its camera (the back) points up is a positive pitch (+y rolls into +z, so -z,
     // the camera, rolls into +y). Players reported the first version looked down when they tilted up: the
     // pitch sign was the wrong way round. Mouse counts: +x looks right, +y looks down.
     const yaw = w[0] * up[0] + w[1] * up[1] + w[2] * up[2];
     const pitch = w[0] * right[0] + w[1] * right[1];
-    if (Math.abs(yaw) < 0.4 && Math.abs(pitch) < 0.4) return;  // hand tremor: a small dead zone
+    if (Math.abs(yaw) < 0.3 && Math.abs(pitch) < 0.3) return;  // hand tremor: a small dead zone
     const k = DEG * S.gyroSens * lookScale() * dt;
     look(-yaw * k * (S.gyroInvX ? -1 : 1), -pitch * k * (S.gyroInvY ? -1 : 1));
   }
@@ -278,7 +287,7 @@ const RcControls = (() => {
         }
       } catch { gyroStatus = 'denied'; return gyroStatus; }
       window.addEventListener('devicemotion', onMotion);
-      gyroOn = true; gyroLast = 0; gyroStatus = 'on';
+      gyroOn = true; gyroLast = 0; wf = null; gyroStatus = 'on';
       // no event within 1.5 s: the device has no motion sensors (or the browser blocks them)
       setTimeout(() => { if (gyroStatus === 'on' && !gyroLast) gyroStatus = 'none'; }, 1500);
       return gyroStatus;

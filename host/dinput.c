@@ -106,8 +106,11 @@ void dinput_mouse_button(int b, int down) {
     else g_mouse_buttons &= ~(1 << b);
     push(2, 12u + (uint32_t)b, down ? 0x80 : 0);
 }
+/* Called from the page / SDL thread while the game thread drains the sums each frame (GetDeviceState):
+   atomic, or an update is lost or applied twice now and then (a hitch or a jump in the view, worst with a
+   60 Hz gyroscope or a 1000 Hz mouse). */
 void dinput_mouse_move(int dx, int dy) {
-    g_mouse_dx += dx; g_mouse_dy += dy;
+    __atomic_fetch_add(&g_mouse_dx, dx, __ATOMIC_SEQ_CST); __atomic_fetch_add(&g_mouse_dy, dy, __ATOMIC_SEQ_CST);
     if (dx) push(2, 0, (uint32_t)dx);
     if (dy) push(2, 4, (uint32_t)dy);
 }
@@ -293,12 +296,14 @@ W(dev_GetDeviceState) {
         /* The game turns the view at most so far in one frame (about 250 counts): what a frame can't take is
            carried into the next one, so a fast swipe on a slow phone still turns all the way (a frame late)
            instead of being cut short. In cursor mode the motion goes through as it is. */
-        int32_t dx = g_mouse_dx, dy = g_mouse_dy;
+        int32_t dx = __atomic_exchange_n(&g_mouse_dx, 0, __ATOMIC_SEQ_CST), dy = __atomic_exchange_n(&g_mouse_dy, 0, __ATOMIC_SEQ_CST);
         if (look && !deterministic()) {
             const int32_t lim = 240;
+            int32_t ax = dx, ay = dy;
             if (dx > lim) dx = lim; else if (dx < -lim) dx = -lim;
             if (dy > lim) dy = lim; else if (dy < -lim) dy = -lim;
-            g_mouse_dx -= dx; g_mouse_dy -= dy;
+            if (ax != dx) __atomic_fetch_add(&g_mouse_dx, ax - dx, __ATOMIC_SEQ_CST);   /* the rest waits for the next frame */
+            if (ay != dy) __atomic_fetch_add(&g_mouse_dy, ay - dy, __ATOMIC_SEQ_CST);
             /* The game accelerates the mouse: a frame's motion of n counts turns the view by about
                0.212 * n * (0.52 + 0.48 * min(1, (n/50)^2)) degrees (measured, mission 1), so slow aiming moves
                only half as far per count as a fast turn, and the feel changes with the frame rate (a phone
@@ -312,7 +317,7 @@ W(dev_GetDeviceState) {
             /* what was sent, in input counts: the forward curve of the sent counts */
             cx -= mouse_curve(dx); cy -= mouse_curve(dy);
             if (fabs(cx) < 1e-6) cx = 0; if (fabs(cy) < 1e-6) cy = 0;
-        } else { g_mouse_dx -= dx; g_mouse_dy -= dy; }
+        }
         W32(p, (uint32_t)dx); W32(p + 4, (uint32_t)(look ? -dy : dy));
         double now = host_seconds();
         for (int b = 0; b < 4; b++) {

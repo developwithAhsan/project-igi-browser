@@ -54,7 +54,7 @@ const RcTouch = (() => {
     const root = document.createElement('div');
     root.id = 'touch';
     root.className = 'off';   // hidden until the game runs (attach), except while the layout is being edited
-    root.innerHTML = '<div class="t-look"></div><div class="t-stick"><div class="t-lock" aria-hidden="true">⇧</div><div class="t-knob"></div></div>' +
+    root.innerHTML = '<div class="t-look"></div><div class="t-stick"><div class="t-lock" aria-hidden="true"><span>🏃</span></div><div class="t-knob"></div></div>' +
       BUTTONS.map(([id, label, , cls]) => `<button class="t-btn ${cls}" data-id="${id}">${label}</button>`).join('') +
       '<div class="t-edit"><b>Drag any button or the stick where you want it</b>' +
       '<label>Size <input type="range" min="0.7" max="1.5" step="0.05" data-k="size"></label>' +
@@ -123,23 +123,35 @@ const RcTouch = (() => {
       for (const a of next) if (!arrows.has(a)) C.press({ key: ARROWS[a] }, true);
       arrows = next;
     };
-    // The forward lock (mobile shooters' sprint lock): pushing the stick past its top edge arms the marker
-    // above it; letting go there keeps the forward arrow down, the knob pinned at the top, until the next
-    // touch on the stick. Only in a mission (the menus use the stick to move through their items).
-    let locked = false, armed = false;
+    // The sprint lock, as mobile shooters do it: pushing the stick forward shows a running figure well above
+    // the stick (with a dotted line up to it); sliding the thumb up onto that figure locks running forward
+    // (the forward arrow stays down, the knob pinned at the top, the figure lit) and the thumb can leave the
+    // screen. The next touch on the stick frees it. Only in a mission (the menus use the stick for their
+    // items). Running "forward" follows the view: turning with the other thumb turns the run, as in PUBG.
+    let locked = false;
     const unlock = () => {
-      locked = false; armed = false;
-      stick.classList.remove('locked', 'fwd'); lockEl.classList.remove('arm');
+      locked = false;
+      stick.classList.remove('locked', 'fwd');
       knob.style.transform = '';
       setArrows(new Set());
+    };
+    const lock = (f) => {
+      locked = true;
+      stick.classList.add('locked');
+      const R = stick.getBoundingClientRect().width / 2;
+      knob.style.transform = `translate(0px, ${-R * 0.6}px)`;
+      setArrows(new Set(['up']));
+      f.kind = 'lockedstick';   // the rest of this touch does nothing
     };
     const steer = (f, x, y) => {
       const r = stick.getBoundingClientRect(), R = r.width / 2;
       let dx = x - (r.left + R), dy = y - (r.top + R);
       const len = Math.hypot(dx, dy), lim = R * 0.6;
-      // past the top edge, mostly upward: arm the lock
-      armed = C.inMission() && dy < -R * 1.05 && Math.abs(dx) < R * 0.7;
-      lockEl.classList.toggle('arm', armed);
+      // the thumb reached the running figure: lock
+      if (C.inMission() && stick.classList.contains('fwd')) {
+        const l = lockEl.getBoundingClientRect();
+        if (Math.hypot(x - (l.left + l.width / 2), y - (l.top + l.height / 2)) < l.width * 0.6) { lock(f); return; }
+      }
       if (len > lim) { dx *= lim / len; dy *= lim / len; }
       knob.style.transform = `translate(${dx}px, ${dy}px)`;
       // 8 directions with a dead zone; diagonals press two arrows, as on a keyboard
@@ -153,15 +165,7 @@ const RcTouch = (() => {
       setArrows(next);
     };
     const release = () => {
-      if (armed && C.inMission()) {
-        locked = true; armed = false;
-        stick.classList.add('locked');
-        const R = stick.getBoundingClientRect().width / 2;
-        knob.style.transform = `translate(0px, ${-R * 0.6}px)`;
-        setArrows(new Set(['up']));
-        return;
-      }
-      knob.style.transform = ''; lockEl.classList.remove('arm'); stick.classList.remove('fwd');
+      knob.style.transform = ''; stick.classList.remove('fwd');
       setArrows(new Set());
     };
 
@@ -252,6 +256,7 @@ const RcTouch = (() => {
       if (!f) return;
       e.preventDefault();
       if (f.kind === 'edit') { editMove(f, e); return; }
+      if (f.kind === 'lockedstick') return;
       if (f.kind === 'stick') { steer(f, e.clientX, e.clientY); return; }
       // look, and the fire buttons too: hold fire and drag to aim while shooting
       if (f.kind === 'look' || f.btn?.dataset.id === 'fire' || f.btn?.dataset.id === 'fire2') {
