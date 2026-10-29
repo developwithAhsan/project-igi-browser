@@ -82,6 +82,7 @@ function showBoot() {
   b.onpointerdown = () => { phase.textContent = 'Still loading — nothing is stuck, the game is being set up…'; };
 }
 function hideBoot() {
+  try { if (typeof gtag === 'function') gtag('event', 'game_start'); } catch { /* analytics blocked */ }
   const b = $('booting');
   for (const k of ['t1', 't2', 't3', 't4']) clearTimeout(showBoot[k]);
   if (stopBootTips) { stopBootTips(); stopBootTips = null; }
@@ -969,7 +970,7 @@ function hangWorker() {
     const body = Object.assign({ type, dur, played: Math.round((Date.now() - t0) / 1000), wasm: mem ? mem.buffer.byteLength >> 20 : 0, fps: fpsBefore },
       info, st ? { mission: st.m, paused: st.p, bg: st.bg, io: st.io, lt: st.lt } : {}, counters());
     try { fetch('crash.php', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {}); } catch { /* offline */ }
-    postMessage({ warn: 'watchdog: ' + JSON.stringify(body) });
+    postMessage({ warn: 'watchdog: ' + JSON.stringify(body), ga: type });
   };
   onmessage = (e) => {
     const d = e.data;
@@ -1012,7 +1013,11 @@ function hangWatch(M, touch) {
   let w;
   try { w = new Worker(URL.createObjectURL(new Blob(['(' + hangWorker.toString() + ')()'], { type: 'text/javascript' }))); }
   catch (e) { console.warn('watchdog worker unavailable:', e); return; }
-  w.onmessage = (e) => { if (e.data && e.data.warn) console.warn(e.data.warn); };
+  w.onmessage = (e) => {
+    if (!e.data) return;
+    if (e.data.warn) console.warn(e.data.warn);
+    try { if (e.data.ga && typeof gtag === 'function') gtag('event', 'freeze_' + e.data.ga); } catch { /* analytics blocked */ }
+  };
   w.postMessage({ init: 1, memory: M.wasmMemory, addr: M._rc_watch_addr(), info: {
     v: 20, ua: navigator.userAgent, mem: navigator.deviceMemory || 0, cores: navigator.hardwareConcurrency || 0,
     touch: touch ? 1 : 0, screen: `${screen.width}x${screen.height}@${devicePixelRatio}` } });
