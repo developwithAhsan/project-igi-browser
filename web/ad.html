@@ -4,9 +4,9 @@
      that check for everything inside it, so this page and the frames an ad network nests in it can load.
      This file is exempt from the isolation headers in .htaccess.
 
-     SLOTS below holds the ad network's own tag for each slot (paste the code the network gives, as a JS
-     string); index.html asks for one with ?slot=side|desk|mobile. A slot with an empty tag renders nothing,
-     and index.html then keeps the affiliate card. Sizes must match index.html's RC_ADS. -->
+     SLOTS below holds the ad network's own tag for each slot (Adsterra: paste the code the network gives, as a
+     JS string, with every closing script tag written as <\/script>); index.html asks for one with ?slot=NAME.
+     A slot with an empty tag renders nothing. Sizes must match index.html's placement script. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -17,13 +17,24 @@
 </head>
 <body>
 <script>
+  var banner = function (key, w, h) {   // an Adsterra banner: its loader reads the size and key from atOptions
+    return '<script>atOptions = { "key": "' + key + '", "format": "iframe", "height": ' + h + ', "width": ' + w + ', "params": {} };<\/script>' +
+           '<script src="https://bauval.org/22/' + key + '"><\/script>';
+  };
   var SLOTS = {
     // desktop left gutter, 160x600
-    side:   { w: 160, h: 600, tag: '' },
-    // landing screen on desktop, 300x250
-    desk:   { w: 300, h: 250, tag: '' },
-    // landing screen on phones, 320x100
-    mobile: { w: 320, h: 100, tag: '' },
+    side:   { w: 160, h: 600, tag: banner('88ee443266e5bae21d941c7a963e6129', 160, 600) },
+    // landing screen on desktop, 728x90
+    lead:   { w: 728, h: 90,  tag: banner('91705cdb372a84b9eb000b27de6dd597', 728, 90) },
+    // 300x250 (not placed at the moment: the right gutter holds the controls panel)
+    box:    { w: 300, h: 250, tag: banner('9a8a33a7e554668ad010c5e115e1f057', 300, 250) },
+    // landing screen on phones, 320x50
+    mobile: { w: 320, h: 50,  tag: banner('73140007d2bd4b8643bf6447a5336961', 320, 50) },
+    // native banner (four cards in a row), landing screen on desktop
+    native: { w: 728, h: 300, tag: '<script async="async" data-cfasync="false" src="https://bauval.org/21/3bff0be464311c5f8a8de0c57d5de5b1"><\/script>' +
+                                   '<div id="container-3bff0be464311c5f8a8de0c57d5de5b1"></div>' },
+    // social bar (floating widgets): confined to this frame when loaded here
+    social: { w: 320, h: 160, tag: '<script data-cfasync="false" src="https://bauval.org/14/2ee007ecb8fd9c8ab24ec52a03dc2a05"><\/script>' },
   };
   (function () {
     var slot = SLOTS[new URLSearchParams(location.search).get('slot')];

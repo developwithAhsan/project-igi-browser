@@ -12,9 +12,11 @@
   gtag('js', new Date());
   gtag('config', 'G-PYENXH0V6X');
 </script>
-  <!-- Ads: the network's tags live in ad.html (one per slot); set a slot to true here to show it. All false,
-       the page shows the Amazon affiliate card instead, exactly as before. Sizes must match ad.html. -->
-  <script>window.RC_ADS = { side: false, desk: false, mobile: false };</script>
+  <!-- Ads (Adsterra): the network's tags live in ad.html (one per slot); set a slot to true here to show it.
+       side: desktop left gutter 160x600; lead: 728x90 and native: a row of four cards, both under the landing
+       views on desktop; mobile: 320x50 under the landing views on phones; social: the floating social bar
+       (off: it would float over the game). Sizes must match ad.html. -->
+  <script>window.RC_ADS = { side: true, lead: true, native: true, mobile: true, social: false };</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -247,7 +249,7 @@
     border-radius: 10px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: none; }
   #kbd-show:hover { color: var(--fg); background: rgba(10, 18, 12, .92); }
   #kbd-show svg { width: 18px; height: 18px; }
-  /* Left-gutter affiliate card (mirrors #kbd on the right): a rotating Amazon.in gaming-gear pick.
+  /* Left-gutter ad (mirrors #kbd on the right): a 160x600 unit, filled by the ads script at the end.
      Shown only on viewports wide enough to have the gutter, never in fullscreen or on phones/tablets. */
   #promo { position: fixed; top: 50%; left: 14px; transform: translateY(-50%); z-index: 2;
     width: 204px; max-height: calc(100vh - 24px); overflow: auto;
@@ -261,23 +263,12 @@
   #promo .promo-head b { font-size: 13px; letter-spacing: .02em; }
   #promo .promo-tag { font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; text-transform: uppercase;
     letter-spacing: .1em; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; }
-  #promo .promo-card { display: block; text-decoration: none; color: var(--fg);
-    border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: rgba(255, 255, 255, .03);
-    transition: opacity .18s ease, background .15s, border-color .15s, transform .15s; }
-  #promo .promo-card:hover { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); transform: translateY(-1px); }
-  #promo .promo-ico { display: grid; place-items: center; width: 46px; height: 46px; font-size: 26px;
-    border-radius: 12px; background: rgba(255, 255, 255, .06); border: 1px solid var(--line); margin-bottom: 10px; }
-  #promo .promo-eyebrow { display: block; font: 600 10.5px/1.3 ui-sans-serif, system-ui, sans-serif;
-    text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-  #promo .promo-title { display: block; font-weight: 700; font-size: 14.5px; margin: 3px 0 4px; }
-  #promo .promo-blurb { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
-  #promo .promo-cta { display: inline-block; margin-top: 11px; font-weight: 700; font-size: 12.5px;
-    color: #fff; background: var(--accent); padding: 7px 12px; border-radius: 8px; }
-  #promo .promo-card:hover .promo-cta { background: var(--accent-hi); }
-  #promo .promo-disc { color: var(--faint); font-size: 10px; line-height: 1.35; margin: 10px 0 0; text-align: center; }
   #promo iframe, #admob iframe { display: block; border: 0; margin: 0 auto; background: transparent; }
-  /* AdSense on phones: a banner under the landing views (never over the game) — see the ads script at the end */
-  #admob { display: none; position: relative; z-index: 1; margin-top: 14px; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* Ads under the landing views (never over the game: #panel is hidden while it runs) — see the ads script at the end */
+  /* wider than the 560px view: centred on it, so a 728-wide unit hangs over both sides of the view's box */
+  #admob { display: none; position: relative; z-index: 1; margin-top: 22px; width: max-content; max-width: 100vw; margin-left: 50%;
+    transform: translateX(-50%); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  #admob iframe + iframe { margin-top: 10px; }
   #admob .ad-tag { display: block; text-align: center; font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; text-transform: uppercase;
     letter-spacing: .1em; color: var(--faint); margin-bottom: 5px; }
   #admob.on { display: block; }
@@ -612,7 +603,7 @@
           <button id="home-controls" type="button" class="link-btn">Controls &amp; layout</button>
           <a href="#" id="reset" class="link-btn">Use a different game folder</a>
         </div>
-        <p class="home-foot" id="updated">Updated <b>30 Oct 2026, 03:59 IST</b> · fixes land often: reload before reporting an old issue</p>
+        <p class="home-foot" id="updated">Updated <b>30 Oct 2026, 04:22 IST</b> · fixes land often: reload before reporting an old issue</p>
       </section>
 
       <!-- multiplayer: host or join -->
@@ -716,16 +707,8 @@
     </div>
     <p class="foot-legal">Project I.G.I. &copy; Innerloop Studios / Eidos Interactive — not affiliated with this project</p>
   </footer>
-  <aside id="promo" aria-label="Recommended gaming gear (advertisement)">
-    <div class="promo-head"><b>Gaming gear</b><span class="promo-tag">Ad</span></div>
-    <a id="promo-card" class="promo-card" href="https://www.amazon.in/?tag=sjazz007-21" target="_blank" rel="sponsored noopener noreferrer">
-      <span class="promo-ico" id="promo-ico" aria-hidden="true">🖱️</span>
-      <span class="promo-eyebrow">Popular on Amazon.in</span>
-      <span class="promo-title" id="promo-title">Gaming mouse</span>
-      <span class="promo-blurb" id="promo-blurb">Lightweight, high-DPI mice for precise aim.</span>
-      <span class="promo-cta">View on Amazon.in →</span>
-    </a>
-    <p class="promo-disc">As an Amazon Associate, we earn from qualifying purchases.</p>
+  <aside id="promo" aria-label="Advertisement">
+    <div class="promo-head"><b>Sponsored</b><span class="promo-tag">Ad</span></div>
   </aside>
   <aside id="kbd" aria-label="Keyboard controls">
     <div class="kbd-head"><b>Controls &amp; settings</b>
@@ -771,63 +754,21 @@
     } catch (e) {}
   })();
 </script>
-<script>
-  // Left-gutter affiliate card: rotates through gaming/tech picks popular with Indian players, each a
-  // tagged Amazon.in search link (search links never 404 or go out of stock, and still carry the tag).
-  // Emoji icons (no Amazon image hotlinking) so nothing is blocked by the page's cross-origin isolation.
-  (function () {
-    var TAG = 'sjazz007-21';
-    var ITEMS = [
-      ['🖱️', 'Gaming mouse', 'Lightweight, high-DPI mice for precise aim.', 'gaming mouse'],
-      ['⌨️', 'Mechanical keyboard', 'Tactile mechanical keys built for gaming.', 'mechanical gaming keyboard'],
-      ['🎧', 'Gaming headset', 'Surround headsets with a clear team mic.', 'gaming headset'],
-      ['🖲️', 'Extended mouse pad', 'Big desk mats for low-sensitivity swipes.', 'extended gaming mouse pad'],
-      ['🎮', 'Game controller', 'Plug-and-play USB & wireless gamepads.', 'usb gaming controller'],
-      ['💨', 'Laptop cooling pad', 'Keep your laptop cool through long sessions.', 'laptop cooling pad'],
-      ['🪑', 'Gaming chair', 'Ergonomic chairs for marathon play.', 'gaming chair'],
-      ['💾', 'Portable SSD', 'Fast external SSDs for your game library.', 'portable ssd'],
-      ['🖥️', 'Gaming monitor', 'High-refresh monitors for smoother play.', '144hz gaming monitor'],
-      ['📶', 'Wi-Fi router', 'Low-lag routers for online gaming.', 'gaming wifi router'],
-      ['🎤', 'Streaming mic', 'USB condenser mics for voice & streams.', 'usb condenser microphone'],
-      ['🔋', 'Power bank', 'Fast-charging power banks for on the go.', 'fast charging power bank'],
-      ['🧠', 'RAM upgrade', 'Add memory to speed up your rig.', 'ddr4 ram 16gb'],
-      ['🎵', 'Wireless earbuds', 'Popular budget TWS earbuds.', 'wireless earbuds']
-    ];
-    var ico = document.getElementById('promo-ico'), title = document.getElementById('promo-title'),
-        blurb = document.getElementById('promo-blurb'), card = document.getElementById('promo-card'),
-        promo = document.getElementById('promo');
-    if (!card || !promo) return;
-    var link = function (q) { return 'https://www.amazon.in/s?k=' + encodeURIComponent(q) + '&tag=' + TAG; };
-    var i = Math.floor(Math.random() * ITEMS.length), timer = 0;
-    function show(n) {
-      card.style.opacity = '0';
-      setTimeout(function () {
-        var it = ITEMS[n];
-        ico.textContent = it[0]; title.textContent = it[1]; blurb.textContent = it[2];
-        card.href = link(it[3]); card.setAttribute('aria-label', it[1] + ' on Amazon.in');
-        card.style.opacity = '1';
-      }, 180);
-    }
-    function next() { i = (i + 1) % ITEMS.length; show(i); }
-    function start() { stop(); timer = setInterval(next, 7000); }
-    function stop() { if (timer) { clearInterval(timer); timer = 0; } }
-    show(i); start();
-    promo.addEventListener('mouseenter', stop);   // pause rotation while the visitor is reading it
-    promo.addEventListener('mouseleave', start);
-  })();
-</script>
 <script src="netplay.js"></script>
 <script src="controls.js?v=8"></script>
 <script src="touch.js?v=12"></script>
 <script src="loader.js?v=26"></script>
 <script>
-  // Ads (slots switched on in RC_ADS; the network tags are in ad.html). The page is cross-origin isolated,
-  // which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>: that
-  // lifts the check for the frame and everything the network nests in it (Chromium 110+; Safari and Firefox
-  // lack it and keep the affiliate card). A credentialless frame has no cookies: ads are non-personalised.
+  // Ads (Adsterra; slots switched on in RC_ADS, the network's tags in ad.html). The page is cross-origin
+  // isolated, which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>:
+  // that lifts the check for the frame and everything the network nests in it (Chromium 110+; Safari and
+  // Firefox lack it and show no ads). A credentialless frame has no cookies: ads are non-personalised. Units
+  // sit under the landing views (gone once the game runs: #panel is hidden then) and, on wide desktop windows,
+  // in the left gutter beside the game, which is hidden in fullscreen and on phones.
   (function () {
     var A = window.RC_ADS || {};
-    if (!('credentialless' in HTMLIFrameElement.prototype)) return;
+    var promo = document.getElementById('promo');
+    if (!('credentialless' in HTMLIFrameElement.prototype)) { if (promo) promo.remove(); return; }
     var frame = function (slot, w, h) {
       var f = document.createElement('iframe');
       f.credentialless = true;
@@ -838,21 +779,16 @@
       return f;
     };
     var coarse = document.body.classList.contains('coarse');
-    var promo = document.getElementById('promo');
-    if (promo && A.side) {   // desktop gutter: 160x600 in place of the affiliate card
-      var card = document.getElementById('promo-card'), disc = promo.querySelector('.promo-disc'), head = promo.querySelector('.promo-head b');
-      if (card) card.remove();
-      if (disc) disc.remove();
-      if (head) head.textContent = 'Sponsored';
-      promo.appendChild(frame('side', 160, 600));
-    }
-    var landing = coarse ? (A.mobile && ['mobile', 320, 100]) : (A.desk && ['desk', 300, 250]);
-    if (landing) {   // under the landing views (download, Play); never over the game
+    if (promo) { if (A.side && !coarse) promo.appendChild(frame('side', 160, 600)); else promo.remove(); }
+    var units = coarse ? (A.mobile ? [['mobile', 320, 50]] : [])
+                       : [].concat(A.lead ? [['lead', 728, 90]] : [], A.native ? [['native', 728, 300]] : []);
+    if (A.social) units.push(['social', 320, 160]);
+    if (units.length) {
       var d = document.createElement('div');
       d.id = 'admob'; d.className = 'on';
       d.innerHTML = '<span class="ad-tag">Advertisement</span>';
-      d.appendChild(frame(landing[0], landing[1], landing[2]));
-      document.getElementById('panel').appendChild(d);
+      units.forEach(function (u) { d.appendChild(frame(u[0], u[1], u[2])); });
+      document.getElementById('view-home').appendChild(d);   // inside the home view: under its footnote, in flow
     }
   })();
 </script>
