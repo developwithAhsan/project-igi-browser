@@ -76,12 +76,16 @@
   /* Wide windows (the ads script sets body.ads-wide at 1700x900 and up, landing only): the left column holds the
      160x600 with the 728x90 under it, the right column the controls panel with the 300x250 under it, and the
      stage sits between them; nothing under the stage. While the game runs the columns go back to normal. */
-  @media (min-width: 1700px) {
-    body.ads-wide:not(.playing) main { padding-left: 784px; padding-right: 342px; box-sizing: border-box; }
-    body.ads-wide:not(.playing) #promo { top: 14px; transform: none; width: 756px; }
+  @media (min-width: 1900px) {
+    /* only the stage moves over (its margins reserve the columns); the footer keeps the full width */
+    body.ads-wide:not(.playing) #stage, body.ads-wide:not(.playing):not(.kbd-off) #stage {
+      width: min(calc(100% - 1126px), calc((100vh - 150px) * 4 / 3)); margin-left: 784px; margin-right: 342px; }
+    /* the left column is two stacked units, not one big framed box: no frame, units left-aligned */
+    body.ads-wide:not(.playing) #promo { top: 14px; transform: none; width: 756px; background: none; border-color: transparent;
+      box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    body.ads-wide:not(.playing) #promo .promo-head { width: 160px; }
+    body.ads-wide:not(.playing) #promo iframe { margin: 0; }
     body.ads-wide:not(.playing) #kbd { top: 14px; transform: none; max-height: calc(100vh - 330px); }
-    /* the columns are reserved by main's padding, so the stage no longer subtracts the panels' 440px */
-    body.ads-wide:not(.playing) #stage, body.ads-wide:not(.playing):not(.kbd-off) #stage { width: min(100%, calc((100vh - 150px) * 4 / 3)); }
     body.ads-wide:not(.playing) #adbox.on { display: block; }
   }
   body.playing #promo .ad-unit.lead { display: none; }
@@ -632,7 +636,7 @@
           <button id="home-controls" type="button" class="link-btn">Controls &amp; layout</button>
           <a href="#" id="reset" class="link-btn">Use a different game folder</a>
         </div>
-        <p class="home-foot" id="updated">Updated <b>30 Oct 2026, 05:02 IST</b> · fixes land often: reload before reporting an old issue</p>
+        <p class="home-foot" id="updated">Updated <b>30 Oct 2026, 05:08 IST</b> · fixes land often: reload before reporting an old issue</p>
       </section>
 
       <!-- multiplayer: host or join -->
@@ -813,7 +817,7 @@
     var row = document.getElementById('adrow'), stage = document.getElementById('stage');
     if (coarse) { if (promo) promo.remove(); if (row) row.remove(); }
     else {
-      // Desktop. Wide windows (1700x900 and up): the 728x90 under the gutter unit and the 300x250 under the
+      // Desktop. Wide windows (1900x900 and up): the 728x90 under the gutter unit and the 300x250 under the
       // controls panel (body.ads-wide). Smaller: the 728x90 in a row under the stage. Units are made only for
       // the layout in use (never two copies), and remade when a resize changes the layout.
       var box = document.createElement('aside'); box.id = 'adbox'; box.setAttribute('aria-label', 'Advertisement');
@@ -827,7 +831,7 @@
       };
       var layout = function () {
         var playing = document.body.classList.contains('playing');
-        var wide = innerWidth >= 1700 && innerHeight >= 900, m = wide ? 'wide' : 'row';
+        var wide = innerWidth >= 1900 && innerHeight >= 900, m = wide ? 'wide' : 'row';   // the stage keeps at least ~770px
         if (m !== mode) {
           mode = m; [promo, row, box].forEach(clear);
           document.body.classList.toggle('ads-wide', wide);
