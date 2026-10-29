@@ -781,7 +781,7 @@ async function run(session) {
   if (session) await clearNetSaves(session);
   sizeCanvas();
   const script = document.createElement('script');
-  script.src = 'build/recomp.js?v=9';
+  script.src = 'build/recomp.js?v=10';
   await new Promise((ok, fail) => { script.onload = ok; script.onerror = fail; document.head.appendChild(script); });
   const M = await createRecomp({
     arguments: ['/opfs/' + OPFS_DIR],
@@ -793,6 +793,7 @@ async function run(session) {
       if (params.has('log')) m.ENV.RC_LOG = '1';
       if (params.has('pads')) m.ENV.RC_PADS = params.get('pads');
       if (params.has('input')) m.ENV.RC_INPUT = params.get('input');   // testing: scripted input (host/input.c)
+      if (params.has('poke')) m.ENV.RC_POKE = params.get('poke');      // testing: memory pokes (host/input.c)
       if (params.has('queue')) m.ENV.RC_QUEUE = params.get('queue');
       if (params.has('gpuskip')) m.ENV.RC_GPU_SKIP = '1';   // diagnostics: the executor issues no draws
       if (session) Object.assign(m.ENV, RcNetplay.gameEnv(session), { RC_USERDATA: '/opfs/' + netSaves(session) });
@@ -1027,7 +1028,7 @@ function controlsTip() {
 async function buildVersion() {
   // peers must run the same build and game files, or their simulations diverge
   const marker = await readMarker();
-  const wasm = await fetch('build/recomp9.wasm', { method: 'HEAD' }).catch(() => null);
+  const wasm = await fetch('build/recomp10.wasm', { method: 'HEAD' }).catch(() => null);
   // the ETag comes back weak (W/"...") when the response is compressed: compare only its value
   const etag = (wasm?.headers.get('ETag') || '').replace(/^W\//, '').replace(/"/g, '');
   return `${marker?.version || 'local'}:${etag || wasm?.headers.get('Content-Length') || '?'}`;
@@ -1165,6 +1166,11 @@ function setupDevice() {
   const sync = () => {
     const touch = RcTouch.wanted();
     document.body.classList.toggle('coarse', touch);
+    // iPhone Safari has no fullscreen for a page, and its toolbars slide in over the page when a swipe starts
+    // at the screen's edge (looking down starts one at the top): the viewport shrinks, and a stage fixed to
+    // it would resize the game's picture every time. There the stage keeps the largest viewport's size
+    // instead (index.html body.nofs #stage); the toolbar overlaps the bottom until it hides again.
+    document.body.classList.toggle('nofs', touch && !document.fullscreenEnabled && !document.webkitFullscreenEnabled);
     for (const b of box.querySelectorAll('button')) {
       const on = (b.dataset.device === 'touch') === touch;
       b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false');

@@ -73,6 +73,8 @@ const RcControls = (() => {
   let M = null;
   const inMission = () => !!(M && M._input_in_mission && M._input_in_mission());
   const paused = () => !!(M && M._input_paused && M._input_paused());
+  // the mission's script failed the level: the game's menu is up with Resume greyed out (host/input.c)
+  const levelFailed = () => !!(M && M._input_level_failed && M._input_level_failed());
   const downAt = new Map();
   function press(what, down) {
     if (!M) return;
@@ -136,28 +138,45 @@ const RcControls = (() => {
       else if (t - drive.lastT > patience || t - drive.t0 > 4000) driveStop(false);
     }, 16);
   }
-  // The scope button. Only the sniper rifles and the binoculars can zoom in this game: with any other weapon
-  // the zoom keys do nothing, so when the view doesn't respond the toggle brings up the binoculars (the game
-  // toggles them on each press of their key) and zooms through those; the next tap zooms back out and puts
-  // them away again. A player who opened the binoculars themselves keeps them.
-  let viaBino = false, binoWait = 0;
+  // The scope button. Only the sniper rifle's scope and the binoculars zoom in this game, and the zoom keys
+  // only work once one of them is up. A tap first presses Alternate fire, which raises the rifle's scope when
+  // the player holds one (the view zooms a little within a few frames; with the other weapons the key does
+  // nothing): then the zoom keys drive the scope to the set level, and the next tap lowers the scope with
+  // Alternate fire again (the game resets the zoom with it). With any other weapon the toggle brings up the
+  // binoculars instead (the game toggles them on each press of their key) and zooms through those; the next
+  // tap zooms back out and puts them away. A player who raised the scope or the binoculars themselves gets
+  // the same taps.
+  let viaBino = false, viaScope = false, wait = 0;
+  const later = (ms, f) => { wait = setTimeout(() => { wait = 0; f(); }, ms); };
   function scopeToggle() {
     if (!inMission()) return;
-    if (binoWait) { clearTimeout(binoWait); binoWait = 0; }
+    if (wait) { clearTimeout(wait); wait = 0; return; }   // a tap while the last one is still settling
     if (drive) { driveStop(); return; }   // a tap while it's still zooming: stop where it is
     if (scoped()) {
+      if (viaScope) { viaScope = false; tap(ACTIONS.altfire); return; }
       zoomTo(1, () => { if (viaBino) { viaBino = false; tap(ACTIONS.bino); } });
       return;
     }
-    zoomTo(S.scopeZoom, (reached, moved) => {
-      if (reached || moved || viaBino) return;
-      viaBino = true;
-      tap(ACTIONS.bino);
-      // the binoculars take a few frames to come up (longer on a slow phone), then zoom through them
-      binoWait = setTimeout(() => { binoWait = 0; zoomTo(S.scopeZoom, null, 1500); }, 350);
-    }, 500);
+    viaBino = viaScope = false;
+    const z0 = zoom();
+    tap(ACTIONS.altfire);
+    const t0 = performance.now();
+    const probe = () => {
+      if (Math.abs(zoom() - z0) > 0.01) { viaScope = true; zoomTo(S.scopeZoom, null, 700); return; }   // the rifle's scope came up
+      if (performance.now() - t0 < 450) { later(40, probe); return; }   // a slow phone draws a frame in 70 ms
+      // no scope on this weapon. The zoom keys still work when the player has the binoculars up at 1x:
+      // try them before bringing up the binoculars (which would put the player's away)
+      zoomTo(S.scopeZoom, (reached, moved) => {
+        if (reached || moved) return;
+        viaBino = true;
+        tap(ACTIONS.bino);
+        // the binoculars take a few frames to come up (longer on a slow phone), then zoom through them
+        later(350, () => zoomTo(S.scopeZoom, null, 1500));
+      }, 400);
+    };
+    later(40, probe);
   }
-  function weaponChanged() { driveStop(); }   // the game drops the zoom itself; the readout follows
+  function weaponChanged() { driveStop(); viaScope = false; }   // the game drops the scope and zoom itself
   // the scope button's state follows the real zoom, polled a few times a second
   setInterval(() => {
     if (!M) return;
@@ -176,6 +195,7 @@ const RcControls = (() => {
     }
     if (down && (name === 'nextweapon' || name === 'prevweapon')) weaponChanged();
     if (down && name === 'bino') viaBino = false;   // the player handles the binoculars themselves
+    if (down && name === 'altfire') viaScope = !scoped();   // raising the rifle's scope by hand: the toggle lowers it
     press(a, down);
   }
   // which action a physical mouse button does right now: in mouse-look mode the player's binding, in the
@@ -271,5 +291,5 @@ const RcControls = (() => {
   function attach(module) { M = module; gyroApply(); wideApply(); }
 
   return { ACTIONS, MOUSE_CHOICES, DEFAULTS, get, set, setMouse, reset, attach, press, tap, act, mouseAction, keyUsage,
-    look, lookScale, scoped, zoom, zoomTo, onScope, weaponChanged, inMission, paused, gyroEnable, gyroState };
+    look, lookScale, scoped, zoom, zoomTo, onScope, weaponChanged, inMission, paused, levelFailed, gyroEnable, gyroState };
 })();

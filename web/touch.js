@@ -67,7 +67,17 @@ const RcTouch = (() => {
       scopeBtn.querySelector('small').textContent = on ? `${z.toFixed(1)}×` : 'SCOPE';
     });
     // the buttons only mean something in a mission; in the menus they fade so the menu is readable
-    setInterval(() => root.classList.toggle('menus', !C.inMission()), 250);
+    // A failed mission (a timed objective missed, say) makes the game open its own menu with Resume greyed
+    // out, which reads like a freeze: say what happened and what to tap. Lives beside the overlay so the
+    // menus fade doesn't take it, and ignores touches so the menu underneath still gets them.
+    const failedNote = document.createElement('div');
+    failedNote.id = 'tfailed'; failedNote.hidden = true;
+    failedNote.textContent = 'Mission failed. Tap RESTART MISSION in the menu to try again.';
+    root.parentElement.appendChild(failedNote);
+    setInterval(() => {
+      root.classList.toggle('menus', !C.inMission());
+      failedNote.hidden = !C.levelFailed();
+    }, 250);
 
     // Finger motion -> mouse counts. In the 2D menus the game turns a count into about 1.33 px across and
     // 0.8 px down of its 640x480 screen, which the canvas letterboxes at 4:3: these factors make the menu

@@ -28,6 +28,18 @@ EXPORT void input_mouse_move(int dx, int dy) { if (!netplay_on()) dinput_mouse_m
 EXPORT int input_in_mission(void) { extern int g_in_mission, g_paused; return g_in_mission && !g_paused; }
 /* 1 while the Esc menu is up over a mission (the game's clock stands still; render_rec.c) */
 EXPORT int input_paused(void) { extern int g_paused; return g_paused; }
+/* 1 when the mission's script has failed the level (the game then opens its menu with Resume greyed out;
+   only Restart Mission goes on). Read from the game's LevelFlow object (profile.h); 0 for games without one. */
+EXPORT int input_level_failed(void) {
+#ifdef PROFILE_LEVELFLOW
+    extern int g_in_mission;
+    uint32_t lf = R32(PROFILE_LEVELFLOW);
+    if (!g_in_mission || !lf) return 0;
+    return R8(lf + PROFILE_LEVELFLOW_FAILED) != 0;
+#else
+    return 0;
+#endif
+}
 /* The zoom of the world as drawn last frame: the projection's y scale (1 / tan(fov_y / 2)), larger when the
    sniper scope or binoculars are zoomed in; 0 in the 2D menus (render_rec.c). The page's scope toggle holds
    the game's Zoom keys until this reaches what it wants, so the toggle is exact at any frame rate. */
@@ -351,8 +363,18 @@ static void snap_tick(uint32_t frame) {
         if (*p == ',') p++;
     }
 }
+/* Debugging: an address in RC_POKE / RC_DUMP is "base" or a pointer chain "base>off>off...": each ">off"
+   loads the dword at the address so far and adds off (so "bc2360>7c>4" is *(*(*0xbc2360 + 0x7c) + 4) style
+   walking into objects on the heap). Resolved at the frame it's used, so heap pointers may change between. */
+static uint32_t debug_addr(const char **pp) {
+    const char *p = *pp;
+    uint32_t a = (uint32_t)strtoul(p, (char **)&p, 16);
+    while (*p == '>') { p++; a = R32(a) + (uint32_t)strtoul(p, (char **)&p, 16); }
+    *pp = p;
+    return a;
+}
 /* Debugging: RC_POKE="frame:addr:hexbytes,..." writes bytes into guest memory at that frame (testing: e.g.
-   selecting another mission than the profile allows). */
+   selecting another mission than the profile allows, or forcing a level complete). */
 static void poke_tick(uint32_t frame) {
     static const char *spec = (const char *)1;
     if (spec == (const char *)1) spec = getenv("RC_POKE");
@@ -360,7 +382,8 @@ static void poke_tick(uint32_t frame) {
     for (const char *p = spec; *p;) {
         uint32_t f = (uint32_t)strtoul(p, (char **)&p, 10);
         if (*p == ':') p++;
-        uint32_t a = (uint32_t)strtoul(p, (char **)&p, 16);
+        uint32_t a = 0;
+        if (f == frame) a = debug_addr(&p); else while (*p && *p != ':') p++;
         if (*p == ':') p++;
         uint32_t n = 0;
         for (; p[0] && p[1] && p[0] != ','; p += 2, n++) {
@@ -382,7 +405,8 @@ void dump_tick(uint32_t frame) {
     for (const char *p = spec; *p;) {
         uint32_t f = (uint32_t)strtoul(p, (char **)&p, 10);
         if (*p == ':') p++;
-        uint32_t a = (uint32_t)strtoul(p, (char **)&p, 16);
+        uint32_t a = 0;
+        if (f == frame) a = debug_addr(&p); else while (*p && *p != ':') p++;
         if (*p == ':') p++;
         uint32_t n = (uint32_t)strtoul(p, (char **)&p, 16);
         if (f == frame) {
