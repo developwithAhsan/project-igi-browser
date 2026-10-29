@@ -182,8 +182,17 @@ async function gameDir(create) {
 
 async function readMarker() {
   try {
-    const f = await (await (await gameDir(false)).getFileHandle(MARKER)).getFile();
-    return JSON.parse(await f.text());
+    const dir = await gameDir(false);
+    const f = await (await dir.getFileHandle(MARKER)).getFile();
+    const m = JSON.parse(await f.text());
+    // A browser short of storage can evict the game's files but leave the marker (seen in a test profile:
+    // "igi.exe: No such file", and the page waits forever). No executable: treat it as not installed. The
+    // host maps names case-insensitively, so look through the folder rather than ask for one spelling.
+    if (typeof dir.keys !== 'function') return m;   // no folder listing in this browser: trust the marker
+    let exe = false;
+    for await (const name of dir.keys()) if (/^igi\.exe$/i.test(name)) { exe = true; break; }
+    if (!exe) { console.warn('the game folder has no executable: installing again'); return null; }
+    return m;
   } catch { return null; }
 }
 
@@ -250,7 +259,17 @@ const DL_CONCURRENCY = 10;
 async function importFromServer(list) {
   const stopTips = startTips($('tips'));
   try {
-    await importFromServerInner(list);
+    try { await importFromServerInner(list); }
+    catch (err) {
+      // A browser short of storage evicts files behind the folder's back: entries still listed can't be opened
+      // ("could not be found at the time an operation was processed"), and a download over such a folder
+      // fails the same way. Start over from an empty folder once; anything else (network) is reported.
+      if (!(err && (err.name === 'NotFoundError' || /could not be found/.test(err.message || '')))) throw err;
+      console.warn('the game folder is inconsistent, downloading again from scratch:', err.message);
+      const root = await navigator.storage.getDirectory();
+      await root.removeEntry(OPFS_DIR, { recursive: true }).catch(() => { /* already gone */ });
+      await importFromServerInner(list);
+    }
   } finally {
     stopTips();
   }
@@ -293,19 +312,27 @@ async function importFromServerInner(list) {
   const fetchInto = async (e, fh) => {
     // no-store: don't also keep a copy in the browser's HTTP cache (OPFS is the permanent store); the CDN
     // edge cache still serves these, so repeat loads stay fast.
-    const r = await fetch('game/' + e.path.split('/').map(encodeURIComponent).join('/'), { cache: 'no-store' });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const w = await fh.createWritable();
-    const reader = r.body.getReader();
-    let wrote = 0;
-    for (;;) {
-      const { done: end, value } = await reader.read();
-      if (end) break;
-      await w.write(value);
-      wrote += value.length;
-    }
-    await w.close();
-    if (wrote !== e.size) throw new Error(`short read ${wrote}/${e.size}`);
+    // A connection the shared host leaves hanging never ends and never errors, and a download then stops at
+    // some percentage for good (seen at 42% and 60%): abort a fetch that brings nothing for 30 s and retry it.
+    const ac = new AbortController();
+    let stallTimer = setTimeout(() => ac.abort(), 30000);
+    const alive = () => { clearTimeout(stallTimer); stallTimer = setTimeout(() => ac.abort(), 30000); };
+    try {
+      const r = await fetch('game/' + e.path.split('/').map(encodeURIComponent).join('/'), { cache: 'no-store', signal: ac.signal });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const w = await fh.createWritable();
+      const reader = r.body.getReader();
+      let wrote = 0;
+      for (;;) {
+        const { done: end, value } = await reader.read();
+        if (end) break;
+        alive();
+        await w.write(value);
+        wrote += value.length;
+      }
+      await w.close();
+      if (wrote !== e.size) throw new Error(`short read ${wrote}/${e.size}`);
+    } finally { clearTimeout(stallTimer); }
   };
 
   const worker = async () => {
@@ -725,6 +752,10 @@ function compactMemory() {
 // game can't draw any more (render_wgpu.c calls this). Say so instead of leaving a frozen picture.
 window.rcDeviceLost = (msg) => {
   if ($('gpulost')) return;
+  try {   // telemetry (crash.php): how often the browser drops the device, and why
+    navigator.sendBeacon('crash.php', new Blob([JSON.stringify({ v: 20, type: 'gpulost', msg: String(msg || '').slice(0, 200), ua: navigator.userAgent,
+      mem: navigator.deviceMemory || 0, mission: RcControls.inMission() ? 1 : 0, bg: document.hidden ? 1 : 0 })], { type: 'application/json' }));
+  } catch { /* no beacon */ }
   const d = document.createElement('div');
   d.id = 'gpulost';
   d.style.cssText = 'position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(0,0,0,.92);color:#fff;' +
@@ -814,7 +845,7 @@ async function run(session) {
   if (session) await clearNetSaves(session);
   sizeCanvas();
   const script = document.createElement('script');
-  script.src = 'build/recomp.js?v=12';
+  script.src = 'build/recomp.js?v=14';
   await new Promise((ok, fail) => { script.onload = ok; script.onerror = fail; document.head.appendChild(script); });
   const M = await createRecomp({
     arguments: ['/opfs/' + OPFS_DIR],
@@ -849,7 +880,7 @@ async function run(session) {
   hookInput(M, !!session);
   if (touch) { RcTouch.attach(M, $('stage'), canvas); followVisualViewport($('stage')); }
   if (session) { session.client.attach(M); showNetStatus(M, session); }
-  crashWatch(touch);
+  crashWatch(M, touch);
   startAudio(M, audio).catch((e) => console.warn('audio unavailable:', e));
   const poll = session ? pollLocalPad : pollGamepads;
   // Online, present at most 60 times a second: every Present is a lockstep frame, and the input delay and
@@ -895,7 +926,7 @@ async function run(session) {
 // such a kill. The player gets a note on the landing screen, and the site a report (crash.php: the device,
 // its memory, how long the game ran, whether it was in a mission or in the background) to find the pattern.
 const RUN_STORE = 'igi-run';
-function crashWatch(touch) {
+function crashWatch(M, touch) {
   const t0 = Date.now();
   const beat = () => {
     try {
@@ -905,13 +936,103 @@ function crashWatch(touch) {
   beat();
   setInterval(beat, 5000);
   window.addEventListener('pagehide', () => { try { sessionStorage.removeItem(RUN_STORE); } catch { /* storage blocked */ } });
+  hangWatch(M, touch);
+}
+
+// Watchdog worker. Players report two freezes the heartbeat above can't explain: the page thread stops
+// answering (Chrome's "Page unresponsive" dialog; the heartbeat stops with it, so the reload after it shows
+// a gap of a minute or more), and the picture stops while the page still answers. A worker keeps its own
+// clock: the page thread posts a beat every second (and on visibility changes), and the worker reads the
+// host's watchdog counters straight from the shared wasm memory (host/win32.h RcWatch: what the page thread
+// and the game thread were doing). After 15 s without a beat in the foreground it reports a hang, and after
+// 20 s with no frame presented and no file read in a running mission a stall, to crash.php, with those
+// counters; the end of either is reported too, so a hang that recovers is told from one that lasts.
+function hangWorker() {
+  let mem = null, addr = 0, info = {}, t0 = Date.now(), last = 0, st = null, lastBg = 0;
+  let hangAt = 0, hangSent = false, stallAt = 0, stallSent = false, lastFrames = -1, lastIo = -1, lastMoveT = 0, fpsBefore = 0;
+  const counters = () => {
+    if (!mem || !addr) return {};
+    const a = new Int32Array(mem.buffer, addr, 7);
+    return { pp: a[0], gp: a[1], frames: a[2], queued: a[3], gf: a[4], beat: a[5], rb: a[6] };
+  };
+  const hist = [];   // (time, frames presented) over the last 10 s, for the frame rate before a freeze
+  const fps = () => {
+    const w = counters();
+    if (w.frames === undefined) return 0;
+    const now = Date.now();
+    hist.push([now, w.frames]);
+    while (hist.length > 1 && now - hist[0][0] > 10000) hist.shift();
+    const a = hist[0];
+    return now - a[0] >= 1000 ? Math.round((w.frames - a[1]) * 1000 / (now - a[0])) : 0;
+  };
+  const report = (type, dur) => {
+    const body = Object.assign({ type, dur, played: Math.round((Date.now() - t0) / 1000), wasm: mem ? mem.buffer.byteLength >> 20 : 0, fps: fpsBefore },
+      info, st ? { mission: st.m, paused: st.p, bg: st.bg, io: st.io, lt: st.lt } : {}, counters());
+    try { fetch('crash.php', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {}); } catch { /* offline */ }
+    postMessage({ warn: 'watchdog: ' + JSON.stringify(body) });
+  };
+  onmessage = (e) => {
+    const d = e.data;
+    if (d.init) { mem = d.memory; addr = d.addr; info = d.info; t0 = Date.now(); return; }
+    last = Date.now(); st = d;
+  };
+  let lastTick = 0;
+  setInterval(() => {
+    if (!last) return;
+    const now = Date.now(), quiet = now - last, bg = st && st.bg;
+    // this worker itself didn't run for a while: the whole process was paused (the device slept, the browser
+    // froze the tab or the system paged it out), which is not a hang of the page thread; reported apart,
+    // and the page thread's silence over that time is not counted as a hang
+    const jump = lastTick ? now - lastTick : 0;
+    lastTick = now;
+    if (jump > 8000) { report('pause', Math.round(jump / 1000)); last = now; return; }
+    const f = fps();
+    if (quiet < 3000 && !bg) fpsBefore = f;   // the frame rate while the page still answered
+    if (bg !== lastBg) { lastBg = bg; lastMoveT = now; }   // frames stop in a hidden tab: not a stall
+    if (!bg && quiet > 10000) {
+      if (!hangAt) hangAt = last;
+      if (!hangSent && quiet > 15000) { hangSent = true; report('hang', Math.round(quiet / 1000)); }
+    } else if (hangAt) {
+      if (hangSent) report('hangend', Math.round((now - hangAt) / 1000));
+      hangAt = 0; hangSent = false;
+    }
+    const w = counters();
+    if (w.frames === undefined || !st || bg || quiet > 3000) return;
+    if (w.frames !== lastFrames || st.io !== lastIo) {
+      lastFrames = w.frames; lastIo = st.io; lastMoveT = now;
+      if (stallAt) { if (stallSent) report('stallend', Math.round((now - stallAt) / 1000)); stallAt = 0; stallSent = false; }
+    } else if (st.m && !st.p && lastMoveT && now - lastMoveT > 20000) {
+      if (!stallAt) stallAt = lastMoveT;
+      if (!stallSent) { stallSent = true; report('stall', Math.round((now - lastMoveT) / 1000)); }
+    }
+  }, 1000);
+}
+function hangWatch(M, touch) {
+  if (!M || !M.wasmMemory || !M._rc_watch_addr || typeof Worker !== 'function') return;
+  let w;
+  try { w = new Worker(URL.createObjectURL(new Blob(['(' + hangWorker.toString() + ')()'], { type: 'text/javascript' }))); }
+  catch (e) { console.warn('watchdog worker unavailable:', e); return; }
+  w.onmessage = (e) => { if (e.data && e.data.warn) console.warn(e.data.warn); };
+  w.postMessage({ init: 1, memory: M.wasmMemory, addr: M._rc_watch_addr(), info: {
+    v: 20, ua: navigator.userAgent, mem: navigator.deviceMemory || 0, cores: navigator.hardwareConcurrency || 0,
+    touch: touch ? 1 : 0, screen: `${screen.width}x${screen.height}@${devicePixelRatio}` } });
+  // the longest task the page thread ran (ms): a hang that ends shows as one long task; a stutter as many
+  let lt = 0;
+  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.duration > lt) lt = e.duration; }).observe({ type: 'longtask', buffered: true }); } catch { /* no longtask support */ }
+  const beat = () => {
+    try { w.postMessage({ t: Date.now(), m: RcControls.inMission() ? 1 : 0, p: RcControls.paused() ? 1 : 0, bg: document.hidden ? 1 : 0, io: M._rc_io_activity ? M._rc_io_activity() : 0, lt: Math.round(lt) }); }
+    catch { /* the game is gone */ }
+  };
+  beat();
+  setInterval(beat, 1000);
+  document.addEventListener('visibilitychange', beat);
 }
 function crashCheck() {
   let r = null;
   try { r = JSON.parse(sessionStorage.getItem(RUN_STORE) || 'null'); sessionStorage.removeItem(RUN_STORE); } catch { r = null; }
   if (!r || typeof r.t !== 'number' || Date.now() - r.t > 120000) return;   // not the reload right after a running game
   const info = {
-    v: 19, ua: navigator.userAgent, mem: navigator.deviceMemory || 0, cores: navigator.hardwareConcurrency || 0,
+    v: 20, type: 'reload', ua: navigator.userAgent, mem: navigator.deviceMemory || 0, cores: navigator.hardwareConcurrency || 0,
     played: Math.round((r.t - r.t0) / 1000), gap: Math.round((Date.now() - r.t) / 1000), mission: r.m, touch: r.touch, bg: r.bg,
     nav: performance.getEntriesByType('navigation')[0]?.type || '', screen: `${screen.width}x${screen.height}@${devicePixelRatio}`,
   };
@@ -1114,7 +1235,7 @@ function controlsTip() {
 async function buildVersion() {
   // peers must run the same build and game files, or their simulations diverge
   const marker = await readMarker();
-  const wasm = await fetch('build/recomp12.wasm', { method: 'HEAD' }).catch(() => null);
+  const wasm = await fetch('build/recomp14.wasm', { method: 'HEAD' }).catch(() => null);
   // the ETag comes back weak (W/"...") when the response is compressed: compare only its value
   const etag = (wasm?.headers.get('ETag') || '').replace(/^W\//, '').replace(/"/g, '');
   return `${marker?.version || 'local'}:${etag || wasm?.headers.get('Content-Length') || '?'}`;

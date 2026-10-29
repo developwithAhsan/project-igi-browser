@@ -9,6 +9,7 @@
  * translated to WGSL (pshader.c). Pipelines are cached by render state; textures are RGBA8 by id. */
 #include "render.h"
 #include "render_cmd.h"
+#include "win32.h"   /* g_watch */
 
 #include <math.h>
 #include <webgpu/webgpu.h>
@@ -248,25 +249,20 @@ static void make_depth(void) {
     g_depth_view = wgpuTextureCreateView(g_depth, NULL);
 }
 
-/* Widescreen (rc_set_wide, RC_WIDE natively): the back buffer is the whole window and the 3D world is drawn
-   across all of it with a wider horizontal field of view (the game's 4:3 projection scaled in x), while the
-   game's 2D drawing (menus, HUD, the scope overlays) keeps a 4:3 box in the middle. Off: the whole picture is
-   the largest 4:3 box that fits, letterboxed. */
-int g_wide;
-static int g_wide_cfg;
+/* Widescreen (rc_set_wide, RC_WIDE natively). The game runs on a display as wide as the window (ddraw7.c
+   SetDisplayMode), and the recorder decides per frame (render_rec.c g_frame_wide, CmdDraw.wide) whether the
+   frame is wide: then the game's field of view is widened by the same factor and its world, including the
+   near polygons it transforms itself, is drawn over the whole window, while its 2D drawing (HUD, menus),
+   which it laid out for the wide display, is squeezed back into a 4:3 box in the middle. Other frames (wide
+   off, the 2D menus, the scope and binocular masks that cover the screen) are the game's 4:3 picture squeezed
+   back from the wide display, in the largest 4:3 box that fits. The back buffer is the whole window either
+   way; what the picture doesn't cover starts black every frame. */
+extern int g_wide;   /* render_rec.c (the headless build has no renderer) */
 static int g_world_frame;   /* a 3D draw reached the back buffer this frame */
-/* How much of the game's screen its 2D drawing covered last frame (sum of the quads' areas): the sniper scope
-   and binocular masks are tiled 2D quads covering all of it, and then the world must stay inside the 4:3 box
-   (the mask can't be stretched), so such frames are letterboxed. The HUD and the Esc menu cover far less. */
-static float g_cover, g_overlay_prev;
 static void configure_surface(void) {
     g_win_w = g_window_w > 0 ? g_window_w : 1024;
     g_win_h = g_window_h > 0 ? g_window_h : 768;
-    g_wide_cfg = g_wide;
-    if (g_wide) { g_surf_w = g_win_w; g_surf_h = g_win_h; }
-    /* the game is 4:3: render at the largest 4:3 size that fits, letterboxed (no stretching) */
-    else if (g_win_w * 3 > g_win_h * 4) { g_surf_h = g_win_h; g_surf_w = g_win_h * 4 / 3; }
-    else { g_surf_w = g_win_w; g_surf_h = g_win_w * 3 / 4; }
+    g_surf_w = g_win_w; g_surf_h = g_win_h;
     WGPUSurfaceConfiguration sc = WGPU_SURFACE_CONFIGURATION_INIT;
     sc.device = g_dev;
     sc.format = g_surf_fmt;
@@ -375,7 +371,7 @@ static void create_resources(void) {
 
 #ifndef __EMSCRIPTEN__
 int gpu_init_native(void) {
-    if (getenv("RC_WIDE")) g_wide = 1;   /* testing: widescreen from the start */
+    if (getenv("RC_WIDE")) g_wide = atoi(getenv("RC_WIDE")) != 0;   /* testing: widescreen from the start (RC_WIDE=0 off) */
     if (g_dev) return 1;
     if (!g_metal_layer) { fprintf(stderr, "[wgpu] no window\n"); return 0; }
     g_inst = wgpuCreateInstance(NULL);
@@ -712,7 +708,7 @@ static void submit(void) {
 static void begin_pass(uint32_t clear, uint32_t color, float z, uint32_t stencil);
 static void begin_frame(void) {
     if (g_frame_open) return;
-    if (g_window_w != g_win_w || g_window_h != g_win_h || g_wide != g_wide_cfg) {
+    if (g_window_w != g_win_w || g_window_h != g_win_h) {
         end_pass();
         configure_surface();
         g_tgt_color = g_tgt_depth = NULL;
@@ -720,9 +716,9 @@ static void begin_frame(void) {
     }
     g_frame_open = 1;
     g_world_frame = 0;
-    /* widescreen: the sides outside the game's 4:3 box start black every frame, so a 2D screen that doesn't
-       clear never shows the previous frame there */
-    if (g_wide_cfg && !g_tgt_color) begin_pass(1, 0, 1.f, 0);
+    /* the window outside the game's picture (the bars around a 4:3 frame, the sides a HUD doesn't reach) starts
+       black every frame, so a 2D screen that doesn't clear never shows the previous frame there */
+    if (!g_tgt_color) begin_pass(1, 0, 1.f, 0);
 }
 
 /* Opens a render pass on the current target; clear flags: 1 color, 2 depth, 4 stencil. */
@@ -982,46 +978,46 @@ static void exec_draw(const CmdDraw *c) {
             views[s] = gs && !gs->depth && gs->view != g_tgt_color ? gs->view : g_black.view;
         }
     }
-    /* Where this draw lands on the target. Plain: the target scaled from the game's logical size. Widescreen
-       back buffer: 3D draws cover the whole target with their clip x scaled down (the same vertical field of
-       view, more to the sides); 2D draws keep a 4:3 box in the middle, except a full-screen quad drawn over
-       the world (the scope and binocular masks, fades), which is scaled up to cover the whole target. */
+    /* Where this draw lands on the target. A render target: scaled from its logical size. The back buffer: the
+       game's screen (the wide display it was told, lw x lh) fitted into the window. On a wide frame
+       (c->wide) the picture keeps the display's proportions: the world, including the near polygons the game
+       pre-transforms (depth-tested), covers it all, and the game's 2D (no depth test: the HUD, menus, fades),
+       laid out for the wide display, is squeezed into a 4:3 box in the middle, except a quad spanning the
+       whole width over a world (a fade, a cutscene bar), which keeps the width. On any other frame the game's
+       4:3 picture, which it spread over the wide display, is squeezed back into the largest 4:3 box that
+       fits: the 2D menus, the scope and binocular masks, and widescreen off. */
     int pre = c->u.flags[0] == 1, bb = !g_tgt_gs && !c->full_viewport;
-    int wide = g_wide_cfg && bb && g_tgt_w * 3 != g_tgt_h * 4 && !(g_overlay_prev > 0.5f);
     float xscale = 1.f;
     float vx, vy, vw, vh;
-    if (c->full_viewport) { vx = vy = 0; vw = (float)g_tgt_w; vh = (float)g_tgt_h; }
-    else if (!wide) {
+    if (c->full_viewport) {
+        vx = vy = 0; vw = (float)g_tgt_w; vh = (float)g_tgt_h;
+        if (!g_tgt_gs && !c->wide) {   /* a clear of the back buffer on a 4:3 frame: only the box, the bars stay black */
+            float W = (float)g_tgt_w, H = (float)g_tgt_h, lh = (float)g_tgt_lh, pw = lh * 4.f / 3.f;
+            float s = fminf(W / pw, H / lh);
+            vx = (W - pw * s) / 2; vy = (H - lh * s) / 2; vw = pw * s; vh = lh * s;
+        }
+    }
+    else if (!bb) {
         float sx = (float)g_tgt_w / (float)g_tgt_lw, sy = (float)g_tgt_h / (float)g_tgt_lh;
         vx = c->vp[0] * sx; vy = c->vp[1] * sy; vw = c->vp[2] * sx; vh = c->vp[3] * sy;
-        if (pre && bb && n <= 8) {
-            const CVert *v = (const CVert *)(c + 1);
-            float lw = (float)g_tgt_lw, lh = (float)g_tgt_lh, x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
-            for (uint32_t i = 0; i < n; i++) { x0 = fminf(x0, v[i].x); y0 = fminf(y0, v[i].y); x1 = fmaxf(x1, v[i].x); y1 = fmaxf(y1, v[i].y); }
-            g_cover += fminf(1.f, fmaxf(0.f, fminf(x1, lw) - fmaxf(x0, 0.f)) * fmaxf(0.f, fminf(y1, lh) - fmaxf(y0, 0.f)) / (lw * lh));
-        }
     } else {
         float W = (float)g_tgt_w, H = (float)g_tgt_h, lw = (float)g_tgt_lw, lh = (float)g_tgt_lh;
-        float sbox = fminf(W / lw, H / lh);                      /* the 4:3 box: the largest that fits */
-        float bx = (W - lw * sbox) / 2, by = (H - lh * sbox) / 2;
-        if (!pre) {
-            g_world_frame = 1;
-            vx = c->vp[0] * (W / lw); vy = c->vp[1] * (H / lh); vw = c->vp[2] * (W / lw); vh = c->vp[3] * (H / lh);
-            xscale = (lw * H) / (lh * W);
-        } else {
+        float box = lh * 4.f / 3.f;                              /* the 4:3 picture's width in the game's units */
+        float pw = c->wide ? lw : box;                           /* the picture's width */
+        float s = fminf(W / pw, H / lh);                         /* fitted into the window */
+        float sx = s * pw / lw, sy = s, ox = (W - pw * s) / 2, oy = (H - lh * s) / 2;
+        if (!pre) g_world_frame = 1;
+        else if (c->wide && !c->key.zen) {   /* the game's 2D on a wide frame */
             int full = 0;
-            if (n <= 8) {   /* a quad: how much of the screen it covers, and does it span the full width (a fade, a cutscene bar)? */
+            if (n <= 8 && g_world_frame) {
                 const CVert *v = (const CVert *)(c + 1);
-                float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
-                for (uint32_t i = 0; i < n; i++) { x0 = fminf(x0, v[i].x); y0 = fminf(y0, v[i].y); x1 = fmaxf(x1, v[i].x); y1 = fmaxf(y1, v[i].y); }
-                float a = fmaxf(0.f, fminf(x1, lw) - fmaxf(x0, 0.f)) * fmaxf(0.f, fminf(y1, lh) - fmaxf(y0, 0.f)) / (lw * lh);
-                g_cover += fminf(1.f, a);
-                full = g_world_frame && x0 <= 1.f && x1 >= lw - 1.f;
+                float x0 = 1e9f, x1 = -1e9f;
+                for (uint32_t i = 0; i < n; i++) { x0 = fminf(x0, v[i].x); x1 = fmaxf(x1, v[i].x); }
+                full = x0 <= 1.f && x1 >= lw - 1.f;
             }
-            float sc = full ? fmaxf(W / lw, H / lh) : sbox;     /* cover the target, or the 4:3 box */
-            float ox = full ? (W - lw * sc) / 2 : bx, oy = full ? (H - lh * sc) / 2 : by;
-            vx = ox + c->vp[0] * sc; vy = oy + c->vp[1] * sc; vw = c->vp[2] * sc; vh = c->vp[3] * sc;
+            if (!full) { sx = s * box / lw; ox = (W - box * s) / 2; }
         }
+        vx = ox + c->vp[0] * sx; vy = oy + c->vp[1] * sy; vw = c->vp[2] * sx; vh = c->vp[3] * sy;
     }
     if (vx < 0) { vw += vx; vx = 0; }
     if (vy < 0) { vh += vy; vy = 0; }
@@ -1107,7 +1103,6 @@ static void pace_60hz(void) {
 
 static void exec_present(const CmdPresent *c) {
     begin_frame();
-    g_overlay_prev = g_cover; g_cover = 0;
     use_backbuffer();
     if (!g_pass && !g_enc) begin_pass(1, 0, 1.f, 0);   /* nothing drawn: present black */
     submit();
@@ -1244,6 +1239,7 @@ static int run_chunk(Chunk *ch) {
     while (ch->off < ch->len) {
         const CmdHdr *h = (const CmdHdr *)(ch->buf + ch->off);
         ch->off += h->size;
+        g_watch.page_phase = 10 + (int)h->type;
         switch (h->type) {
         case CMD_TARGET: exec_target((const CmdTarget *)h); break;
         case CMD_CLEAR: exec_clear((const CmdClear *)h); break;
@@ -1276,21 +1272,28 @@ static int run_chunk(Chunk *ch) {
 EMSCRIPTEN_KEEPALIVE int rc_gpu_pump(int allow_present) {
     int presented = 0;
     if (!g_ready) return 0;
+    g_watch.page_phase = 1;
     while (!g_rb_pending) {
+        g_watch.page_phase = 2;
         pthread_mutex_lock(&g_q_lock);
         Chunk *ch = g_q_head;
+        g_watch.queued = g_q_frames;
         pthread_mutex_unlock(&g_q_lock);
+        g_watch.page_phase = 1;
         if (!ch || (ch->ends_frame && !allow_present)) break;
         if (run_chunk(ch)) break;   /* readback in flight: resume when it is mapped */
+        g_watch.page_phase = 2;
         pthread_mutex_lock(&g_q_lock);
         g_q_head = ch->next;
         if (!g_q_head) g_q_tail = NULL;
         if (ch->ends_frame) g_q_frames--;
         pthread_mutex_unlock(&g_q_lock);
-        if (ch->ends_frame) { presented++; allow_present = 0; }
+        g_watch.page_phase = 3;
+        if (ch->ends_frame) { presented++; allow_present = 0; g_watch.frames++; }
         free(ch->buf);
         free(ch);
     }
+    g_watch.page_phase = 0;
     return presented;
 }
 

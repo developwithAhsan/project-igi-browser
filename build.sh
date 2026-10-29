@@ -20,6 +20,9 @@ else OUT=out_all; OBJ=obj_all; LIB=librecomp.dylib; TFLAG=; fi
 export OUT OBJ  # used inside the per-file compile command below
 
 "$PY" -I "$R/translator/x86toc.py" "$EXE" "$FUNCS" "$R/$OUT" --all --per-file 300 $TFLAG | head -1
+# a game profile's post-translation patch (ports/<game>/patch.sh next to its profile.h, or PATCH=...)
+if [ -z "$PATCH" ] && [ -n "$PROFILE" ] && [ -f "$(dirname "$PROFILE")/patch.sh" ]; then PATCH="$(dirname "$PROFILE")/patch.sh"; fi
+if [ -n "$PATCH" ]; then sh "$PATCH" "$R/$OUT"; fi
 mkdir -p "$R/build/$OBJ"
 cd "$R"
 ls $OUT/*.c | while read f; do

@@ -61,6 +61,7 @@ static void write_msg(uint32_t p, const Msg *m) {
 }
 
 W(PeekMessageA) {
+    if (on_game_thread()) g_watch.beat++;   /* the game loop is turning (watchdog, win32.h RcWatch) */
     if (g_pump_host_events) g_pump_host_events();
     Msg m;
     if (!pop_message(&m, ARG(4) & 1 /* PM_REMOVE */)) RET(5, 0);

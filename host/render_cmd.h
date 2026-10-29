@@ -49,6 +49,7 @@ typedef struct {
     float vp[4];              /* Direct3D viewport (target logical pixels) */
     float minz, maxz;
     uint32_t full_viewport;   /* clear quads: ignore vp, cover the whole target */
+    uint32_t wide;            /* widescreen frame (render_rec.c g_frame_wide): world over the whole window, 2D in a 4:3 box */
     uint32_t slot_kind[4], slot_id[4], samp_key[4];
     uint32_t pixel_shader;    /* empty slots read black (pixel shaders) or white (fixed function) */
     int32_t capture_index;    /* debugging: save the back buffer after this draw (native only); -1 none */

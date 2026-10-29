@@ -42,6 +42,9 @@ int rc_stack_size(int normal_mb, int compact_mb);   /* host thread stack size fo
 
 typedef struct { const char *name; GuestFn fn; } ImportHandler;  /* name like "KERNEL32.DLL!GetTickCount" */
 typedef struct { uint32_t image_base, entry, num_imports; } LoadedImage;
+/* Widescreen factor for a game profile's post-translation patch (e.g. ports/project-igi/patch.sh multiplies the
+   game's horizontal field-of-view tangent by it): (display aspect) / (4/3) on frames drawn wide, else 1. */
+extern float rc_aspect_x;
 extern uint32_t g_image_lo, g_image_hi;   /* the loaded executable's address range */
 extern uint32_t g_state_lo, g_state_hi;   /* its writable sections (global data): what determinism checks hash */
 

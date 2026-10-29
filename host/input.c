@@ -22,6 +22,9 @@ void dinput_mouse_move(int dx, int dy);
 int netplay_on(void);
 int netplay_local_pad(int idx, int connected, uint32_t buttons, const int32_t axis[4]);
 EXPORT void input_mouse_move(int dx, int dy) { if (!netplay_on()) dinput_mouse_move(dx, dy); }
+/* watchdog counters (win32.h RcWatch): the page's watchdog worker reads them straight from the shared memory */
+RcWatch g_watch;
+EXPORT uint32_t rc_watch_addr(void) { return (uint32_t)(uintptr_t)&g_watch; }
 /* 1 while the game draws a 3D world (a mission), 0 in its 2D menus (render_rec.c latches it per frame). The
    page's controls layer (web/controls.js) remaps mouse buttons and scales the look only in a mission, so the
    menus always get a plain click and cursor. */

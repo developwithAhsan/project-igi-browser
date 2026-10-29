@@ -56,6 +56,23 @@ While zoomed the game already scales turning by the zoom (0.7x in the binoculars
 page adds only the player's "scoped sensitivity" factor, nothing automatic. All missions are selectable in the
 mission list (`tap=380:218+16*n` on the 640x480 screen, n = 0 Trainyard, 3 GOD, 4 Radar Base ...).
 
+Widescreen (2026-10-30): the game clips the polygons nearest the camera itself (software transform, submitted
+pre-transformed with the depth test on, clipped to its screen), so widening only the projection showed sky at
+the sides when looking down. Now `host/ddraw7.c` EnumDisplayModes offers every mode reshaped to the window's aspect
+(16:9 at least, 2.4:1 at most) with its pixel count kept (800x600 becomes 924x520 at 16:9, 640x480 800x450),
+because the game takes the offered mode nearest in pixel count to the one it wants (keeping heights instead,
+it took 854x480 for a mission wanting 800x600, and 640x480 on a 2.14:1 phone), so it picks and sets the wide
+counterpart of its setting itself;
+`patch.sh` multiplies the 20 generated-code reads of its camera's horizontal half-FOV tangent (0xbcab20) by
+`rc_aspect_x` (runtime.h), which `host/render_rec.c` sets per frame: (display aspect)/(4/3) on frames drawn
+wide (`g_frame_wide`: wide wanted, the previous frame drew a world, and its 2D quads drawn after the last world
+draw covered under half the screen — the sniper scope and binocular masks are tiles that cover it all, the
+sky's cloud strips come before the world, a fade is one quad over everything and doesn't count), 1 otherwise.
+The executor (`host/render_wgpu.c` exec_draw, `CmdDraw.wide`) draws a wide frame's world over the fitted
+picture and its 2D (no depth test) squeezed into a 4:3 box, full-width quads over a world excepted (cutscene
+bars, fades); other frames are the 4:3 picture squeezed back from the wide screen, in the largest 4:3 box,
+with clears kept inside the box. `RC_WIDE_DISPLAY=0` offers the 4:3 modes again (testing).
+
 Testing switches: `RC_MEMSNAP=frame:addr:len:path`, `RC_POKE=frame:addr:hexbytes`, `RC_DUMP=frame:addr:len`
 (an address may be a pointer chain, `base>off>off`: each `>off` loads the dword so far and adds off, resolved
 at that frame — for objects on the heap), `RC_ZOOM_LOG=1`

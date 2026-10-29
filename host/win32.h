@@ -116,4 +116,12 @@ int sched_wait(int (*pred)(void *), void *arg, uint64_t deadline_us, uint64_t (*
 int sched_active(void);                           /* the calling thread is scheduled */
 uint64_t sched_now_us(void);
 
+/* Watchdog counters (input.c: rc_watch_addr), read by the page's watchdog worker (web/loader.js) when the
+   page thread stops answering or the game stops presenting: what each thread was doing at the time.
+   page_phase: 0 idle, 1 in rc_gpu_pump, 2 taking the queue lock, 10+command type while running a command.
+   game_phase (the game's main thread only): 0 running, 1 waiting for the page to present, 2 waiting for a
+   readback, 3 waiting for the renderer at start, 4 in a file open/read, 5 in WaitForSingleObject, 6 in Sleep. */
+typedef struct { volatile int page_phase, game_phase, frames, queued, game_frame, beat, readbacks; } RcWatch;
+extern RcWatch g_watch;
+
 #endif

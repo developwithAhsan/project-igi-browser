@@ -32,9 +32,15 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
   rate. The scope toggle reads the real zoom of the view (the world's projection) and holds the game's Zoom
   keys until the view is there. The Esc menu over a paused mission is told apart from play by the game's
   clock standing still, so its cursor is never inverted and phone taps reach its items.
-- **Widescreen**: the 3D world fills a 16:9 (or any) screen with a wider field of view, while the game's 2D
-  menus, HUD and scope masks keep their 4:3 proportions in the middle (`host/render_wgpu.c`, `rc_set_wide`;
-  a setting on the page, on by default).
+- **Widescreen**: the game is offered display modes as wide as the window and picks one itself, so its
+  viewport, its HUD layout and its own transform and clipping of the polygons nearest the camera (it submits
+  those pre-transformed, clipped to its screen) all follow; its field of view is widened by the same factor
+  through a one-line post-translation patch (`ports/project-igi/patch.sh`, a runtime factor read where the
+  game reads its camera's tangent), and the renderer draws its 2D layer back into 4:3 proportions. Frames
+  under the sniper scope or the binoculars, the 2D menus, and widescreen off are the game's 4:3 picture
+  squeezed back into a 4:3 box (`host/render_rec.c` `g_frame_wide`, `host/render_wgpu.c`, `host/ddraw7.c`;
+  a setting on the page, on by default). An earlier version only widened the projection, and looking down
+  showed sky at the sides where the game had clipped the near ground to 4:3.
 - **Loading time**: the game reads thousands of files per mission and maps every path case-insensitively, and
   in the browser each file-system call is a round trip to the OPFS thread. The host reads each file whole on
   open and serves it from memory, and keeps directory listings (`host/kernel32.c`, `host/core.c`), which cut
@@ -58,6 +64,14 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
   the landing page). The running game keeps a heartbeat in `sessionStorage`, cleared on an orderly unload;
   a start that finds one tells the player what happened and posts the device, memory, time played and
   mission state to `web/crash.php`, which appends it to a log above the web root (`?view=KEY` lists it).
+  A watchdog worker (`web/loader.js` `hangWorker`) keeps its own clock: the page thread posts it a beat
+  every second, and the host keeps counters in shared memory (`host/win32.h` `RcWatch`: what the page thread
+  and the game thread are doing, frames presented, the game loop's turns, file reads). 15 s without a beat
+  in the foreground is reported as a hang with those counters, 20 s without a frame or a file read in a
+  running mission as a stall, each with its end; a jump of the worker's own clock (the device slept, the tab
+  was frozen) is reported apart, and so is a lost WebGPU device. A game folder the browser evicted files from
+  (the marker left, the executable gone, or a not-found error while downloading over it) is downloaded again
+  from scratch instead of waiting forever at "Starting the game".
 
 The game profile is `ports/project-igi/profile.h`; build with `PROFILE=ports/project-igi/profile.h` in the
 commands below. Everything below this line is the original project's README, which still applies.

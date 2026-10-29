@@ -6,6 +6,7 @@
  * command runs immediately; in the browser commands are queued per frame for the page's thread. */
 #include "render.h"
 #include "render_cmd.h"
+#include "win32.h"   /* g_watch */
 #include "vshader.h"
 
 #include <math.h>
@@ -161,6 +162,16 @@ static int want_screenshot(uint32_t frame) {
 static CmdTarget g_last_target;   /* zero: back buffer, not yet sent */
 static int g_target_sent;
 static uint32_t g_tgt_lw, g_tgt_lh;
+static int g_rec_bb;        /* the current target is the back buffer */
+/* Widescreen (render_wgpu.c g_wide, ddraw7.c: the game is told a display as wide as the window). A frame is
+   drawn wide when the player wants it, the previous frame drew a 3D world and its 2D quads didn't cover the
+   screen (the sniper scope and binocular masks do: those frames keep the 4:3 picture, squeezed back from the
+   wide display, so the mask stays round). On a wide frame the game's field of view is widened by rc_aspect_x
+   (runtime.h, read by the patched game code: ports/project-igi/patch.sh) and the executor draws the world over
+   the whole window, with the game's 2D (laid out for the wide display) squeezed back into a 4:3 box. */
+int g_wide;                 /* the player wants widescreen (render_wgpu.c rc_set_wide / RC_WIDE) */
+int g_frame_wide;
+static float g_rec_cover;   /* share of the game's screen covered by its 2D quads this frame */
 
 static void select_target(Device *d) {
     const DevState *st = &d->st;
@@ -172,6 +183,7 @@ static void select_target(Device *d) {
     else { t.lw = d->width; t.lh = d->height; }
     if (ds) { t.depth_id = ds->gpu_id; t.depth_w = ds->width; t.depth_h = ds->height; }
     g_tgt_lw = t.lw; g_tgt_lh = t.lh;
+    g_rec_bb = !rt;
     if (g_target_sent && !memcmp(&t.color_id, &g_last_target.color_id, sizeof t - sizeof t.h)) return;
     if (g_snap_detail)
         fprintf(stderr, "[target] color %u (%ux%u, logical %ux%u) depth %u\n", t.color_id, t.color_w, t.color_h, t.lw, t.lh,
@@ -424,6 +436,7 @@ static void clear_quad(Device *d, float x1, float y1, float x2, float y2, uint32
     CmdDraw *c = cmd_alloc(CMD_DRAW, sizeof *c + 6 * sizeof(CVert));
     c->key = (PKey){ 0, 2, 1, 1, 1, (flags & 2) ? 1u : 0u, 8, 1, (flags & 1) ? 0xFu : 0u, TOPO_TRIANGLES, 0 };
     c->full_viewport = 1;
+    c->wide = (uint32_t)g_frame_wide;
     c->minz = 0.f; c->maxz = 1.f;
     c->capture_index = -1;
     for (int i = 0; i < 4; i++) c->samp_key[i] = sampler_key(d->st.tss[i]);
@@ -445,7 +458,9 @@ static void rec_clear_impl(Device *d, uint32_t count, uint32_t rects, uint32_t f
     float vx2 = vx1 + (float)(st->viewport.w ? st->viewport.w : g_tgt_lw);
     float vy2 = vy1 + (float)(st->viewport.h ? st->viewport.h : g_tgt_lh);
     int full = !count && vx1 <= 0 && vy1 <= 0 && vx2 >= (float)g_tgt_lw && vy2 >= (float)g_tgt_lh;
-    if (full) {
+    /* a pass clear covers the whole window; on a 4:3 frame the back buffer's picture is a box in the middle
+       (render_wgpu.c exec_draw), so clear it with a quad, which the executor keeps inside the box */
+    if (full && !(g_rec_bb && !g_frame_wide)) {
         CmdClear *c = cmd_alloc(CMD_CLEAR, sizeof *c);
         c->flags = flags & 7; c->color = color; c->z = z; c->stencil = stencil;
         cmd_end();
@@ -490,7 +505,10 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
 
     FvfLayout L;
     fvf_layout(sh ? 0x2 /* XYZ: transformed by the shader */ : st->vs, &L);
-    if (L.pos_type != 0x4) g_world_this_frame = 1;   /* non-RHW = 3D world: we're in a mission, not a menu */
+    if (L.pos_type != 0x4) {   /* non-RHW = 3D world: we're in a mission, not a menu */
+        g_world_this_frame = 1;
+        g_rec_cover = 0;   /* only 2D drawn after the last world draw can be a mask over it (the sky's cloud strips come before) */
+    }
     if (!sh && L.pos_type != 0x4) {
         float m11 = fabsf(st->transform[3][5]);   /* the game may bake a y flip in: the magnitude is the zoom */
         if (m11 > g_zoom_this_frame) g_zoom_this_frame = m11;   /* the most zoomed projection of the frame */
@@ -546,6 +564,7 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
     CmdDraw *c = cmd_alloc(CMD_DRAW, sizeof *c + (size_t)n * sizeof(CVert));
     CVert *cv = (CVert *)(c + 1);
     c->nverts = n;
+    c->wide = (uint32_t)g_frame_wide;
     c->capture_index = g_snap_detail ? (int32_t)(g_f_drawn - 1) : -1;
     if (sh) {
         VsStreams vss;
@@ -661,6 +680,13 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
                 c->slot_kind[0], c->slot_id[0], c->slot_kind[1], c->slot_id[1], c->slot_kind[2], c->slot_id[2],
                 c->slot_kind[3], c->slot_id[3], c->pixel_shader, c->vp[0], c->vp[1], c->vp[2], c->vp[3], c->minz, c->maxz,
                 fnv_qa(2166136261u, u->mvp, 16, 1024.f), sig_pos(cv, n), sig_col(cv, n), sig_tc(cv, n));
+    if (L.pos_type == 0x4 && !k.zen && n <= 8 && g_rec_bb && g_tgt_lw && g_tgt_lh) {   /* a 2D quad (no depth test: not a near polygon the game pre-transformed): how much of the screen it covers */
+        float lw = (float)g_tgt_lw, lh = (float)g_tgt_lh, x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+        for (uint32_t i = 0; i < n; i++) { x0 = fminf(x0, cv[i].x); y0 = fminf(y0, cv[i].y); x1 = fmaxf(x1, cv[i].x); y1 = fmaxf(y1, cv[i].y); }
+        float frac = fminf(1.f, fmaxf(0.f, fminf(x1, lw) - fmaxf(x0, 0.f)) * fmaxf(0.f, fminf(y1, lh) - fmaxf(y0, 0.f)) / (lw * lh));
+        if (frac < 0.9f) g_rec_cover += frac;   /* one quad over the whole screen is a fade, drawn over the wide picture as it is */
+        if (d->frame == g_cmd_sig_frame) fprintf(stderr, "[cover] d%u n=%u box %g,%g-%g,%g frac %.3f total %.3f\n", g_f_drawn - 1, n, x0, y0, x1, y1, frac, g_rec_cover);
+    }
     cmd_end();
 }
 
@@ -669,7 +695,9 @@ static void rec_draw_impl(Device *d, uint32_t prim, uint32_t prim_count, uint32_
 static int rec_init(Device *d) {
     (void)d;
 #ifdef __EMSCRIPTEN__
+    g_watch.game_phase = 3;
     while (!web_gpu_ready()) usleep(1000);   /* the page creates the WebGPU device before starting the game */
+    g_watch.game_phase = 0;
     return 1;
 #else
     return gpu_init_native();
@@ -689,6 +717,16 @@ static void rec_present_impl(Device *d) {
     g_target_sent = 0;   /* the executor ends every frame on the back buffer */
     if (d->frame == g_cmd_sig_frame + 1) fprintf(stderr, "[sig] f%u end draws=%u\n", g_cmd_sig_frame, g_f_drawn);   /* the present of that frame's draws */
     g_f_drawn = 0;
+    {   /* the next frame's widescreen mode (see g_frame_wide): decided here so the game's field of view and the
+           executor's mapping agree for the whole frame */
+        extern void dd_display_size(int *, int *);
+        int dw, dh; dd_display_size(&dw, &dh);
+        float factor = dw > 0 && dh > 0 ? ((float)dw / (float)dh) / (4.f / 3.f) : 1.f;
+        int overlay = g_rec_cover > 0.5f;
+        g_rec_cover = 0;
+        g_frame_wide = g_wide && g_world_this_frame && !overlay && factor > 1.01f;
+        rc_aspect_x = g_frame_wide ? factor : 1.f;
+    }
     g_in_mission = g_world_this_frame;   /* latch for this frame's input; reset for the next */
     g_world_this_frame = 0;
 #ifdef PROFILE_TICK
@@ -711,7 +749,10 @@ static void rec_present_impl(Device *d) {
         depth = q ? atoi(q) : 2;
         if (depth < 1) depth = 1;
     }
+    g_watch.game_frame = (int)d->frame;
+    g_watch.game_phase = 1;
     while (web_queued_frames() >= depth) usleep(1000);
+    g_watch.game_phase = 0;
 #endif
 }
 
@@ -726,7 +767,10 @@ static void rec_readback_impl(Device *d, Surface *s) {
     c->done_ptr = (uint64_t)(uintptr_t)&done;
     cmd_end();
     cmd_flush(0);
+    g_watch.game_phase = 2;
+    g_watch.readbacks++;
     while (!__atomic_load_n(&done, __ATOMIC_ACQUIRE)) usleep(200);   /* natively it already ran */
+    g_watch.game_phase = 0;
 }
 
 static void rec_upload_surface_impl(Device *d, Surface *s) {

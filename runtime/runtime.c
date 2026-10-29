@@ -361,6 +361,7 @@ int load_image(const char *path, LoadedImage *out) {
 
 /* ------------------------------------------------------------------ memory + CPU setup */
 
+float rc_aspect_x = 1.0f;   /* runtime.h: widescreen factor read by patched game code */
 #ifdef __EMSCRIPTEN__
 #include <emscripten/heap.h>
 #include <errno.h>

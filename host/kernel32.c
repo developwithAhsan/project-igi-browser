@@ -627,6 +627,8 @@ static uint32_t wait_one(uint32_t h, uint32_t ms) {
         dl.tv_nsec += (long)(ms % 1000) * 1000000L;
         if (dl.tv_nsec >= 1000000000L) { dl.tv_sec++; dl.tv_nsec -= 1000000000L; }
     }
+    int gt = on_game_thread();
+    if (gt) g_watch.game_phase = 5;
     pthread_mutex_lock(&s->m);
     uint32_t r = 0;
     int waited = 0;
@@ -642,6 +644,7 @@ static uint32_t wait_one(uint32_t h, uint32_t ms) {
         if (r && s->handoff && !s->waiters) { s->handoff = 0; pthread_cond_broadcast(&s->cv); }  /* nobody left to take it */
     }
     pthread_mutex_unlock(&s->m);
+    if (gt) g_watch.game_phase = 0;
     return r;
 }
 W(WaitForSingleObject) {
@@ -668,13 +671,19 @@ static int det_sleep(uint32_t ms) {
 W(Sleep) {
     uint32_t ms = ARG(0);
     if (det_sleep(ms)) RET(1, 0);
+    int gt = on_game_thread();
+    if (gt) g_watch.game_phase = 6;
     if (ms == 0) sched_yield(); else usleep(ms * 1000);
+    if (gt) g_watch.game_phase = 0;
     RET(1, 0);
 }
 W(SleepEx) {
     uint32_t ms = ARG(0);
     if (det_sleep(ms)) RET(2, 0);
+    int gt = on_game_thread();
+    if (gt) g_watch.game_phase = 6;
     if (ms == 0) sched_yield(); else usleep(ms * 1000);
+    if (gt) g_watch.game_phase = 0;
     RET(2, 0);
 }
 
@@ -831,6 +840,7 @@ static void io_report(void) {
 W(CreateFileA) {
     const char *name = GSTR(ARG(0));
     uint32_t access = ARG(1), disp = ARG(4);
+    if (on_game_thread()) g_watch.game_phase = 4;
     char host[1024];
     int exists = map_path(name, host, sizeof host);
     int fl = 0;
@@ -877,6 +887,7 @@ W(CreateFileA) {
     }
     g_io.opens++;
     g_io.ns += io_now() - t0;
+    if (on_game_thread()) g_watch.game_phase = 0;
     if (g_io.opens % 200 == 0) io_report();
     set_error((disp == 4 || disp == 2) && exists ? ERROR_ALREADY_EXISTS : 0);
     RET(7, h);
@@ -910,7 +921,9 @@ W(ReadFile) {
     /* Windows only returns short reads at end of file; host reads can stop early, so loop */
     uint64_t t0 = io_now();
     ssize_t n = 0;
+    if (on_game_thread()) g_watch.game_phase = 4;
     while (got < want && (n = read(x->fd, HP(ARG(1) + got), want - got)) > 0) got += (uint32_t)n;
+    if (on_game_thread()) g_watch.game_phase = 0;
     g_io.ns += io_now() - t0;
     g_io.bytes += got;
     if (ARG(3)) W32(ARG(3), got);

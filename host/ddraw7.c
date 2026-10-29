@@ -408,8 +408,31 @@ static void write_mode_desc(uint32_t p, uint32_t w, uint32_t h, uint32_t bpp) {
 W(dd_EnumDisplayModes) {
     uint32_t flags = ARG(1), filter = ARG(2), ctx = ARG(3), cb = ARG(4);
     (void)flags;
-    static const uint32_t modes[][2] = { { 640, 480 }, { 800, 600 }, { 1024, 768 }, { 1152, 864 }, { 1280, 960 },
-                                         { 1280, 1024 }, { 1600, 1200 } };
+    uint32_t modes[][2] = { { 640, 480 }, { 800, 600 }, { 1024, 768 }, { 1152, 864 }, { 1280, 960 },
+                            { 1280, 1024 }, { 1600, 1200 } };
+    /* Widescreen (render_rec.c g_frame_wide): the modes offered are as wide as the window (16:9 at least, 2.4:1
+       at most) at the usual heights, and the game picks and sets one by itself, so its viewport, its own transform
+       and clipping of the polygons nearest the camera (it submits those pre-transformed, clipped to its screen)
+       and its HUD layout all follow; its field of view is widened to match through rc_aspect_x
+       (ports/project-igi/patch.sh) on frames drawn wide, and on the others the executor squeezes its 4:3 picture
+       back from the wide screen. RC_WIDE_DISPLAY=0 offers the 4:3 modes (testing). */
+    { const char *e = getenv("RC_WIDE_DISPLAY");
+      if (!e || atoi(e)) {
+          extern int g_window_w, g_window_h;
+          double a = g_window_h > 0 ? (double)g_window_w / (double)g_window_h : 16.0 / 9;
+          if (a < 16.0 / 9) a = 16.0 / 9;
+          if (a > 2.4) a = 2.4;
+          /* The game takes the offered mode nearest in pixel count to the one it wants (seen: 800x600 wanted,
+             1068x600 taken over 640x480, but 854x480 taken when both were offered; 900x480 wanted, 640x480 taken
+             over 1286x600), so each mode keeps its pixel count and only changes shape: its choice maps one to
+             one. The menus' 640x480 becomes 800x450 and is drawn back into a 4:3 box like any 2D screen. */
+          for (size_t i = 0; i < sizeof modes / sizeof modes[0]; i++) {
+              double px = (double)modes[i][0] * modes[i][1];
+              uint32_t h = ((uint32_t)(sqrt(px / a) + 0.5) + 1) & ~1u;
+              modes[i][1] = h;
+              modes[i][0] = ((uint32_t)(h * a + 0.5) + 1) & ~1u;
+          }
+      } }
     static const uint32_t bpps[] = { 16, 32 };
     uint32_t p = heap_alloc(124, 1);
     for (int b = 0; b < 2; b++)
