@@ -13,10 +13,11 @@
   gtag('config', 'G-PYENXH0V6X');
 </script>
   <!-- Ads (Adsterra): the network's tags live in ad.html (one per slot); set a slot to true here to show it.
-       side: desktop left gutter 160x600; lead: 728x90 and native: a row of four cards, both under the landing
-       views on desktop; mobile: 320x50 under the landing views on phones; social: the floating social bar
-       (off: it would float over the game). Sizes must match ad.html. -->
-  <script>window.RC_ADS = { side: true, lead: true, native: true, mobile: true, social: false };</script>
+       side: desktop left gutter 160x600; lead: 728x90, box: 300x250 and native (the native widget: off until its
+       layout in the dashboard is a row of four, "4:1" — the default "1:4" is a column of four, which a landing-sized
+       box cuts off), all under the landing views on desktop; mobile: 320x50 under the landing views on phones;
+       social: the floating social bar (off: it would float over the game). Sizes must match ad.html. -->
+  <script>window.RC_ADS = { side: true, lead: true, box: true, native: false, mobile: true, social: false };</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -782,7 +783,7 @@
     var coarse = document.body.classList.contains('coarse');
     if (promo) { if (A.side && !coarse) { promo.appendChild(frame('side', 160, 600)); promo.classList.add('on'); } else promo.remove(); }
     var units = coarse ? (A.mobile ? [['mobile', 320, 50]] : [])
-                       : [].concat(A.lead ? [['lead', 728, 90]] : [], A.native ? [['native', 728, 300]] : []);
+                       : [].concat(A.lead ? [['lead', 728, 90]] : [], A.box ? [['box', 300, 250]] : [], A.native ? [['native', 728, 260]] : []);
     if (A.social) units.push(['social', 320, 160]);
     if (units.length) {
       var d = document.createElement('div');
