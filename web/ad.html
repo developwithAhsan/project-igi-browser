@@ -41,6 +41,22 @@
     if (!slot || !slot.tag) return;
     // document.write keeps the network's own <script> tags executing in order, as on a plain page
     document.write('<div style="width:' + slot.w + 'px;height:' + slot.h + 'px;overflow:hidden">' + slot.tag + '</div>');
+    // Diagnostics for index.html?adtest: what happened in here (the network's loader fetched? an ad frame made?
+    // resources that failed?), posted to the page after a few seconds and again later.
+    var failed = [];
+    window.addEventListener('error', function (e) { if (e.target && e.target.src) failed.push(String(e.target.src).replace(/^https?:\/\//, '').slice(0, 40)); }, true);
+    var report = function (t) {
+      var res = (performance.getEntriesByType('resource') || []).map(function (r) { return r.name; });
+      var msg = { rcAd: 1, slot: new URLSearchParams(location.search).get('slot'), at: t,
+                  loader: res.some(function (n) { return /bauval\.org\/(22|21|14)\//.test(n); }),
+                  requests: res.filter(function (n) { return !/igi\.sagarinfosec|127\.0\.0\.1/.test(n); }).length,
+                  frames: document.querySelectorAll('iframe').length, images: document.images.length,
+                  text: (document.body.innerText || '').trim().slice(0, 40), failed: failed.slice(0, 4),
+                  credentialless: typeof window.credentialless === 'undefined' ? 'n/a' : window.credentialless };
+      try { parent.postMessage(msg, '*'); } catch (e) {}
+    };
+    setTimeout(function () { report(4); }, 4000);
+    setTimeout(function () { report(12); }, 12000);
   })();
 </script>
 </body>

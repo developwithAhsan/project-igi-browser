@@ -791,6 +791,22 @@
       units.forEach(function (u) { d.appendChild(frame(u[0], u[1], u[2])); });
       document.getElementById('view-home').appendChild(d);   // inside the home view: under its footnote, in flow
     }
+    // ?adtest: each ad frame reports what happened inside it (ad.html), shown under the landing views
+    if (new URLSearchParams(location.search).has('adtest')) {
+      var box = document.createElement('pre');
+      box.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:60;max-width:92vw;max-height:45vh;overflow:auto;margin:0;padding:8px;' +
+        'font:11px/1.4 ui-monospace,monospace;color:#dfe;background:rgba(0,0,0,.85);border:1px solid #4a6;border-radius:8px;white-space:pre-wrap';
+      box.textContent = 'ad test: ' + navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 90) + '\ncredentialless frames: ' +
+        ('credentialless' in HTMLIFrameElement.prototype) + ' | isolated: ' + crossOriginIsolated + ' | units: ' +
+        units.map(function (u) { return u[0]; }).join(',') + (A.side && !coarse ? ',side' : '') + '\n';
+      document.body.appendChild(box);
+      window.addEventListener('message', function (e) {
+        var m = e.data;
+        if (!m || !m.rcAd) return;
+        box.textContent += '[' + m.slot + ' @' + m.at + 's] loader fetched: ' + m.loader + ', ad requests: ' + m.requests + ', frames: ' + m.frames +
+          ', images: ' + m.images + ', failed: ' + (m.failed.length ? m.failed.join(' ') : 'none') + (m.text ? ', text: "' + m.text + '"' : '') + '\n';
+      });
+    }
   })();
 </script>
 </body>
