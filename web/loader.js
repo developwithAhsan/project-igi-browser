@@ -823,6 +823,7 @@ async function run(session) {
   hookInput(M, !!session);
   if (touch) { RcTouch.attach(M, $('stage'), canvas); followVisualViewport($('stage')); }
   if (session) { session.client.attach(M); showNetStatus(M, session); }
+  crashWatch(touch);
   startAudio(M, audio).catch((e) => console.warn('audio unavailable:', e));
   const poll = session ? pollLocalPad : pollGamepads;
   // Online, present at most 60 times a second: every Present is a lockstep frame, and the input delay and
@@ -859,6 +860,38 @@ async function run(session) {
   if (session) setInterval(() => { if (document.hidden) { poll(M); M._rc_gpu_pump(1); } }, 16);
   canvas.focus();
   window.recomp = M;
+}
+
+// Players report the game going black mid-mission and the page coming back on the landing screen: that is
+// the browser killing the page (out of memory, usually) and reloading it, which no code here can catch as it
+// happens. So the running game leaves a heartbeat in sessionStorage (kept across a browser reload, gone when
+// the tab closes) and clears it on an orderly unload; a start that finds a fresh heartbeat is the reload after
+// such a kill. The player gets a note on the landing screen, and the site a report (crash.php: the device,
+// its memory, how long the game ran, whether it was in a mission or in the background) to find the pattern.
+const RUN_STORE = 'igi-run';
+function crashWatch(touch) {
+  const t0 = Date.now();
+  const beat = () => {
+    try {
+      sessionStorage.setItem(RUN_STORE, JSON.stringify({ t: Date.now(), t0, m: RcControls.inMission() ? 1 : 0, touch: touch ? 1 : 0, bg: document.hidden ? 1 : 0 }));
+    } catch { /* storage blocked */ }
+  };
+  beat();
+  setInterval(beat, 5000);
+  window.addEventListener('pagehide', () => { try { sessionStorage.removeItem(RUN_STORE); } catch { /* storage blocked */ } });
+}
+function crashCheck() {
+  let r = null;
+  try { r = JSON.parse(sessionStorage.getItem(RUN_STORE) || 'null'); sessionStorage.removeItem(RUN_STORE); } catch { r = null; }
+  if (!r || typeof r.t !== 'number' || Date.now() - r.t > 120000) return;   // not the reload right after a running game
+  const info = {
+    v: 19, ua: navigator.userAgent, mem: navigator.deviceMemory || 0, cores: navigator.hardwareConcurrency || 0,
+    played: Math.round((r.t - r.t0) / 1000), gap: Math.round((Date.now() - r.t) / 1000), mission: r.m, touch: r.touch, bg: r.bg,
+    nav: performance.getEntriesByType('navigation')[0]?.type || '', screen: `${screen.width}x${screen.height}@${devicePixelRatio}`,
+  };
+  console.warn('the previous run ended without unloading (the browser killed the page?)', info);
+  try { navigator.sendBeacon('crash.php', new Blob([JSON.stringify(info)], { type: 'application/json' })); } catch { /* no beacon */ }
+  if (!r.bg) $('crashnote')?.classList.remove('hidden');   // a kill in the background is the OS reclaiming a hidden tab, not a crash
 }
 
 // Follow gate (index.html #iggate): the first Play shows a prompt to follow the site's Instagram; Play is
@@ -913,6 +946,7 @@ async function boot() {
   };
   const ready = () => {
     show('home');
+    crashCheck();
     if (params.get('join')) goOnline();   // an invite link goes straight to joining
     if (params.has('autoplay')) $('play').click();
   };
@@ -1197,6 +1231,13 @@ function setupDevice() {
     // it would resize the game's picture every time. There the stage keeps the largest viewport's size
     // instead (index.html body.nofs #stage); the toolbar overlaps the bottom until it hides again.
     document.body.classList.toggle('nofs', touch && !document.fullscreenEnabled && !document.webkitFullscreenEnabled);
+    // the on-screen controls exist from here on (hidden until the game runs), so their settings and layout can
+    // be set up on the landing screen and while the game loads
+    if (touch) {
+      RcTouch.setup($('stage'), $('canvas'));
+      $('home-controls').onclick = () => RcTouch.openSettings();
+      $('boot-controls').onclick = () => RcTouch.openSettings();
+    }
     for (const b of box.querySelectorAll('button')) {
       const on = (b.dataset.device === 'touch') === touch;
       b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false');

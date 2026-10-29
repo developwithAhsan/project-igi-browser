@@ -49,6 +49,8 @@ const RcControls = (() => {
     scopeZoom: 4,       // the zoom the scope button snaps to (x the normal view)
     gyro: 'scope',      // 'off' | 'on' | 'scope'
     gyroSens: 1,
+    gyroInvY: false,    // gyroscope: tilt the phone up to look down (some players want it, as in flight games)
+    gyroInvX: false,    // and turn left to look right
     wide: true,         // widescreen: the 3D world fills the whole screen (host rc_set_wide); false = 4:3 letterboxed
   };
   let S = load();
@@ -59,6 +61,7 @@ const RcControls = (() => {
     for (const k of ['mouseSens', 'look', 'scopeSens', 'scopeZoom', 'gyroSens']) if (typeof saved[k] === 'number' && saved[k] > 0) s[k] = saved[k];
     if (['off', 'on', 'scope'].includes(saved.gyro)) s.gyro = saved.gyro;
     if (typeof saved.wide === 'boolean') s.wide = saved.wide;
+    for (const k of ['gyroInvY', 'gyroInvX']) if (typeof saved[k] === 'boolean') s[k] = saved[k];
     if (saved.mouse) for (const b of [0, 1, 2]) if (ACTIONS[saved.mouse[b]]) s.mouse[b] = saved.mouse[b];
     return s;
   }
@@ -250,11 +253,15 @@ const RcControls = (() => {
     // deg/s about device x, y, z. The spec names alpha the rate about z, but Chromium AND WebKit both fill
     // alpha/beta/gamma straight from the gyroscope's x/y/z (device_motion_event_pump.cc, WebCoreMotionManager.mm).
     const w = [r.alpha, r.beta, r.gamma];
-    const yaw = w[0] * up[0] + w[1] * up[1] + w[2] * up[2];    // turning left = positive
-    const pitch = w[0] * right[0] + w[1] * right[1];           // tilting the top edge back (looking up) = negative
+    // right-hand rule about each axis: turning left (counter-clockwise seen from above) is a positive yaw,
+    // and tilting the phone so its camera (the back) points up is a positive pitch (+y rolls into +z, so -z,
+    // the camera, rolls into +y). Players reported the first version looked down when they tilted up: the
+    // pitch sign was the wrong way round. Mouse counts: +x looks right, +y looks down.
+    const yaw = w[0] * up[0] + w[1] * up[1] + w[2] * up[2];
+    const pitch = w[0] * right[0] + w[1] * right[1];
     if (Math.abs(yaw) < 0.4 && Math.abs(pitch) < 0.4) return;  // hand tremor: a small dead zone
     const k = DEG * S.gyroSens * lookScale() * dt;
-    look(-yaw * k, pitch * k);
+    look(-yaw * k * (S.gyroInvX ? -1 : 1), -pitch * k * (S.gyroInvY ? -1 : 1));
   }
   const gyroActive = () => S.gyro === 'on' || (S.gyro === 'scope' && scoped());
   // Starts listening (once): on iOS this must be called from a user gesture (a click). One request at a time.

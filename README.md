@@ -11,12 +11,15 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
   WebGPU renderer, plus the few extra Windows calls the game makes (`host/mm.c`, registry, timers, threads).
 - **Phones and tablets**: on-screen stick and buttons laid out like mobile shooters (`web/touch.js`: a big
   FIRE with jump / crouch / scope around it, a second FIRE above the stick, walk/run and binoculars toggles),
-  a scope button that raises the sniper rifle's scope and snaps it to a chosen zoom and back (through the
-  binoculars when the weapon has no scope), a "mission failed, tap Restart Mission" note when the game's
-  menu opens on its own, tap-to-hold crouch and walk, gyroscope aiming (turn the phone to fine-aim while
-  scoped, or always), swipe / scope / gyro sensitivity settings, a first-start controls guide, taps that work
-  in the game's menus including the Esc menu, fullscreen and landscape, the stage following the visual
-  viewport so a zoomed or scrolled page never crops the picture.
+  a forward lock on the stick (push past its top edge and let go to keep running, tap the stick to stop), a
+  layout editor (drag any button or the stick where you want it, size and opacity, saved in the browser,
+  usable on the landing screen and while the game loads), a scope button that raises the sniper rifle's
+  scope and snaps it to a chosen zoom and back (through the binoculars when the weapon has no scope), a
+  "mission failed, tap Restart Mission" note when the game's menu opens on its own, tap-to-hold crouch and
+  walk, gyroscope aiming (turn the phone to fine-aim while scoped, or always; invert either axis), swipe /
+  scope / gyro sensitivity settings, a first-start controls guide, taps that work in the game's menus
+  including the Esc menu, fullscreen and landscape, the stage following the visual viewport so a zoomed or
+  scrolled page never crops the picture.
 - **Keyboard and mouse**: the game's original keys by default with a one-click Modern (WASD) layout, every key
   rebindable from the page, mouse buttons bindable to any action (right click toggles the sniper scope), a
   mouse sensitivity setting; all saved in the browser (`web/controls.js`). The landing screen asks whether
@@ -46,6 +49,10 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
 - A hosted-game flow (`web/serve.py --manifest`, `?devgame`), scripted input for headless testing
   (`host/input.c`), and the site's own extras (visitor counter, affiliate card, and an AdSense slot that
   works inside the cross-origin-isolated page through an `<iframe credentialless>` around `web/ad.html`).
+- **Crash reports**: a browser that runs out of memory kills the page and reloads it (a black screen, then
+  the landing page). The running game keeps a heartbeat in `sessionStorage`, cleared on an orderly unload;
+  a start that finds one tells the player what happened and posts the device, memory, time played and
+  mission state to `web/crash.php`, which appends it to a log above the web root (`?view=KEY` lists it).
 
 The game profile is `ports/project-igi/profile.h`; build with `PROFILE=ports/project-igi/profile.h` in the
 commands below. Everything below this line is the original project's README, which still applies.

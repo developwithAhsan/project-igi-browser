@@ -322,22 +322,49 @@
      above-right of it; a big FIRE bottom-right with JUMP above, CROUCH / SCOPE to its left, USE / RELOAD further
      in, PEEK up the right edge, WEAPON at the bottom centre; MENU, MAP top-left and the gear, BINO, +/- top-right.
      --u is the button unit, --f the fire button, --g the gap, --sr/--sl the safe-area margins. */
-  #touch { --u: clamp(48px, 14vmin, 64px); --f: clamp(80px, 24vmin, 108px); --g: 10px;
+  /* --k scales every control (the layout editor's Size), --a is their opacity; --sk the stick, --tb the top bar. */
+  #touch { --k: 1; --a: 1; --u: calc(clamp(48px, 14vmin, 64px) * var(--k)); --f: calc(clamp(80px, 24vmin, 108px) * var(--k)); --g: 10px;
+    --sk: calc(clamp(120px, 36vmin, 170px) * var(--k)); --tb: calc(clamp(44px, 12vmin, 56px) * var(--k));
     --sr: max(18px, env(safe-area-inset-right)); --sl: max(18px, env(safe-area-inset-left)); --sb: 20px;
     --st: max(10px, env(safe-area-inset-top)); }
+  #touch.off { display: none; }
   #touch .t-stick { position: absolute; left: var(--sl); bottom: var(--sb);
-    width: clamp(120px, 36vmin, 170px); aspect-ratio: 1; border-radius: 50%;
+    width: var(--sk); aspect-ratio: 1; border-radius: 50%; opacity: var(--a);
     background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .22); }
   #touch .t-knob { position: absolute; inset: 30%; border-radius: 50%; background: rgba(255, 255, 255, .35);
     border: 2px solid rgba(255, 255, 255, .5); pointer-events: none; }
+  /* the forward lock above the stick: faint while pushing forward, lit when the thumb is past the edge (letting
+     go there locks) and while locked */
+  #touch .t-lock { position: absolute; left: 50%; top: calc(-1 * var(--u) * .6); transform: translateX(-50%); width: calc(var(--u) * .75); height: calc(var(--u) * .75);
+    display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); background: rgba(0, 0, 0, .35);
+    color: #fff; font-size: calc(var(--u) * .4); opacity: 0; transition: opacity .15s ease, transform .15s ease; pointer-events: none; }
+  #touch .t-stick.fwd .t-lock { opacity: .55; }
+  #touch .t-lock.arm, #touch .t-stick.locked .t-lock { opacity: 1; background: rgba(52, 184, 102, .6); border-color: rgba(120, 230, 160, .9); transform: translateX(-50%) scale(1.15); }
+  #touch .t-stick.locked { border-color: rgba(120, 230, 160, .6); }
+  #touch .t-stick.locked .t-knob { background: rgba(52, 184, 102, .55); }
   #touch .t-btn { position: absolute; display: grid; place-items: center; align-content: center; padding: 0;
-    width: var(--u); aspect-ratio: 1; border-radius: 50%; touch-action: none;
+    width: var(--u); aspect-ratio: 1; border-radius: 50%; touch-action: none; opacity: var(--a);
     border: 2px solid rgba(255, 255, 255, .3); background: rgba(0, 0, 0, .35); color: rgba(255, 255, 255, .9);
     font: 700 clamp(9px, 2.6vmin, 11px)/1.1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .03em;
     transition: opacity .25s ease; }
   #touch .t-btn small { font-size: .8em; font-weight: 600; opacity: .7; }
   #touch .t-btn.on { background: rgba(52, 184, 102, .55); border-color: rgba(120, 230, 160, .8); }
-  #touch.menus .t-btn:not(.b-menu):not(.b-gear), #touch.menus .t-stick { opacity: .35; }
+  #touch.menus .t-btn:not(.b-menu):not(.b-gear), #touch.menus .t-stick { opacity: calc(var(--a) * .35); }
+  /* the layout editor: the overlay over everything (the boot cover too), every control draggable, a bar on top */
+  #touch.edit { display: block; z-index: 8; background: rgba(0, 0, 0, .6); }
+  #touch.edit .t-btn, #touch.edit .t-stick, #touch.edit.menus .t-btn:not(.b-menu):not(.b-gear), #touch.edit.menus .t-stick {
+    opacity: var(--a); outline: 2px dashed rgba(255, 255, 255, .55); outline-offset: 3px; transition: none; }
+  #touch .t-edit { display: none; position: absolute; left: 50%; top: calc(var(--st) + 4px); transform: translateX(-50%); z-index: 1;
+    width: min(96%, 560px); padding: 8px 12px; border-radius: 12px; background: rgba(10, 18, 12, .96); border: 1px solid rgba(255, 255, 255, .18);
+    color: var(--fg); font: 12px/1.3 ui-sans-serif, system-ui, sans-serif; display: none; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: center; }
+  #touch.edit .t-edit { display: flex; }
+  #touch .t-edit b { width: 100%; text-align: center; font-size: 12.5px; }
+  #touch .t-edit label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  #touch .t-edit input[type=range] { width: 110px; accent-color: var(--accent); margin: 0; touch-action: pan-x; }
+  #touch .t-edit button { padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .25); background: transparent; color: var(--fg);
+    font: 600 12px ui-sans-serif, system-ui, sans-serif; }
+  #touch .t-edit .te-done { background: var(--accent); color: #04140a; border-color: var(--accent); }
+  #touch.edit .t-look { display: none; }
   /* right cluster */
   #touch .b-fire { width: var(--f); right: var(--sr); bottom: var(--sb);
     background: rgba(210, 58, 47, .4); border-color: rgba(255, 150, 140, .5); font-size: clamp(12px, 3.4vmin, 15px); }
@@ -353,18 +380,18 @@
   #touch .b-reload { right: calc(var(--sr) + var(--f) + 2 * var(--g) + var(--u)); bottom: calc(var(--sb) + var(--u) + var(--g) + 6px); }
   #touch .b-weapon { left: 50%; transform: translateX(-50%); bottom: var(--sb); }
   /* left cluster */
-  #touch .b-walk { left: calc(var(--sl) + (clamp(120px, 36vmin, 170px) - var(--u)) / 2); bottom: calc(var(--sb) + clamp(120px, 36vmin, 170px) + var(--g)); }
-  #touch .b-fire2 { --s: calc(var(--u) * 1.2); width: var(--s); left: calc(var(--sl) + clamp(120px, 36vmin, 170px) + var(--g));
-    bottom: calc(var(--sb) + clamp(120px, 36vmin, 170px) * 0.55); background: rgba(210, 58, 47, .3); border-color: rgba(255, 150, 140, .45); }
+  #touch .b-walk { left: calc(var(--sl) + (var(--sk) - var(--u)) / 2); bottom: calc(var(--sb) + var(--sk) + var(--g) + var(--u) * .55); }
+  #touch .b-fire2 { --s: calc(var(--u) * 1.2); width: var(--s); left: calc(var(--sl) + var(--sk) + var(--g));
+    bottom: calc(var(--sb) + var(--sk) * 0.55); background: rgba(210, 58, 47, .3); border-color: rgba(255, 150, 140, .45); }
   /* top bar */
   #touch .b-bino, #touch .b-zin, #touch .b-zout, #touch .b-map, #touch .b-menu, #touch .b-gear {
-    top: var(--st); width: clamp(44px, 12vmin, 56px); }
+    top: var(--st); width: var(--tb); }
   #touch .b-menu { left: max(12px, env(safe-area-inset-left)); }
-  #touch .b-map { left: calc(max(12px, env(safe-area-inset-left)) + clamp(50px, 13.5vmin, 62px)); }
+  #touch .b-map { left: calc(max(12px, env(safe-area-inset-left)) + var(--tb) + 6px); }
   #touch .b-gear { right: max(12px, env(safe-area-inset-right)); font-size: clamp(16px, 4.5vmin, 20px); }
-  #touch .b-bino { right: calc(max(12px, env(safe-area-inset-right)) + clamp(50px, 13.5vmin, 62px)); }
-  #touch .b-zin { right: calc(max(12px, env(safe-area-inset-right)) + 2 * clamp(50px, 13.5vmin, 62px)); font-size: clamp(16px, 4.5vmin, 20px); }
-  #touch .b-zout { right: calc(max(12px, env(safe-area-inset-right)) + 3 * clamp(50px, 13.5vmin, 62px)); font-size: clamp(16px, 4.5vmin, 20px); }
+  #touch .b-bino { right: calc(max(12px, env(safe-area-inset-right)) + var(--tb) + 6px); }
+  #touch .b-zin { right: calc(max(12px, env(safe-area-inset-right)) + 2 * (var(--tb) + 6px)); font-size: clamp(16px, 4.5vmin, 20px); }
+  #touch .b-zout { right: calc(max(12px, env(safe-area-inset-right)) + 3 * (var(--tb) + 6px)); font-size: clamp(16px, 4.5vmin, 20px); }
   /* settings sheet and the first-start guide (touch.js); both live inside #stage so they show in fullscreen */
   #tsettings, #tguide { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; padding: 12px;
     background: rgba(0, 0, 0, .55); -webkit-user-select: none; user-select: none; }
@@ -390,6 +417,17 @@
   .device .seg { background: rgba(0, 0, 0, .25); }
   .device .seg button { padding: 9px 6px; font-size: 13px; }
   .ts-note { display: block; color: var(--faint); font-size: 11px; margin-top: 4px; min-height: 1.2em; }
+  .ts-checks { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .ts-checks label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .ts-checks input { width: 17px; height: 17px; accent-color: var(--accent); margin: 0; }
+  .ts-layout { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .06);
+    color: var(--fg); font: 600 12.5px ui-sans-serif, system-ui, sans-serif; text-align: left; }
+  /* set up the controls before the game is ready: on the landing screen and the boot cover (phones) */
+  #home-controls, #boot-controls { display: none; }
+  body.coarse #home-controls { display: inline-flex; margin-top: 14px; }
+  body.coarse #boot-controls { display: inline-flex; margin-top: 18px; }
+  #crashnote { margin: 0 auto 16px; max-width: 46ch; padding: 10px 14px; border-radius: 10px; text-align: left; font-size: 13px; line-height: 1.45;
+    background: rgba(210, 58, 47, .18); border: 1px solid rgba(255, 150, 140, .4); color: var(--fg); }
   .ts-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
   .ts-foot button { padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .22); background: transparent; color: var(--fg);
     font: 600 12px ui-sans-serif, system-ui, sans-serif; }
@@ -488,11 +526,11 @@
       <div class="tg-card">
         <b class="tg-title">How to play</b>
         <div class="tg-grid">
-          <div><i>✥</i><span><b>Move</b> — the stick on the left. WALK above it: tap to walk, tap again to run.</span></div>
+          <div><i>✥</i><span><b>Move</b> — the stick on the left. Push it past the top to lock running; tap the stick to stop. WALK above it: tap to walk, tap again to run.</span></div>
           <div><i>⌖</i><span><b>Aim</b> — swipe anywhere in the middle. Hold either FIRE and drag to aim while shooting.</span></div>
           <div><i>◎</i><span><b>Scope</b> — tap the eye to snap the sniper scope or binoculars to 4× and back; + / − fine-tune.</span></div>
           <div><i>⇅</i><span><b>Crouch / jump / peek</b> — around FIRE. Tap CROUCH to crouch, tap again to stand. There is no prone in this game.</span></div>
-          <div><i>⚙</i><span><b>Settings</b> — sensitivity, scope zoom, gyroscope. MENU pauses; tap the menu items as usual.</span></div>
+          <div><i>⚙</i><span><b>Settings</b> — sensitivity, scope zoom, gyroscope, and Edit layout to drag the buttons where you like. MENU pauses; tap the menu items as usual.</span></div>
           <div><i>⟲</i><span><b>Gyroscope</b> — turn the phone to fine-aim while scoped, like PUBG. Your browser may ask for motion access.</span></div>
         </div>
         <label class="tg-switch"><input type="checkbox" id="tg-gyro" checked> Gyroscope aiming while scoped</label>
@@ -525,6 +563,8 @@
       <section id="view-home" class="view hidden">
         <h1 class="brand">Project I.G.I.</h1>
         <p class="tagline">I'm Going In.</p>
+        <div id="crashnote" class="hidden" role="status">The game stopped and the browser reloaded the page. On a phone that almost always
+          means it ran out of memory: close other apps and tabs before playing, and keep the game in one tab.</div>
         <div class="choices">
           <button id="play" class="choice">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -544,6 +584,7 @@
             <button type="button" data-device="pc" role="radio" aria-checked="false">🖥️ Keyboard &amp; mouse</button>
           </div>
         </div>
+        <button id="home-controls" type="button" class="btn ghost">⚙ Controls, layout &amp; gyroscope</button>
         <p class="small desk" style="margin-top:18px">Keys, mouse buttons and sensitivity: the Controls panel on the right, which applies at once, mid-mission too. Don't rebind in the game's own Controls menu: those bindings are reset to the game's defaults on every reload.<br>
           Fullscreen: <kbd>Alt</kbd> + <kbd>Enter</kbd> (<kbd>⌥</kbd> + <kbd>Enter</kbd> on Mac) or the button in the corner.</p>
         <p class="small"><a href="#" id="reset">Use a different game folder</a></p>
@@ -631,6 +672,7 @@
         <h2 class="boot-title">Project I.G.I.</h2>
         <p class="boot-phase">Starting the game…</p>
         <div class="tips"><span class="tip-eyebrow">INTEL</span><span class="tip-text"></span></div>
+        <button id="boot-controls" type="button" class="btn ghost">⚙ Set up the controls while it loads</button>
       </div>
     </div>
   </div>
@@ -750,9 +792,9 @@
   })();
 </script>
 <script src="netplay.js"></script>
-<script src="controls.js?v=5"></script>
-<script src="touch.js?v=8"></script>
-<script src="loader.js?v=18"></script>
+<script src="controls.js?v=6"></script>
+<script src="touch.js?v=9"></script>
+<script src="loader.js?v=19"></script>
 <script>
   // Ads (slots switched on in RC_ADS; the network tags are in ad.html). The page is cross-origin isolated,
   // which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>: that

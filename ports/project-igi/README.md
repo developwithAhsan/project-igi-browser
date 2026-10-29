@@ -19,8 +19,13 @@ Useful switches: `?log` (host log in the console), `?input=500:tap=320:200,...` 
 Controls on the page: `web/controls.js` holds the game's actions with their default keys (from its
 `config.qvm`), the mouse-button bindings, the scope toggle, the sensitivity settings and the gyroscope;
 `web/loader.js` renders the Controls panel (keyboard layout presets, keys, mouse, screen) and `web/touch.js`
-the on-screen buttons, settings sheet and guide. The game's own Configuration menu must stay at its defaults
-for these to match. Project I.G.I. has no prone / crawl: crouch is the lowest stance. Crouch and walk are held keys (verified
+the on-screen buttons, settings sheet, layout editor and guide. The game's own Configuration menu must stay
+at its defaults for these to match (loader.js refetches the shipped `config.qvm` on every start). Gyroscope
+signs (right-hand rule in the device frame, `rotationRate.alpha/beta/gamma` = rates about device x/y/z in
+Chromium and WebKit): turning left is a positive yaw, tilting the camera up a positive pitch, both sent as
+negative mouse counts (+x looks right, +y looks down); the first version had the pitch backwards. The touch
+layout is saved as fractions of the stage per control (`igi-layout`), with a size factor (`--k`) and opacity
+(`--a`) the stylesheet multiplies in. Project I.G.I. has no prone / crawl: crouch is the lowest stance. Crouch and walk are held keys (verified
 natively: a tapped crouch key does nothing lasting, a held one lowers the camera), binoculars a toggle, and
 only the sniper rifle's scope and the binoculars zoom: the zoom keys do nothing on their own, even with the
 Dragunov. Alternate fire (Backspace) raises the rifle's scope (the view zooms to 1.18x within 4 frames, then
