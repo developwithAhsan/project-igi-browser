@@ -64,11 +64,22 @@
      the stage, 440px is reserved symmetrically (220 each side) so the panel sits in that gap and the
      stage stays centred rather than off-set. On narrow viewports the panel is hidden and the stage uses
      the full width. The .kbd-off body class (set when the player dismisses the panel) frees the space. */
-  #stage { position: relative; width: min(100%, calc((100vh - 150px) * 4 / 3)); aspect-ratio: 4 / 3; background: #000;
+  #stage { position: relative; width: min(100%, calc((100vh - 150px - var(--adrow-h, 0px)) * 4 / 3)); aspect-ratio: 4 / 3; background: #000;
     border-radius: 12px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, .55); }
   @media (min-width: 1120px) {
-    body:not(.kbd-off) #stage { width: min(calc(100% - 440px), calc((100vh - 150px) * 4 / 3)); }
+    body:not(.kbd-off) #stage { width: min(calc(100% - 440px), calc((100vh - 150px - var(--adrow-h, 0px)) * 4 / 3)); }
+    body.ads-row:not(.playing) #adrow.on { display: flex; }
   }
+  /* Desktop ads row under the stage: as wide as the stage (units at its ends) or as wide as its units, centred;
+     the ads script sizes it and sets --adrow-h (the room the stage leaves for it), 0 while the game runs */
+  body.playing { --adrow-h: 0px; }
+  #adrow { display: none; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: nowrap;
+    min-width: max-content; margin: 0 auto; padding: 14px 0 0; box-sizing: border-box; }
+  #adrow .ad-unit { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  #adrow.one .ad-unit { margin: 0 auto; }
+  #adrow .ad-tag, #admob .ad-tag { display: block; text-align: center; font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--faint); }
+  #adrow iframe { display: block; border: 0; background: transparent; }
   canvas { width: 100%; height: 100%; display: block; cursor: none; }
   .hidden { display: none !important; }
 
@@ -271,8 +282,7 @@
   #admob { display: none; position: relative; z-index: 1; margin-top: 22px; width: max-content; max-width: 100vw; margin-left: 50%;
     transform: translateX(-50%); padding-bottom: env(safe-area-inset-bottom, 0px); }
   #admob iframe + iframe { margin-top: 10px; }
-  #admob .ad-tag { display: block; text-align: center; font: 600 9px/1 ui-sans-serif, system-ui, sans-serif; text-transform: uppercase;
-    letter-spacing: .1em; color: var(--faint); margin-bottom: 5px; }
+  #admob .ad-tag { margin-bottom: 5px; }
   #admob.on { display: block; }
   /* follow gate */
   #iggate { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; padding: 16px;
@@ -605,7 +615,7 @@
           <button id="home-controls" type="button" class="link-btn">Controls &amp; layout</button>
           <a href="#" id="reset" class="link-btn">Use a different game folder</a>
         </div>
-        <p class="home-foot" id="updated">Updated <b>30 Oct 2026, 04:30 IST</b> · fixes land often: reload before reporting an old issue</p>
+        <p class="home-foot" id="updated">Updated <b>30 Oct 2026, 04:55 IST</b> · fixes land often: reload before reporting an old issue</p>
       </section>
 
       <!-- multiplayer: host or join -->
@@ -694,6 +704,8 @@
       </div>
     </div>
   </div>
+  <!-- Desktop ads row (filled by the ads script at the end): 728x90 left, 300x250 right, under the stage, gone while the game runs -->
+  <div id="adrow" aria-label="Advertisements"></div>
   <footer id="sitefoot">
     <div class="foot-main">
       <span class="foot-by">Built by <a href="https://www.instagram.com/aiwithsagar/" target="_blank" rel="noopener">Sagar Joshi</a></span>
@@ -782,15 +794,38 @@
     };
     var coarse = document.body.classList.contains('coarse');
     if (promo) { if (A.side && !coarse) { promo.appendChild(frame('side', 160, 600)); promo.classList.add('on'); } else promo.remove(); }
-    var units = coarse ? (A.mobile ? [['mobile', 320, 50]] : [])
-                       : [].concat(A.lead ? [['lead', 728, 90]] : [], A.box ? [['box', 300, 250]] : [], A.native ? [['native', 728, 260]] : []);
+    var row = document.getElementById('adrow');
+    if (!coarse && row) {   // desktop: a row under the stage, 728x90 at the left and 300x250 at the right (hidden while playing)
+      var put = function (slot, w, h) {
+        var cell = document.createElement('div'); cell.className = 'ad-unit';
+        cell.innerHTML = '<span class="ad-tag">Advertisement</span>';
+        cell.appendChild(frame(slot, w, h)); row.appendChild(cell);
+      };
+      if (A.lead) put('lead', 728, 90);
+      if (A.native) put('native', 728, 260);
+      if (A.box) put('box', 300, 250);
+      if (row.children.length) {
+        row.classList.add('on'); document.body.classList.add('ads-row');
+        var stage = document.getElementById('stage'), box = row.querySelector('iframe[src*="slot=box"]');
+        var fit = function () {   // the 300x250 only on big screens (the stage keeps a playable size); row = stage width
+          if (box) box.parentNode.style.display = (innerWidth >= 1700 && innerHeight >= 1000) ? '' : 'none';
+          row.classList.toggle('one', [].filter.call(row.children, function (c) { return c.style.display !== 'none'; }).length < 2);
+          row.style.width = stage.getBoundingClientRect().width + 'px';
+          var h = document.body.classList.contains('playing') ? 0 : row.offsetHeight + 14;
+          document.documentElement.style.setProperty('--adrow-h', h + 'px');
+        };
+        fit(); addEventListener('resize', fit); setTimeout(fit, 300);
+        new MutationObserver(fit).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+      } else row.remove();
+    } else if (row) row.remove();
+    var units = coarse ? (A.mobile ? [['mobile', 320, 50]] : []) : [];
     if (A.social) units.push(['social', 320, 160]);
-    if (units.length) {
+    if (units.length) {   // phones: a banner under the landing views (inside the home view, in flow)
       var d = document.createElement('div');
       d.id = 'admob'; d.className = 'on';
       d.innerHTML = '<span class="ad-tag">Advertisement</span>';
       units.forEach(function (u) { d.appendChild(frame(u[0], u[1], u[2])); });
-      document.getElementById('view-home').appendChild(d);   // inside the home view: under its footnote, in flow
+      document.getElementById('view-home').appendChild(d);
     }
     // ?adtest: each ad frame reports what happened inside it (ad.html), shown under the landing views
     if (new URLSearchParams(location.search).has('adtest')) {
