@@ -30,7 +30,7 @@
 <meta property="og:url" content="https://igi.sagarinfosec.site/">
 <meta property="og:image" content="https://igi.sagarinfosec.site/poster.jpg">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="apple-touch-icon" href="favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="apple-touch-icon" href="favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <meta name="theme-color" content="#2F7D32">
 <style>
   :root {
@@ -806,10 +806,10 @@
     } catch (e) {}
   })();
 </script>
-<script src="netplay.js"></script>
-<script src="controls.js?v=8"></script>
-<script src="touch.js?v=12"></script>
-<script src="loader.js?v=30"></script>
+<script defer src="netplay.js"></script>
+<script defer src="controls.js?v=8"></script>
+<script defer src="touch.js?v=12"></script>
+<script defer src="loader.js?v=30"></script>
 <script>
   // Ads (Adsterra; slots switched on in RC_ADS, the network's tags in ad.html). The page is cross-origin
   // isolated, which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>:
@@ -817,6 +817,7 @@
   // Firefox lack it and show no ads). A credentialless frame has no cookies: ads are non-personalised. Units
   // sit under the landing views (gone once the game runs: #panel is hidden then) and, on wide desktop windows,
   // in the left gutter beside the game, which is hidden in fullscreen and on phones.
+  setTimeout(function () {
   (function () {
     var A = window.RC_ADS || {};
     var promo = document.getElementById('promo');
@@ -893,6 +894,7 @@
       });
     }
   })();
+  }, 3500); // Let the page paint before third-party ad frames start loading.
 </script>
 <script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd");if(st&&k)st.addEventListener("click",function(){k.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})});var h=k&&k.querySelector(".kbd-head");if(h&&k)h.addEventListener("click",function(e){if(innerWidth<=800&&e.target.id!=="kbd-close"){var c=k.classList.toggle("mobile-collapsed");h.setAttribute("aria-expanded",String(!c))}})})();</script><script src="redesign-ui.js" defer></script></body>
 </html>
