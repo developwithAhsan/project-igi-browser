@@ -9,7 +9,7 @@
   "description": "Unofficial browser port for your own legally obtained copy of Project I.G.I.",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/logo.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
