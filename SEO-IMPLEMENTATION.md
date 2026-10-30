@@ -66,17 +66,22 @@ The Vercel Alias API returned 404 for \`project-igi-online.vercel.app\`, so that
 
 ### Redirect test matrix
 
-The status column is filled only after the deployed HTTP responses are tested. Expected destination is path-preserving, not a homepage redirect.
+Tested on the latest production deployment after path-preserving host redirects were enabled. The Vercel fetch helper follows same-origin redirects in some cases, so only the returned HTTP status and Location header are labelled as independently confirmed.
 
-| Old URL | Expected new URL | Expected status | Final canonical |
+| Old URL | Final URL / result | Observed status | Final canonical |
 |---|---|---:|---|
-| \`https://www.project-igi.online/faq\` | \`https://project-igi.online/faq\` | 301 | \`https://project-igi.online/faq\` |
-| \`https://project-igi-browser-tostoreusefuldata-7699.vercel.app/faq\` | \`https://project-igi.online/faq\` | 301 | \`https://project-igi.online/faq\` |
-| \`https://project-igi-browser-git-redesign-oct30-tostoreusefuldata-7699.vercel.app/controls\` | \`https://project-igi.online/controls\` | 301 | \`https://project-igi.online/controls\` |
-| \`https://project-igi-online.vercel.app/\` | Not attached to current project; old project must be checked | Not verified | \`https://project-igi.online/\` |
+| \`https://project-igi-browser-tostoreusefuldata-7699.vercel.app/faq\` | \`https://project-igi.online/faq\` | 301 confirmed; Location header matched | \`https://project-igi.online/faq\` |
+| \`https://project-igi-browser-git-redesign-oct30-tostoreusefuldata-7699.vercel.app/controls\` | \`https://project-igi.online/controls\` | 301 confirmed; Location header matched | \`https://project-igi.online/controls\` |
+| \`https://www.project-igi.online/faq\` | Vercel has the www alias configured to redirect to \`project-igi.online\` with status 301; the HTTP fetch helper failed before returning a response | Configured; direct HTTP status not independently verified | \`https://project-igi.online/faq\` |
+| \`https://project-igi-online.vercel.app/\` | Not attached to the current Vercel project; Vercel alias lookup returned 404 | Not available to this project; old project owner must be checked | \`https://project-igi.online/\` |
 
-Do not delete old Vercel projects or aliases as part of this migration. Keep them available until the old-host response is confirmed and the move has been monitored.
+The stable and branch Vercel aliases above were observed to return path-preserving 301s. The unknown old \`project-igi-online.vercel.app\` hostname must not be described as redirected: it is not an alias on the current project. The old Vercel project was not deleted, transferred or changed.
 
+The canonical site was also checked directly:
+- \`/\`, \`/play\`, \`/about\`, \`/faq\` and \`/controls\` returned HTTP 200 and the corresponding clean primary-domain canonical.
+- \`/sitemap.xml\` returned HTTP 200 with 18 canonical URLs.
+- \`/robots.txt\` returned HTTP 200 and named the primary-domain sitemap.
+- PNG/ICO/SVG favicon, Apple icon, PWA icons, social image and manifest all returned HTTP 200 with image/manifest MIME types.
 ## 4. Competitor and search-result research
 
 ### Requested competitor: igi.sagarinfosec.site
@@ -135,26 +140,26 @@ The competitor's name is not a target keyword. Search monitoring can include it 
 
 Title and description lengths below are the actual current HTML attribute string lengths. HTML entities such as \`&amp;\` are counted as stored in the source; rendered visible text is slightly shorter. Titles are under 60 and descriptions under 160 characters.
 
-| URL | Title (chars) | Meta description (chars) | H1 | Primary keyword | Secondary terms / internal links |
-|---|---|---|---|---|---|
-| \`/\` | Project IGI Online Play – Browser Edition (41) | 137 | Play Project I.G.I. Online | project igi online play | project igi browser; /play, /controls, /faq, /about |
-| \`/play\` | Play Project IGI Online Free in Browser (39) | 128 | Play Project I.G.I. Online in Your Browser | play project igi online free | game online play; own-copy note; /, /controls, /faq, /is-project-igi-online-safe |
-| \`/project-igi-1-online\` | Project IGI 1 Online – Original 2000 Game (41) | 132 | Project I.G.I. 1 Online: The Original 2000 Game | project igi 1 game online | I'm Going In; /play, /controls, /faq, /project-igi-3-online-does-it-exist |
-| \`/project-igi-3-online-does-it-exist\` | Project IGI 3 – Does It Exist? Honest Guide (43) | 119 | Project I.G.I. 3 Online: Does the Game Exist? | project igi 3 game play online | I.G.I. Origins; /play, /project-igi-1-online |
-| \`/is-project-igi-online-safe\` | Is Project IGI Online Safe? Browser Guide (41) | 120 | Is Project I.G.I. Online Safe to Use? | is project igi online safe | local storage; /play, /privacy, /disclaimer, /dmca |
-| \`/controls\` | Project IGI Controls – Keyboard, Mouse &amp; Touch (50) | 101 | Project I.G.I. Controls: Keyboard, Mouse &amp; Touch | project igi controls keyboard mouse | touch, gyro and widescreen; /play, /faq |
-| \`/faq\` | Project IGI Online FAQ – Setup &amp; Browser Help (49) | 119 | Project I.G.I. Online: Frequently Asked Questions | project igi browser help | Roman Urdu/Hindi queries; /play, /controls, /is-project-igi-online-safe |
-| \`/about\` | About IGI Online – Browser Edition (34) | 127 | About IGI Online | IGI Online | port, file import; /play, /disclaimer |
-| \`/contact\` | Contact IGI Online – Technical &amp; Rights Requests (52) | 98 | Contact IGI Online | contact IGI Online | technical issue, takedown; /dmca |
-| \`/privacy\` | Privacy Policy – IGI Online (27) | 108 | Privacy Policy | IGI Online privacy | browser storage, third parties; /cookie-policy |
-| \`/terms\` | Terms of Use – IGI Online (25) | 117 | Terms of Use | IGI Online terms | lawful file ownership; /disclaimer |
-| \`/dmca\` | DMCA &amp; Copyright Takedown – IGI Online (42) | 103 | DMCA &amp; Copyright Takedown | IGI Online DMCA | rights holder request; /contact, /disclaimer |
-| \`/disclaimer\` | Project IGI Browser Edition – Disclaimer (40) | 109 | Fan Project Disclaimer | Project IGI disclaimer | unofficial port; /dmca, /terms |
-| \`/cookie-policy\` | Cookie Policy – IGI Online (26) | 98 | Cookie &amp; Browser Storage Policy | IGI Online cookie policy | OPFS, ads; /privacy |
-| \`/blog\` | Project IGI Blog – Browser Guides &amp; Help (44) | 97 | Field reports &amp; guides | Project IGI browser guides | /play, /controls, /faq |
-| \`/blog/getting-started\` | How to Play Project IGI in Browser – Setup Guide (48) | 100 | How to Play Project I.G.I. in Your Browser | Project IGI browser setup | own files; /play, /controls |
-| \`/blog/stealth-tactics\` | Project IGI Stealth Tactics – Beginner Guide (44) | 98 | Project I.G.I. Stealth Tactics for Difficult Missions | Project IGI stealth tactics | observation, cover; /play, /project-igi-1-online |
-| \`/blog/browser-performance\` | Project IGI Browser Performance – Troubleshooting (49) | 97 | Project I.G.I. Browser Performance: Troubleshooting | Project IGI browser performance | graphics, memory; /play, /faq |
+| URL | Title | Title chars | Meta description | Description chars | H1 | Primary keyword | Useful internal links |
+|---|---|---:|---|---:|---|---|---|
+| \`/\` | Project I.G.I. Online Play – Browser Edition | 44 | Play Project I.G.I. online in your browser with your own legally obtained game copy. No sign-up or installer; files stay in browser storage. | 140 | Project I.G.I. Online Play | project igi online play | /play, /controls, /faq, /about |
+| \`/play\` | Play Project I.G.I. Online Free in Browser | 42 | Website access is free; import your own legally obtained Project I.G.I. game files. No separate installer or sign-up; game files are not hosted here. | 149 | Play Project I.G.I. Online in Your Browser | play project igi online free | /, /controls, /faq, /is-project-igi-online-safe |
+| \`/project-igi-1-online\` | Project IGI 1 Online – Original 2000 Game | 41 | Use this browser port for the original 2000 Project I.G.I. with your own legally obtained game files; no game files are hosted here. | 132 | Project I.G.I. 1 Online: The Original 2000 Game | project igi 1 game online | /play, /controls, /faq, /project-igi-3-online-does-it-exist |
+| \`/project-igi-3-online-does-it-exist\` | Project IGI 3 – Does It Exist? Honest Guide | 43 | Find out what I.G.I. Origins is, what I.G.I.-2 added, and which Project I.G.I. game this browser edition actually runs. | 119 | Project I.G.I. 3 Online: Does the Game Exist? | project igi 3 game play online | /play, /project-igi-1-online |
+| \`/is-project-igi-online-safe\` | Is Project IGI Online Safe? Browser Guide | 41 | Learn how own-folder import, browser storage and motion permissions work in this unofficial Project I.G.I. browser port. | 120 | Is Project I.G.I. Online Safe to Use? | is project igi online safe | /play, /privacy, /disclaimer, /dmca |
+| \`/controls\` | Project I.G.I. Controls – Keyboard &amp; Mouse | 46 | Check Project I.G.I. browser defaults for mouse, keyboard, touch, gyro and widescreen controls, including confirmed action bindings. | 132 | Project I.G.I. Controls: Keyboard, Mouse &amp; Touch | project igi controls keyboard mouse | /play, /faq |
+| \`/faq\` | Project I.G.I. Online FAQ – Setup &amp; Browser Help | 52 | Answers on importing your own game files, supported controls, browser compatibility, storage and common startup issues. | 119 | Project I.G.I. Online: Frequently Asked Questions | project igi browser help | /play, /controls, /is-project-igi-online-safe |
+| \`/about\` | About Project I.G.I. Online – Browser Edition | 45 | Learn how the original Project I.G.I. browser port works, what controls it supports and how your own game files stay in browser storage. | 136 | About IGI Online | IGI Online | /play, /disclaimer |
+| \`/contact\` | Contact IGI Online – Technical &amp; Rights Requests | 52 | Contact the IGI Online team about technical problems, feedback or copyright and takedown requests. | 98 | Contact IGI Online | contact IGI Online | /dmca |
+| \`/privacy\` | Privacy Policy – IGI Online | 27 | How IGI Online handles local game-file storage, technical hosting data and third-party advertising requests. | 108 | Privacy Policy | IGI Online privacy | /cookie-policy |
+| \`/terms\` | Terms of Use – IGI Online | 25 | Read the terms for using this unofficial browser port, including your responsibility for legally obtained game files. | 117 | Terms of Use | IGI Online terms | /disclaimer |
+| \`/dmca\` | DMCA &amp; Copyright Takedown – IGI Online | 42 | Information for rights holders who want to report material or request a copyright review on IGI Online. | 103 | DMCA &amp; Copyright Takedown | IGI Online DMCA | /contact, /disclaimer |
+| \`/disclaimer\` | Project IGI Browser Edition – Disclaimer | 40 | Read the independent fan-project, game-file, trademark and compatibility disclaimer for this browser edition. | 109 | Fan Project Disclaimer | Project IGI disclaimer | /dmca, /terms |
+| \`/cookie-policy\` | Cookie Policy – IGI Online | 26 | Understand cookies, local browser storage and third-party requests made by the IGI Online website. | 98 | Cookie &amp; Browser Storage Policy | IGI Online cookie policy | /privacy |
+| \`/blog\` | Project IGI Blog – Browser Guides &amp; Help | 44 | Browser setup guides, controls help and troubleshooting notes for the Project I.G.I. web edition. | 97 | Field reports &amp; guides | Project IGI browser guides | /play, /controls, /faq |
+| \`/blog/getting-started\` | How to Play Project IGI in Browser – Setup Guide | 48 | A practical guide to importing your own Project I.G.I. game folder and starting the browser edition. | 100 | How to Play Project I.G.I. in Your Browser | Project IGI browser setup | /play, /controls |
+| \`/blog/stealth-tactics\` | Project IGI Stealth Tactics – Beginner Guide | 44 | Tactical tips for observation, cover and careful movement in the original Project I.G.I. campaign. | 98 | Project I.G.I. Stealth Tactics for Difficult Missions | Project IGI stealth tactics | /play, /project-igi-1-online |
+| \`/blog/browser-performance\` | Project IGI Browser Performance – Troubleshooting | 49 | Troubleshoot slow starts, graphics errors and memory pressure in the Project I.G.I. browser port. | 97 | Project I.G.I. Browser Performance: Troubleshooting | Project IGI browser performance | /play, /faq |
 
 The title/description/one-H1/canonical checks are enforced by \`tools/seo-check.mjs\`. The three existing blog posts currently contain concise articles; add genuinely useful depth before creating additional posts.
 
@@ -202,9 +207,9 @@ Generated image paths:
 The reproducible generator is \`tools/generate-brand-assets.py\`; workflow \`.github/workflows/generate-brand-assets.yml\` ran successfully on the existing \`redesign-oct30\` branch. Generated repository file sizes: \`favicon.ico\` 8,032 bytes; \`favicon.svg\` 55,341 bytes; \`apple-touch-icon.png\` 48,293 bytes; \`icon-192.png\` 53,626 bytes; \`icon-512.png\` 255,896 bytes; \`og-project-igi.png\` 89,236 bytes. MIME types and cache behavior still require production HTTP verification.
 
 JSON-LD types:
-- Home and player: WebSite, Organization, VideoGame and FAQPage.
+- Home: WebSite, Organization and VideoGame. Player: WebSite, Organization, VideoGame, BreadcrumbList and FAQPage.
 - Inner pages: BreadcrumbList.
-- FAQ, player and safety page: FAQPage.
+- Full FAQ and safety pages: FAQPage. The player page also has a separate FAQPage block for its five visible quick answers.
 - Blog posts: Article.
 
 The automated check parses each JSON-LD block as JSON and enforces the expected types on the relevant routes. This is not a substitute for Google Rich Results Test or Search Console enhancement reports.
