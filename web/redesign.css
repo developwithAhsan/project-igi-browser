@@ -232,3 +232,7 @@ body.coarse:not(.playing) #stage,body.touch:not(.playing) #stage{position:relati
 body.coarse:not(.playing) #kbd,body.touch:not(.playing) #kbd{display:block!important;position:relative;top:auto;max-height:420px}
 body.coarse:not(.playing) #sitefoot,body.touch:not(.playing) #sitefoot{display:grid!important}
 body.coarse.playing #kbd,body.touch.playing #kbd,body.coarse.playing #sitefoot,body.touch.playing #sitefoot{display:none!important}
+
+/* Preserve legible light text inside the original dark game launcher and follow gate. */
+#panel{color:#eef4ef}
+#iggate{color:#eef4ef;--fg:#eef4ef;--muted:#a9b8ab;--faint:#8da092;--accent:#e9a820;--accent-hi:#f5c45c;--line:rgba(255,255,255,.16)}
