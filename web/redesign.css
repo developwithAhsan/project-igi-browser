@@ -221,3 +221,7 @@ body.ads-wide:not(.playing) main #stage{grid-column:2;grid-row:3}
 /* Keep the original close/reopen and fullscreen behavior of the controls rail. */
 #kbd-show{background:#fff;color:var(--primary);border:1px solid var(--border);box-shadow:0 8px 20px rgba(47,125,50,.12)}
 #stage:fullscreen ~ #kbd,#stage:-webkit-full-screen ~ #kbd{display:none!important}
+
+body.kbd-off #stage ~ #kbd{display:none!important}
+body.kbd-off main #stage{grid-column:1/-1}
+body.kbd-off #stage ~ #kbd-show{display:grid!important}
