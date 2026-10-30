@@ -170,3 +170,13 @@ Note: The /play page uses the same existing player markup/runtime files. No load
 | og-project-igi.png | 1200×630, under 300 KB | PNG or JPG | Open Graph and Twitter card |
 
 The repository currently includes favicon.svg and og-project-igi.svg as temporary vector assets. The PNG files above are still needed for broad social/PWA/iOS compatibility.
+
+
+## Research references consulted
+
+- [IGDB press kit — Project I.G.I.: I'm Going In](https://www.igdb.com/games/project-i-dot-g-i-dot-im-going-in/presskit): developer, release date, publisher and game description.
+- [GameSpot review — Project IGI: I'm Going In](https://www.gamespot.com/reviews/project-igi-im-going-in-review/1900-2668524/): contemporary description of the protagonist and stealth/surveillance gameplay.
+- [PCGamingWiki — Project I.G.I.: I'm Going In](https://www.pcgamingwiki.com/wiki/Project_I.G.I.:_I%27m_Going_In): technical and game-history reference.
+- [Steam — I.G.I. Origins](https://store.steampowered.com/app/1186430/IGI_Origins/): current public release status and official product description; currently listed as “To be announced”.
+- [OpenIGI](https://openigi.com/): competitor sample surfaced in search; full technical audit not completed.
+- [Specified competitor](https://igi.sagarinfosec.site/): direct live inspection was attempted but unavailable to the research browser in this pass.
