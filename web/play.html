@@ -531,6 +531,22 @@
   @media (prefers-reduced-motion: reduce) {
     #booting .radar .sweep, #booting .radar .ping, #booting .boot-inner { animation: none; }
   }
+
+  .game-toolbar{width:min(100%,calc((100vh - 150px)*4/3));display:flex;justify-content:flex-end;align-items:center;margin:0 auto 8px;position:relative;z-index:4}
+  .toolbar-actions{display:flex;justify-content:flex-end;gap:8px}
+  .toolbar-actions button{border:1px solid var(--line);background:rgba(10,18,12,.92);color:var(--fg);border-radius:9px;padding:8px 13px;font-weight:650}
+  .toolbar-actions button:hover{background:var(--card-hi);border-color:rgba(255,255,255,.28)}
+  .launcher-game-logo{display:block;width:clamp(84px,14vw,132px);height:clamp(84px,14vw,132px);object-fit:contain;margin:0 auto 12px;filter:drop-shadow(0 8px 22px rgba(0,0,0,.55))}
+  #kbd{position:fixed!important;inset:0!important;z-index:100!important;width:100%!important;max-width:none!important;max-height:none!important;height:100dvh!important;margin:0!important;padding:24px!important;border:0!important;border-radius:0!important;transform:none!important;background:rgba(0,0,0,.72)!important;backdrop-filter:blur(8px)!important;display:none!important;overflow:auto!important}
+  #kbd.is-open{display:grid!important;place-items:center!important}
+  #kbd .settings-dialog{width:min(100%,620px);max-height:min(82dvh,760px);overflow:auto;padding:24px;border:1px solid var(--line);border-radius:16px;background:#0b140e;box-shadow:0 24px 80px rgba(0,0,0,.65)}
+  #kbd-binds,#kbd .kbd-foot{display:none!important}
+  #kbd .settings-group{padding:14px 0;border-bottom:1px solid var(--line)}
+  #kbd .settings-group summary{cursor:pointer;color:var(--fg);font-weight:700}
+  #controls-rail{position:static!important;inset:auto!important;transform:none!important;width:min(100%,260px);max-height:none!important;margin:18px 14px 18px auto!important;overflow:visible!important}
+  @media(max-width:1119px){.game-toolbar{width:100%}#controls-rail{display:none}}
+  @media(min-width:1120px){body:not(.kbd-off) #stage:not(:fullscreen) ~ #kbd{display:none!important}}
+ 
 </style>
 <link rel="preload" href="/redesign.css?v=20261030-1" as="style"><link rel="stylesheet" href="/redesign.css?v=20261030-1">
 
@@ -542,18 +558,12 @@
 <main id="main-content">\n<noscript><section class="content-section" aria-label="About this browser edition"><p><strong>Project I.G.I. Browser Edition</strong></p><p>This is an unofficial browser port of Project I.G.I.: I'm Going In (2000). You must import your own legally obtained game files. This website does not host or distribute the original game data.</p><p><a href="/play">Read the browser play guide</a> · <a href="/controls">Controls guide</a> · <a href="/disclaimer">Fan project disclaimer</a></p></section></noscript>
 <aside class="game-info-card" aria-label="Game information"><div class="info-brand"><img src="/logo.png" alt="IGI Online fan project logo"><div><strong>Project I.G.I.</strong><div>Release date: 2000</div></div></div><p><b>Controls:</b> Keyboard + Mouse</p><p><b>About:</b> A tactical stealth shooter starring David Jones, featuring covert infiltration and high-risk missions.</p></aside>
   <!-- GAME: DO NOT EDIT — existing game stage, canvas, overlays and runtime DOM. -->
+  <div class="game-toolbar" aria-label="Game actions"><div class="toolbar-actions"><button id="toolbar-fullscreen" type="button">⛶ Fullscreen</button><button id="toolbar-settings" type="button" aria-haspopup="dialog" aria-controls="kbd">⚙ Settings</button></div></div>
   <div id="stage">
     <canvas id="canvas" width="1024" height="768" tabindex="0"></canvas>
     <div id="netstatus" class="hidden"></div>
-    <button id="fs" title="Fullscreen (Alt+Enter)" aria-label="Toggle fullscreen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path id="fs-icon" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
-    </button>
-    <button id="stage-settings" type="button" aria-label="Open game settings" title="Settings">⚙</button>
+    <button id="fs" type="button" aria-hidden="true" tabindex="-1" style="display:none"></button>
     <div id="soundtip" class="hidden">Tap the game or press a key to turn on sound</div>
-    <button id="refull" type="button" aria-label="Enter fullscreen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
-      Fullscreen</button>
     <div id="rotate">Turn your device sideways to play</div>
     <div id="tguide" class="hidden" role="dialog" aria-label="How to play">
       <div class="tg-card">
@@ -578,6 +588,7 @@
 
       <!-- loading: browser checks, the first-visit download, errors -->
       <section id="view-loading" class="view">
+        <img class="launcher-game-logo" src="/logo.png" alt="Project I.G.I. game logo">
         <div class="brand">Project I.G.I.</div>
         <p id="status" role="status" aria-live="polite"></p>
         <progress id="progress" class="hidden" max="1" value="0"></progress>
@@ -701,11 +712,10 @@
         <div role="presentation" class="boot-title">Project I.G.I.</div>
         <p class="boot-phase">Starting the game…</p>
         <div class="tips"><span class="tip-eyebrow">INTEL</span><span class="tip-text"></span></div>
-        <button id="boot-controls" type="button" class="btn ghost">⚙ Set up the controls while it loads</button>
       </div>
     </div>
   </div>
-  <div class="game-toolbar" aria-label="Game actions"><div class="toolbar-actions"><button id="toolbar-fullscreen" type="button">⛶ Fullscreen</button><button id="toolbar-settings" type="button" aria-haspopup="dialog" aria-controls="kbd">⚙ Settings</button></div></div>
+  
   <!-- Static reference rail: no settings are shown here. -->
   <aside id="controls-rail" aria-label="Game controls">
     <div class="rail-heading"><span class="rail-kicker">FIELD MANUAL</span><div role="presentation">Controls</div><p>Keyboard &amp; mouse reference</p></div>
@@ -718,7 +728,7 @@
     <div class="rail-control"><span>Map computer</span><kbd>C</kbd></div>
     <div class="rail-control"><span>Game menu</span><kbd>Esc</kbd></div>
     <div class="rail-control"><span>Fullscreen</span><kbd>Alt</kbd> + <kbd>Enter</kbd></div>
-    <div class="rail-note">Need to change sensitivity, display or input options? Open <b>Settings</b> below the game.</div>
+    
   </aside>
   <!-- Settings dialog: runtime-generated mouse options and key bindings remain mounted in their original IDs. -->
   <aside id="kbd" role="dialog" aria-modal="true" aria-label="Game settings" aria-hidden="true">
@@ -729,8 +739,8 @@
     <details class="settings-group" open><summary>Screen &amp; input</summary>
       <!-- Mouse sensitivity and configurable input options are populated by the existing loader. -->
       <div id="kbd-mouse"></div>
-      <div id="kbd-binds"></div>
-      <div class="kbd-foot"><span class="small">Select a key and press its replacement. Esc cancels; Backspace unbinds.</span><button id="kbd-reset" type="button" class="btn ghost">Reset controls</button></div>
+      <div id="kbd-binds" aria-hidden="true" style="display:none"></div>
+      
     </details>
     <details class="settings-group"><summary>Graphics / Performance</summary><p>Choose the screen layout supported by your device. For smoother play, close memory-heavy tabs and use an up-to-date browser.</p></details>
     <details class="settings-group"><summary>Audio</summary><p>Audio may start after your first click or key press. Adjust your device volume; the game runtime manages in-game sound.</p></details>
@@ -871,7 +881,7 @@
   } // Third-party ad frames load only after idle or user interaction.
 </script>
 <script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd"),close=document.getElementById("kbd-close"),previous=null;function openSettings(){if(!k)return;previous=document.activeElement;k.classList.add("is-open");k.setAttribute("aria-hidden","false");document.body.classList.add("settings-open");if(close)close.focus()}function closeSettings(){if(!k)return;k.classList.remove("is-open");k.setAttribute("aria-hidden","true");document.body.classList.remove("settings-open");if(previous&&previous.focus)previous.focus()}if(st)st.addEventListener("click",openSettings);if(close)close.addEventListener("click",closeSettings);document.addEventListener("keydown",function(e){if(e.key==="Escape"&&k&&k.classList.contains("is-open"))closeSettings()});if(k)k.addEventListener("click",function(e){if(e.target===k)closeSettings()})})();</script><script src="redesign-ui.js" defer></script><script>(function(){
-  var box=document.getElementById('kbd'),openers=[document.getElementById('toolbar-settings'),document.getElementById('stage-settings')],close=document.getElementById('kbd-close'),previous=null;
+  var box=document.getElementById('kbd'),openers=[document.getElementById('toolbar-settings')],close=document.getElementById('kbd-close'),previous=null;
   function open(){if(!box)return;previous=document.activeElement;box.classList.add('is-open');box.setAttribute('aria-hidden','false');document.body.classList.add('settings-open');if(close)close.focus();}
   function shut(){if(!box)return;box.classList.remove('is-open');box.setAttribute('aria-hidden','true');document.body.classList.remove('settings-open');if(previous&&previous.focus)previous.focus();}
   openers.forEach(function(b){if(b)b.addEventListener('click',open)});if(close)close.addEventListener('click',shut);
