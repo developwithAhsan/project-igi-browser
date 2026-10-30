@@ -13,7 +13,7 @@ async function walk(dir) {
   for (const entry of entries) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) out.push(...await walk(path));
-    else if (entry.isFile() && entry.name.endsWith(".html")) out.push(path);
+    else if (entry.isFile() && entry.name.endsWith(".html") && entry.name !== "ad.html") out.push(path);
   }
   return out;
 }
@@ -21,7 +21,7 @@ async function walk(dir) {
 for (const file of await walk(ROOT)) {
   const html = await readFile(file, "utf8");
   const title = html.match(/<title>([\s\S]*?)<\/title>/i)?.[1]?.trim();
-  const description = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']*)["']/i)?.[1]?.trim();
+  const description = html.match(/<meta\\s+name="description"\\s+content="([^"]*)"/i)?.[1]?.trim();
   const canonical = html.match(/<link\s+rel=["']canonical["']\s+href=["']([^"']+)["']/i)?.[1]?.trim();
   const h1Count = (html.match(/<h1\b/gi) || []).length;
 
