@@ -60,6 +60,15 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
   the game is only called stuck (with a reload button) once it has also opened or read no file for a minute
   (`rc_io_activity`). On a PC the pointer lock is taken back on the next key press after Esc released it, so
   the view keeps turning all the way round.
+- **Light on the CPU**: the game paces itself by spinning on PeekMessage between frames (6.7 million polls a
+  second natively, 99.97% of them under 2 us apart), a busy-wait that burned a whole core on every device. Every
+  128th poll in a row that finds no message now sleeps a millisecond (`host/user32.c`): natively 35% of a core
+  instead of 102% at the same 30 fps, on the web 78 thousand polls a second instead of 3 million. Small files
+  the game reopens again and again (its ambient sounds, every few seconds in a mission) keep their contents
+  after they are closed and are served from memory on the next open (`host/kernel32.c`, 48 MB at most),
+  which spares phones a storage round trip per open. The compact memory layout is the default in every
+  browser now: the engine's memory stays near 0.5 GB and grows as the game allocates, instead of 1.8 GB
+  grown at start (`web/loader.js`, `?mem=full` restores the old layout).
 - **Crash reports**: a browser that runs out of memory kills the page and reloads it (a black screen, then
   the landing page). The running game keeps a heartbeat in `sessionStorage`, cleared on an orderly unload;
   a start that finds one tells the player what happened and posts the device, memory, time played and

@@ -1,6 +1,7 @@
 /* USER32.DLL: windows, messages, input state. For now there is one virtual window; a real host
  * window (and real input) arrives with the renderer. */
 #include "win32.h"
+#include <unistd.h>   /* usleep: the poll yield in PeekMessageA */
 
 #include <pthread.h>
 
@@ -61,7 +62,38 @@ static void write_msg(uint32_t p, const Msg *m) {
 }
 
 W(PeekMessageA) {
-    if (on_game_thread()) g_watch.beat++;   /* the game loop is turning (watchdog, win32.h RcWatch) */
+    if (on_game_thread()) {
+        g_watch.beat++;   /* the game loop is turning (watchdog, win32.h RcWatch) */
+        /* The game paces itself by spinning on PeekMessage between frames: measured at real pace, 6.7 million
+           polls a second, 99.97% of them under 2 us apart (RC_PEEK_LOG), a busy-wait that burns a whole core
+           on every device and starves the page thread on 4-core phones. Once polls come back-to-back (64 in a
+           row under 5 us apart: a spin, never a loading loop, whose polls are tens of us apart around real
+           work), each further poll sleeps half a millisecond: the frame pacing loses nothing at 16 ms a frame
+           and the core is free. RC_NO_YIELD=1 turns it off. */
+        /* No clock (the browser's is too coarse to tell polls apart): every 128th poll in a row that finds no
+           message sleeps a millisecond. A spin sleeps most of the time; a loop that polls between file reads
+           (hundreds of microseconds each) loses under 1%. A message resets the run. */
+        static int yield_on = -1; static unsigned empties;
+        if (yield_on < 0) yield_on = !getenv("RC_NO_YIELD");
+        if (yield_on && !sched_active() && g_qhead == g_qtail) { if (++empties % 128 == 0) usleep(1000); }
+        else empties = 0;
+        /* RC_PEEK_LOG=1: how the game polls (the loop turns ~2 million times a second in play): the time
+           between consecutive polls, bucketed, every 200000 polls. A spin (polls microseconds apart) can yield. */
+        static int logit = -1; static uint64_t last_ns, n, b[4], t_start;
+        if (logit < 0) logit = getenv("RC_PEEK_LOG") != NULL;
+        if (logit) {
+            struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+            uint64_t now = (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+            if (!t_start) t_start = now;
+            if (last_ns) { uint64_t d = now - last_ns; b[d < 2000 ? 0 : d < 20000 ? 1 : d < 1000000 ? 2 : 3]++; }
+            last_ns = now;
+            if (++n % 200000 == 0) {
+                fprintf(stderr, "[peek] %llu polls in %.2f s: <2us %llu, <20us %llu, <1ms %llu, >=1ms %llu\n", (unsigned long long)n,
+                        (now - t_start) / 1e9, (unsigned long long)b[0], (unsigned long long)b[1], (unsigned long long)b[2], (unsigned long long)b[3]);
+                b[0] = b[1] = b[2] = b[3] = 0; t_start = now;
+            }
+        }
+    }
     if (g_pump_host_events) g_pump_host_events();
     Msg m;
     if (!pop_message(&m, ARG(4) & 1 /* PM_REMOVE */)) RET(5, 0);

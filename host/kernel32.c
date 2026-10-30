@@ -807,7 +807,58 @@ W(DuplicateHandle) {
     RET(7, 1);
 }
 /* I/O accounting (see the files section) */
-static struct { uint64_t opens, reads, bytes, cached_bytes, ns, now_cached, peak_cached; } g_io;
+static struct { uint64_t opens, reads, bytes, cached_bytes, ns, now_cached, peak_cached, kept_hits; } g_io;
+/* Small files the game opens again and again keep their contents after they are closed, and the next open of
+   the same file serves them from memory without reading it: in a mission the game reopens its ambient sounds
+   (BIRD_01.WAV, CAR_01.WAV, ...) every few seconds, and in the browser each read is a round trip to the OPFS
+   thread plus a copy. Up to 48 files of up to 2 MB, 48 MB in all, least recently used dropped first; a file
+   opened for writing (config.qvm, saves) or deleted is dropped. A handle on a kept file shares its buffer
+   (refs), so the buffer outlives neither. */
+typedef struct { char path[1024]; uint8_t *buf; uint32_t size; int refs; uint64_t used; } FileKeep;
+static FileKeep g_keep[48];
+static uint64_t g_keep_bytes, g_keep_tick;
+static pthread_mutex_t g_keep_lock = PTHREAD_MUTEX_INITIALIZER;
+#define KEEP_MAX_FILE (2u << 20)
+#define KEEP_MAX_BYTES (48u << 20)
+static FileKeep *keep_find(const char *host) {   /* with g_keep_lock held */
+    for (size_t i = 0; i < sizeof g_keep / sizeof g_keep[0]; i++) if (g_keep[i].buf && !strcmp(g_keep[i].path, host)) return &g_keep[i];
+    return NULL;
+}
+static void keep_free(FileKeep *k) { free(k->buf); g_keep_bytes -= k->size; k->buf = NULL; k->path[0] = 0; k->size = 0; }
+/* a file about to be written, truncated or deleted: whatever is kept of it is stale */
+static void keep_invalidate(const char *host) {
+    pthread_mutex_lock(&g_keep_lock);
+    FileKeep *k = keep_find(host);
+    if (k) { if (k->refs == 0) keep_free(k); else k->path[0] = 0; }   /* in use: unfindable, freed at its last close */
+    pthread_mutex_unlock(&g_keep_lock);
+}
+/* takes ownership of buf when it keeps it; returns the entry (refs 1) or NULL (caller keeps owning buf) */
+static FileKeep *keep_add(const char *host, uint8_t *buf, uint32_t size) {
+    if (size > KEEP_MAX_FILE) return NULL;
+    pthread_mutex_lock(&g_keep_lock);
+    while (g_keep_bytes + size > KEEP_MAX_BYTES) {   /* make room: drop the least recently used unused entry */
+        FileKeep *old = NULL;
+        for (size_t i = 0; i < sizeof g_keep / sizeof g_keep[0]; i++)
+            if (g_keep[i].buf && g_keep[i].refs == 0 && (!old || g_keep[i].used < old->used)) old = &g_keep[i];
+        if (!old) { pthread_mutex_unlock(&g_keep_lock); return NULL; }
+        keep_free(old);
+    }
+    FileKeep *k = NULL;
+    for (size_t i = 0; i < sizeof g_keep / sizeof g_keep[0]; i++) if (!g_keep[i].buf) { k = &g_keep[i]; break; }
+    if (!k) {
+        for (size_t i = 0; i < sizeof g_keep / sizeof g_keep[0]; i++)
+            if (g_keep[i].refs == 0 && (!k || g_keep[i].used < k->used)) k = &g_keep[i];
+        if (k) keep_free(k);
+    }
+    if (k) { snprintf(k->path, sizeof k->path, "%s", host); k->buf = buf; k->size = size; k->refs = 1; k->used = ++g_keep_tick; g_keep_bytes += size; }
+    pthread_mutex_unlock(&g_keep_lock);
+    return k;
+}
+static void keep_release(FileKeep *k) {   /* a handle on a kept file closes */
+    pthread_mutex_lock(&g_keep_lock);
+    if (--k->refs == 0 && !k->path[0]) keep_free(k);   /* invalidated while in use */
+    pthread_mutex_unlock(&g_keep_lock);
+}
 /* The page's stall detector (loader.js): a mission load presents no frames for a while, but keeps opening
    and reading files; only a game thread that does neither for a long time has stopped. */
 #ifdef __EMSCRIPTEN__
@@ -817,7 +868,10 @@ EMSCRIPTEN_KEEPALIVE
 unsigned rc_io_activity(void) { return (unsigned)(g_io.opens + g_io.reads); }
 W(CloseHandle) {
     WinHandle *x = handle_get(ARG(0), H_FILE);
-    if (x && x->buf) g_io.now_cached -= x->size;
+    if (x && x->buf) {
+        g_io.now_cached -= x->size;
+        if (x->ptr) { keep_release((FileKeep *)x->ptr); x->ptr = NULL; x->buf = NULL; }   /* the keep owns the buffer */
+    }
     handle_close(ARG(0));
     RET(1, 1);
 }
@@ -831,8 +885,8 @@ static uint64_t io_now(void) {
     return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
 }
 static void io_report(void) {
-    LOG("[file] io: %llu opens, %llu reads, %llu KB read (%llu KB cached whole, %llu KB held now, %llu KB peak), %llu ms in the file system\n",
-        (unsigned long long)g_io.opens, (unsigned long long)g_io.reads, (unsigned long long)(g_io.bytes >> 10),
+    LOG("[file] io: %llu opens (%llu served from kept files, %llu KB kept), %llu reads, %llu KB read (%llu KB cached whole, %llu KB held now, %llu KB peak), %llu ms in the file system\n",
+        (unsigned long long)g_io.opens, (unsigned long long)g_io.kept_hits, (unsigned long long)(g_keep_bytes >> 10), (unsigned long long)g_io.reads, (unsigned long long)(g_io.bytes >> 10),
         (unsigned long long)(g_io.cached_bytes >> 10), (unsigned long long)(g_io.now_cached >> 10),
         (unsigned long long)(g_io.peak_cached >> 10), (unsigned long long)(g_io.ns / 1000000ull));
 }
@@ -860,6 +914,7 @@ W(CreateFileA) {
         for (char *p = dir + 1; *p; p++) if (*p == '/') { *p = 0; mkdir(dir, 0755); *p = '/'; }
     }
     uint64_t t0 = io_now();
+    if (fl != O_RDONLY) keep_invalidate(host);
     int fd = open(host, fl, 0644);
     if (fl & O_CREAT) dircache_flush();   /* the listing may have a new entry now */
     LOG("[file] CreateFileA(%s -> %s, disp %u) = %s\n", name, host, disp, fd >= 0 ? "ok" : strerror(errno));
@@ -871,9 +926,15 @@ W(CreateFileA) {
     snprintf(x->path, sizeof x->path, "%s", host);
     /* A file opened for reading is read whole, once, and served from memory: the game reads its data in
        thousands of small pieces, and in the browser every read is a round trip to the OPFS thread. */
+    x->ptr = NULL;
     if (fl == O_RDONLY) {
+        pthread_mutex_lock(&g_keep_lock);
+        FileKeep *k = keep_find(host);
+        if (k) { k->refs++; k->used = ++g_keep_tick; x->buf = k->buf; x->size = k->size; x->pos = 0; x->ptr = k; }
+        pthread_mutex_unlock(&g_keep_lock);
+        if (k) { g_io.kept_hits++; g_io.now_cached += x->size; }
         struct stat st;
-        if (!fstat(fd, &st) && st.st_size > 0 && st.st_size <= 48 * 1024 * 1024 && (x->buf = malloc((size_t)st.st_size))) {
+        if (!k && !fstat(fd, &st) && st.st_size > 0 && st.st_size <= 48 * 1024 * 1024 && (x->buf = malloc((size_t)st.st_size))) {
             uint32_t got = 0;
             ssize_t n;
             while (got < (uint32_t)st.st_size && (n = read(fd, x->buf + got, (size_t)st.st_size - got)) > 0) got += (uint32_t)n;
@@ -881,6 +942,7 @@ W(CreateFileA) {
                 x->size = got; x->pos = 0;
                 g_io.cached_bytes += got; g_io.now_cached += got;
                 if (g_io.now_cached > g_io.peak_cached) g_io.peak_cached = g_io.now_cached;
+                x->ptr = keep_add(host, x->buf, got);   /* kept: the keep owns the buffer from now on */
             }
             else { free(x->buf); x->buf = NULL; lseek(fd, 0, SEEK_SET); }
         }
@@ -985,6 +1047,7 @@ W(SetEndOfFile) {
 W(DeleteFileA) {
     char host[1024];
     map_path(GSTR(ARG(0)), host, sizeof host);
+    keep_invalidate(host);
     int r = unlink(host);
     dircache_flush();
     RET(1, r == 0);
@@ -993,6 +1056,7 @@ W(MoveFileA) {
     char a[1024], b[1024];
     map_path(GSTR(ARG(0)), a, sizeof a);
     map_path(GSTR(ARG(1)), b, sizeof b);
+    keep_invalidate(a); keep_invalidate(b);
     int r = rename(a, b);
     dircache_flush();
     RET(2, r == 0);

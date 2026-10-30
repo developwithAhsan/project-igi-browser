@@ -744,9 +744,14 @@ async function startAudio(M, ctx) {
 // ------------------------------------------------------------------ run
 
 const isWebKit = () => /AppleWebKit\//.test(navigator.userAgent) && !/Chrome\/|Chromium\/|Edg\//.test(navigator.userAgent);
+// The compact layout (runtime.c RC_MEM_COMPACT) is now the default everywhere, not only on WebKit: with the
+// full layout the engine's memory is grown to ~1.8 GB at start (reserved for the game's 32-bit address space,
+// mostly never touched), and on Windows that whole size counts as committed memory, which is what pushes an
+// 8 GB machine with other things open into paging (the field reports' minute-long whole-process freezes).
+// Compact keeps it at ~0.5 GB and grows it only as the game allocates. ?mem=full restores the old layout.
 function compactMemory() {
   const want = params.get('mem');
-  return want === 'compact' || (want !== 'full' && isWebKit());
+  return want !== 'full';
 }
 
 // The browser dropped the WebGPU device (its GPU process died, or the page was pushed out of memory): the
@@ -846,7 +851,7 @@ async function run(session) {
   if (session) await clearNetSaves(session);
   sizeCanvas();
   const script = document.createElement('script');
-  script.src = 'build/recomp.js?v=14';
+  script.src = 'build/recomp.js?v=15';
   await new Promise((ok, fail) => { script.onload = ok; script.onerror = fail; document.head.appendChild(script); });
   const M = await createRecomp({
     arguments: ['/opfs/' + OPFS_DIR],
@@ -858,6 +863,8 @@ async function run(session) {
       if (params.has('log')) m.ENV.RC_LOG = '1';
       if (params.has('pads')) m.ENV.RC_PADS = params.get('pads');
       if (params.has('input')) m.ENV.RC_INPUT = params.get('input');   // testing: scripted input (host/input.c)
+      if (params.has('noyield')) m.ENV.RC_NO_YIELD = '1';               // testing: the game's poll spins unyielded (host/user32.c)
+      if (params.has('peeklog')) m.ENV.RC_PEEK_LOG = '1';               // testing: poll interval log in the console
       if (params.has('poke')) m.ENV.RC_POKE = params.get('poke');      // testing: memory pokes (host/input.c)
       if (params.has('queue')) m.ENV.RC_QUEUE = params.get('queue');
       if (params.has('gpuskip')) m.ENV.RC_GPU_SKIP = '1';   // diagnostics: the executor issues no draws
@@ -912,7 +919,9 @@ async function run(session) {
   };
   requestAnimationFrame(frame);
   // readbacks mid-frame are answered without waiting for vsync; online, the pad is also sampled here
-  setInterval(() => { if (session) poll(M); M._rc_gpu_pump(0); }, 1);
+  // (8 ms, not 1: the browser clamps nested 1 ms timers to 4 ms anyway, and the game reads pixels back only for
+  // screenshots, so a few ms of readback latency cost nothing while halving the page thread's idle wake-ups)
+  setInterval(() => { if (session) poll(M); M._rc_gpu_pump(0); }, 8);
   // Online, a hidden tab still has to present frames (browsers pause requestAnimationFrame there), or the
   // lockstep would freeze every other player with it.
   if (session) setInterval(() => { if (document.hidden) { poll(M); M._rc_gpu_pump(1); } }, 16);
@@ -929,13 +938,28 @@ async function run(session) {
 const RUN_STORE = 'igi-run';
 function crashWatch(M, touch) {
   const t0 = Date.now();
+  // The heartbeat also keeps the state just before a freeze (the field reports show whole-process freezes
+  // that no watchdog report precedes): the frame rate over the last beat, the page's memory (wasm, JS, GPU
+  // copies: measureUserAgentSpecificMemory, sampled every 30 s), the threads' phases and the longest task.
+  let lastFrames = -1, fps = 0, pageMB = 0, longTask = 0;
+  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.duration > longTask) longTask = e.duration; }).observe({ type: 'longtask', buffered: true }); } catch { /* no longtask support */ }
+  const counters = () => {
+    try { return M && M._rc_watch_addr ? Array.from(new Int32Array(M.wasmMemory.buffer, M._rc_watch_addr(), 7)) : []; } catch { return []; }
+  };
   const beat = () => {
     try {
-      sessionStorage.setItem(RUN_STORE, JSON.stringify({ t: Date.now(), t0, m: RcControls.inMission() ? 1 : 0, touch: touch ? 1 : 0, bg: document.hidden ? 1 : 0 }));
+      const w = counters();
+      if (w.length) { if (lastFrames >= 0) fps = Math.round((w[2] - lastFrames) / 5); lastFrames = w[2]; }
+      sessionStorage.setItem(RUN_STORE, JSON.stringify({ t: Date.now(), t0, m: RcControls.inMission() ? 1 : 0, touch: touch ? 1 : 0, bg: document.hidden ? 1 : 0,
+        fps, page: pageMB, lt: Math.round(longTask), pp: w[0], gp: w[1], gf: w[4], io: M && M._rc_io_activity ? M._rc_io_activity() : 0 }));
     } catch { /* storage blocked */ }
   };
-  beat();
+  const measure = () => {
+    try { if (performance.measureUserAgentSpecificMemory) performance.measureUserAgentSpecificMemory().then((r) => { pageMB = r.bytes >> 20; }).catch(() => {}); } catch { /* unsupported */ }
+  };
+  beat(); measure();
   setInterval(beat, 5000);
+  setInterval(measure, 60000);   // the measurement waits for a garbage collection: once a minute is plenty
   window.addEventListener('pagehide', () => { try { sessionStorage.removeItem(RUN_STORE); } catch { /* storage blocked */ } });
   hangWatch(M, touch);
 }
@@ -1040,6 +1064,7 @@ function crashCheck() {
     v: 20, type: 'reload', ua: navigator.userAgent, mem: navigator.deviceMemory || 0, cores: navigator.hardwareConcurrency || 0,
     played: Math.round((r.t - r.t0) / 1000), gap: Math.round((Date.now() - r.t) / 1000), mission: r.m, touch: r.touch, bg: r.bg,
     nav: performance.getEntriesByType('navigation')[0]?.type || '', screen: `${screen.width}x${screen.height}@${devicePixelRatio}`,
+    fps: r.fps, page: r.page, lt: r.lt, pp: r.pp, gp: r.gp, gf: r.gf, io: r.io,   // the state at the last beat before the end
   };
   console.warn('the previous run ended without unloading (the browser killed the page?)', info);
   try { navigator.sendBeacon('crash.php', new Blob([JSON.stringify(info)], { type: 'application/json' })); } catch { /* no beacon */ }
@@ -1248,7 +1273,7 @@ function controlsTip() {
 async function buildVersion() {
   // peers must run the same build and game files, or their simulations diverge
   const marker = await readMarker();
-  const wasm = await fetch('build/recomp14.wasm', { method: 'HEAD' }).catch(() => null);
+  const wasm = await fetch('build/recomp15.wasm', { method: 'HEAD' }).catch(() => null);
   // the ETag comes back weak (W/"...") when the response is compressed: compare only its value
   const etag = (wasm?.headers.get('ETag') || '').replace(/^W\//, '').replace(/"/g, '');
   return `${marker?.version || 'local'}:${etag || wasm?.headers.get('Content-Length') || '?'}`;

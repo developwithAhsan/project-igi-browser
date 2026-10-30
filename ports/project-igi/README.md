@@ -73,6 +73,15 @@ picture and its 2D (no depth test) squeezed into a 4:3 box, full-width quads ove
 bars, fades); other frames are the 4:3 picture squeezed back from the wide screen, in the largest 4:3 box,
 with clears kept inside the box. `RC_WIDE_DISPLAY=0` offers the 4:3 modes again (testing).
 
+CPU and I/O (2026-10-30): the game's loop polls PeekMessage ~6.7 M times a second between frames (a spin that
+burned a core); `host/user32.c` sleeps 1 ms on every 128th poll in a row with no message (RC_NO_YIELD=1 /
+`?noyield` off, RC_PEEK_LOG=1 / `?peeklog` logs intervals): 35% of a core instead of 102% natively at the same
+30 fps. In a mission the game reopens its ambient WAVs every few seconds; `host/kernel32.c` keeps small files'
+contents after close (48 entries, 2 MB each, 48 MB; dropped on write/delete/rename) and serves the next open from
+memory (mission 6: 345 of 600 opens). `web/loader.js` now defaults every browser to the compact memory layout
+(engine memory ~0.5 GB instead of ~1.8 GB grown at start; `?mem=full` restores the old one) and polls the GPU
+queue every 8 ms instead of 1.
+
 Testing switches: `RC_MEMSNAP=frame:addr:len:path`, `RC_POKE=frame:addr:hexbytes`, `RC_DUMP=frame:addr:len`
 (an address may be a pointer chain, `base>off>off`: each `>off` loads the dword so far and adds off, resolved
 at that frame — for objects on the heap), `RC_ZOOM_LOG=1`
