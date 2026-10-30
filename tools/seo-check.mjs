@@ -106,6 +106,7 @@ for (const file of files) {
   if (twitterImage !== ogImage) errors.push(rel + ": twitter:image must equal og:image");
   if (!html.includes('rel="manifest"') || !html.includes('rel="apple-touch-icon"') || !html.includes('rel="icon"')) errors.push(rel + ": missing icon or manifest links");
   if (!html.includes('class="legal-note"')) errors.push(rel + ": missing fan-project/legal footer note");
+  if (!html.includes('href="/redesign.css?v=20261030-1"')) errors.push(rel + ": stylesheet must use the versioned root-level CSS asset");
   if (/project-igi-online\.vercel\.app/i.test(html)) errors.push(rel + ": contains old Vercel host");
   if (/free/i.test(title) && !/own legally obtained|legally obtained game files/i.test(description)) errors.push(rel + ": uses free in title without own-copy clarification");
   if (route !== "/" && route !== "/play" && !schemaTypes.includes("BreadcrumbList")) errors.push(rel + ": missing BreadcrumbList JSON-LD");
@@ -148,6 +149,12 @@ if (canonicals.size !== expectedRoutes.length) errors.push("Expected " + expecte
 const rootIndex = await readFile("index.html", "utf8");
 const webIndex = await readFile("web/index.html", "utf8");
 if (rootIndex !== webIndex) errors.push("root index.html must match the full web/index.html game page");
+const rootCss = await readFile("redesign.css", "utf8");
+const webCss = await readFile("web/redesign.css", "utf8");
+if (rootCss !== webCss) errors.push("root redesign.css must match web/redesign.css");
+if (rootCss.length < 10000) errors.push("root redesign.css appears incomplete");
+const notFound = await readFile("404.html", "utf8");
+if (!notFound.includes('href="/redesign.css?v=20261030-1"')) errors.push("404.html must use the root stylesheet asset");
 if (/Opening IGI Online|window\.location\.replace\('\/web\/'\)|http-equiv="refresh"/i.test(rootIndex)) errors.push("root index.html is still a redirect stub");
 
 // Home-only requirements.
