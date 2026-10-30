@@ -420,3 +420,14 @@ body.settings-open:before{content:"";position:fixed;inset:0;background:rgba(4,12
  #controls-rail .rail-control{font-size:11px;gap:7px}
  #controls-rail kbd{font-size:9px;padding:3px 5px}
 }
+
+
+/* Shared PNG brand mark and concise tagline. */
+.site-brand{gap:12px}
+.site-brand .brand-logo{display:block;width:46px;height:46px;object-fit:contain;flex:0 0 auto}
+.site-brand .brand-tagline{display:inline-flex;align-items:center;gap:5px;font-family:Inter,Arial,sans-serif;font-size:12px;font-weight:750;letter-spacing:.045em;text-transform:none;white-space:nowrap;color:var(--ink)}
+.site-brand .brand-tagline span{color:var(--primary)}
+.site-footer .footer-brand{display:inline-flex;margin-bottom:12px}
+.site-footer .footer-brand .brand-logo{width:92px;height:72px;object-fit:contain}
+.site-footer .brand-tagline{font-size:13px;font-weight:750;letter-spacing:.035em;color:var(--ink);margin:0}
+@media(max-width:520px){.site-brand .brand-logo{width:40px;height:40px}.site-brand .brand-tagline{font-size:10px;gap:3px}.site-footer .footer-brand .brand-logo{width:84px;height:66px}}
