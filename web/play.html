@@ -801,7 +801,7 @@
   // Firefox lack it and show no ads). A credentialless frame has no cookies: ads are non-personalised. Units
   // sit under the landing views (gone once the game runs: #panel is hidden then) and, on wide desktop windows,
   // in the left gutter beside the game, which is hidden in fullscreen and on phones.
-  setTimeout(function () {
+  var loadAds = function () {
   (function () {
     var A = window.RC_ADS || {};
     var promo = document.getElementById('promo');
@@ -878,7 +878,13 @@
       });
     }
   })();
-  }, 3500); // Let the page paint before third-party ad frames start loading.
+  };
+  if ('requestIdleCallback' in window) requestIdleCallback(loadAds, { timeout: 10000 });
+  else {
+    addEventListener('pointerdown', loadAds, { once: true, passive: true });
+    addEventListener('keydown', loadAds, { once: true });
+    setTimeout(loadAds, 10000);
+  } // Third-party ad frames load only after idle or user interaction.
 </script>
 <script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd");if(st&&k)st.addEventListener("click",function(){k.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})});var h=k&&k.querySelector(".kbd-head");if(h&&k)h.addEventListener("click",function(e){if(innerWidth<=800&&e.target.id!=="kbd-close"){var c=k.classList.toggle("mobile-collapsed");h.setAttribute("aria-expanded",String(!c))}})})();</script><script src="redesign-ui.js" defer></script></body>
 </html>
