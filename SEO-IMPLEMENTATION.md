@@ -88,7 +88,7 @@ PAA/autocomplete: no verified PAA extraction was available in this research pass
 | URL | Title (chars) | Meta (chars) | H1 | Primary keyword | Secondary keywords | Internal links |
 |---|---|---:|---|---|---|---|
 | / | Project IGI Online Play – Browser Edition (41) | 148 | Play Project I.G.I. Online | project igi online play | project igi browser; play project igi online | /play, /controls, /faq, /about |
-| /play | Play Project IGI Online Free in Browser (39) | 142 | Play Project I.G.I. Online in Your Browser | play project igi online free | project igi game online play; browser edition | /, /controls, /faq, /safe |
+| /play | Play Project IGI Online Free in Browser (39) | 142 | Play Project I.G.I. Online in Your Browser | play project igi online free | project igi game online play; browser edition | /, /controls, /faq, /is-project-igi-online-safe |
 | /project-igi-1-online | Project IGI 1 Online – Original 2000 Game (41) | 125 | Project I.G.I. 1 Online: The Original 2000 Game | project igi 1 game online | I'm Going In; Project IGI 2000 | /play, /faq |
 | /project-igi-3-online-does-it-exist | Project IGI 3 Online – Does It Exist? (37) | 128 | Project I.G.I. 3 Online: Does the Game Exist? | project igi 3 game play online | I.G.I. Origins; release date | /play, /project-igi-1-online |
 | /is-project-igi-online-safe | Is Project IGI Online Safe? Browser Guide (41) | 129 | Is Project I.G.I. Online Safe to Use? | project igi game online safe download | own game files; browser storage | /privacy, /disclaimer, /play |
