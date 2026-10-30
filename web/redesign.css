@@ -225,3 +225,10 @@ body.ads-wide:not(.playing) main #stage{grid-column:2;grid-row:3}
 body.kbd-off #stage ~ #kbd{display:none!important}
 body.kbd-off main #stage{grid-column:1/-1}
 body.kbd-off #stage ~ #kbd-show{display:grid!important}
+
+/* On touch devices the game still takes over the viewport only while a session is active.
+   Before launch, keep the redesigned page, sidebar and footer in normal document flow. */
+body.coarse:not(.playing) #stage,body.touch:not(.playing) #stage{position:relative;inset:auto;top:auto;left:auto;width:100%;height:auto;aspect-ratio:4/3;border-radius:16px}
+body.coarse:not(.playing) #kbd,body.touch:not(.playing) #kbd{display:block!important;position:relative;top:auto;max-height:420px}
+body.coarse:not(.playing) #sitefoot,body.touch:not(.playing) #sitefoot{display:grid!important}
+body.coarse.playing #kbd,body.touch.playing #kbd,body.coarse.playing #sitefoot,body.touch.playing #sitefoot{display:none!important}
