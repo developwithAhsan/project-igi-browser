@@ -25,12 +25,10 @@
   var controls = document.getElementById('kbd');
   if (toolbarSettings && controls) {
     toolbarSettings.addEventListener('click', function () {
-      controls.scrollIntoView({
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-        block: 'start'
-      });
+      document.body.classList.add('settings-open');
     });
   }
+  if (controls) { var close = document.getElementById('kbd-close'); if (close) close.addEventListener('click', function(){ document.body.classList.remove('settings-open'); }); document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.body.classList.contains('settings-open'))document.body.classList.remove('settings-open');}); }
   var controlsToggle = document.getElementById('mobile-controls-toggle');
   if (controlsToggle && controls) {
     controlsToggle.addEventListener('click', function (event) {
