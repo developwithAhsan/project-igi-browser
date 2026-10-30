@@ -509,3 +509,145 @@ body.inner-page .site-comments>p{color:var(--muted);margin:0 0 16px}
 body.inner-page #disqus_thread{width:100%;min-height:180px;padding:16px 0;background:transparent}
 @media(max-width:900px){body.inner-page main.inner-main{width:min(calc(100% - 32px),100%);gap:18px}body.inner-page .blog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){body.inner-page main.inner-main{width:calc(100% - 24px)}body.inner-page .blog-grid{grid-template-columns:1fr}body.inner-page .site-comments{width:calc(100% - 24px);padding:18px}body.inner-page .inner-card{padding:22px 18px}}
+
+
+/* Inner-page layout reset.
+   The desktop game layout also targets #main-content and was assigning inner-page
+   articles to its 250–310px controls/sidebar track. Keep that game grid scoped out. */
+body.inner-page main#main-content.inner-main{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:none!important;
+  grid-auto-flow:row!important;
+  align-items:stretch!important;
+  justify-content:stretch!important;
+  gap:24px!important;
+  width:min(calc(100% - 40px),1200px)!important;
+  max-width:1200px!important;
+  min-width:0!important;
+  margin:0 auto 42px!important;
+  padding:0 0 24px!important;
+}
+body.inner-page main#main-content.inner-main>*{
+  grid-column:1/-1!important;
+  grid-row:auto!important;
+  justify-self:stretch!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+}
+body.inner-page main#main-content.inner-main>.page-hero{
+  margin:24px 0 0!important;
+}
+body.inner-page main#main-content.inner-main>.inner-card,
+body.inner-page main#main-content.inner-main>article.inner-card,
+body.inner-page main#main-content.inner-main>section.inner-card{
+  width:100%!important;
+  max-width:800px!important;
+  justify-self:center!important;
+  min-width:0!important;
+  box-sizing:border-box;
+}
+body.inner-page .inner-card,
+body.inner-page .blog-article{
+  min-width:0;
+  box-sizing:border-box;
+  line-height:1.8;
+}
+body.inner-page .inner-card :where(div,section,article,figure,table),
+body.inner-page .blog-article :where(div,section,article,figure,table){
+  min-width:0;
+  max-width:100%;
+}
+body.inner-page .inner-card h2,
+body.inner-page .blog-article h2{
+  line-height:1.2;
+}
+body.inner-page .inner-card p,
+body.inner-page .inner-card li,
+body.inner-page .blog-article p,
+body.inner-page .blog-article li{
+  font-size:16px;
+  line-height:1.8;
+  overflow-wrap:anywhere;
+}
+body.inner-page .controls-wrap,
+body.inner-page .inner-card .table-wrap,
+body.inner-page .inner-card .table-responsive{
+  display:block;
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+body.inner-page .controls-table,
+body.inner-page .facts-table,
+body.inner-page .inner-card table{
+  width:100%;
+  min-width:560px;
+  border-collapse:collapse;
+  font-size:15px;
+}
+body.inner-page .controls-table th,
+body.inner-page .controls-table td,
+body.inner-page .facts-table th,
+body.inner-page .facts-table td,
+body.inner-page .inner-card table th,
+body.inner-page .inner-card table td{
+  padding:11px 14px;
+  line-height:1.5;
+  text-align:left;
+}
+body.inner-page .controls-table th,
+body.inner-page .facts-table th,
+body.inner-page .inner-card table th{
+  background:var(--primary);
+  color:#fff;
+  font-weight:750;
+}
+body.inner-page .controls-table tbody tr:nth-child(even),
+body.inner-page .facts-table tbody tr:nth-child(even),
+body.inner-page .inner-card table tbody tr:nth-child(even){
+  background:var(--surface-2);
+}
+body.inner-page .blog-article{
+  width:100%;
+  max-width:800px;
+  margin:0 auto;
+}
+body.inner-page .blog-article p{font-size:17px}
+body.inner-page .blog-grid{
+  width:100%;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:20px;
+}
+body.inner-page .blog-card{min-width:0;overflow:hidden}
+body.inner-page .site-comments{
+  width:min(calc(100% - 40px),1200px);
+  max-width:1200px;
+  min-width:0;
+  margin:0 auto 34px;
+}
+@media(max-width:1023px){
+  body.inner-page main#main-content.inner-main{
+    width:calc(100% - 36px)!important;
+    max-width:none!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:18px!important;
+  }
+  body.inner-page main#main-content.inner-main>.page-hero{margin-top:18px!important}
+  body.inner-page main#main-content.inner-main>.inner-card,
+  body.inner-page main#main-content.inner-main>article.inner-card,
+  body.inner-page main#main-content.inner-main>section.inner-card{
+    max-width:800px!important;
+  }
+}
+@media(max-width:600px){
+  body.inner-page main#main-content.inner-main{width:calc(100% - 24px)!important}
+  body.inner-page main#main-content.inner-main>.page-hero{padding:26px 20px}
+  body.inner-page main#main-content.inner-main>.inner-card,
+  body.inner-page main#main-content.inner-main>article.inner-card,
+  body.inner-page main#main-content.inner-main>section.inner-card{padding:22px 18px}
+  body.inner-page .blog-grid{grid-template-columns:minmax(0,1fr)}
+  body.inner-page .site-comments{width:calc(100% - 24px);padding:18px}
+}
