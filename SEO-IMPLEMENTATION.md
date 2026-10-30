@@ -95,13 +95,16 @@ PAA/autocomplete: no verified PAA extraction was available in this research pass
 | /controls | Project IGI Controls – Keyboard, Mouse & Touch (46) | 112 | Project I.G.I. Controls: Keyboard, Mouse & Touch | project igi controls keyboard mouse | touch controls; gyro aim; widescreen | /play, /faq |
 | /faq | Project IGI Online FAQ – Setup & Browser Help (45) | 120 | Project I.G.I. Online: Frequently Asked Questions | project igi browser help | Chromebook; Android; black screen | /play, /controls, /safe |
 | /blog | Project IGI Blog – Browser Guides & Help (40) | 125 | Existing blog index heading | project igi browser guides | setup; troubleshooting; stealth | /play, /controls |
-| /about | About IGI Online – Browser Edition | unique | About IGI Online | IGI Online | fan project; browser port | /play, /disclaimer |
-| /contact | Contact IGI Online – Technical & Rights Requests | unique | Contact IGI Online | contact IGI Online | technical support; takedown | /dmca |
-| /privacy | Privacy Policy – IGI Online | unique | Privacy Policy | IGI Online privacy | local browser storage | /cookie-policy |
-| /terms | Terms of Use – IGI Online | unique | Terms of Use | IGI Online terms | own game files | /disclaimer |
-| /dmca | DMCA & Copyright Takedown – IGI Online | unique | DMCA & Copyright Takedown | IGI Online DMCA | rights holder request | /contact, /disclaimer |
-| /disclaimer | Project IGI Browser Edition – Disclaimer | unique | Fan Project Disclaimer | Project IGI disclaimer | unofficial browser port | /dmca |
-| /cookie-policy | Cookie Policy – IGI Online | unique | Cookie & Browser Storage Policy | IGI Online cookies | OPFS; ads | /privacy |
+| /blog/getting-started | How to Play Project IGI in Browser – Setup Guide (48) | 89 | How to Play Project I.G.I. in Your Browser | project igi browser setup | import own files; no installer | /play, /controls |
+| /blog/stealth-tactics | Project IGI Stealth Tactics – Beginner Guide (44) | 91 | Project I.G.I. Stealth Tactics for Difficult Missions | project igi stealth tactics | reconnaissance; cover | /play, /project-igi-1-online |
+| /blog/browser-performance | Project IGI Browser Performance – Troubleshooting (49) | 99 | Project I.G.I. Browser Performance: Troubleshooting | project igi browser performance | black screen; memory; WebGPU | /play, /faq |
+| /about | About IGI Online – Browser Edition (34) | 127 | About IGI Online | IGI Online | fan project; browser port | /play, /disclaimer |
+| /contact | Contact IGI Online – Technical & Rights Requests (48) | 102 | Contact IGI Online | contact IGI Online | technical support; takedown | /dmca |
+| /privacy | Privacy Policy – IGI Online (27) | 105 | Privacy Policy | IGI Online privacy | local browser storage | /cookie-policy |
+| /terms | Terms of Use – IGI Online (25) | 114 | Terms of Use | IGI Online terms | own game files | /disclaimer |
+| /dmca | DMCA & Copyright Takedown – IGI Online (38) | 100 | DMCA & Copyright Takedown | IGI Online DMCA | rights holder request | /contact, /disclaimer |
+| /disclaimer | Project IGI Browser Edition – Disclaimer (40) | 108 | Fan Project Disclaimer | Project IGI disclaimer | unofficial browser port | /dmca |
+| /cookie-policy | Cookie Policy – IGI Online (26) | 100 | Cookie & Browser Storage Policy | IGI Online cookies | OPFS; ads | /privacy |
 
 Note: The /play page uses the same existing player markup/runtime files. No loader.js, controls.js, touch.js, netplay.js, canvas or WebAssembly game logic was changed for SEO.
 
