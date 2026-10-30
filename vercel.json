@@ -7,7 +7,6 @@
       "has": [
         {
           "type": "host",
-          "key": "host",
           "value": ".*\\.vercel\\.app"
         }
       ],
