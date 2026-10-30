@@ -431,3 +431,25 @@ body.settings-open:before{content:"";position:fixed;inset:0;background:rgba(4,12
 .site-footer .footer-brand .brand-logo{width:92px;height:72px;object-fit:contain}
 .site-footer .brand-tagline{font-size:13px;font-weight:750;letter-spacing:.035em;color:var(--ink);margin:0}
 @media(max-width:520px){.site-brand .brand-logo{width:40px;height:40px}.site-brand .brand-tagline{font-size:10px;gap:3px}.site-footer .footer-brand .brand-logo{width:84px;height:66px}}
+
+
+/* Consistent site identity: IGI Online is the brand; the smaller line is its tagline. */
+.site-brand{align-items:center;gap:10px}
+.site-brand .brand-copy{display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0}
+.site-brand .brand-name{font-size:15px;font-weight:850;line-height:1.05;letter-spacing:.01em;color:var(--ink)}
+.site-brand .brand-tagline{font-size:10px;font-weight:750;line-height:1.1;letter-spacing:.025em;color:var(--muted);white-space:nowrap}
+.site-footer .brand-copy{align-items:flex-start}
+.site-footer .brand-name{font-size:15px}
+.site-footer .brand-tagline{font-size:11px}
+.screenshot-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:22px}
+.screenshot-gallery figure{margin:0;min-width:0;overflow:hidden;border:1px solid var(--border);border-radius:14px;background:var(--surface-2)}
+.screenshot-gallery img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#101610}
+.screenshot-gallery figcaption{padding:10px 12px;color:var(--muted);font-size:12px;font-weight:650}
+.about-article{line-height:1.75}
+.about-article h2{margin-top:30px}
+.about-article h2:first-of-type{margin-top:18px}
+.about-article .screenshot-gallery{margin:18px 0 26px}
+.game-intro .intro-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:16px}
+.game-intro .text-link{font-size:14px;font-weight:750;text-decoration:underline;text-underline-offset:3px;color:var(--primary-dark)}
+@media(max-width:760px){.screenshot-gallery{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.screenshot-gallery{grid-template-columns:1fr}.site-brand .brand-tagline{font-size:9px}}
