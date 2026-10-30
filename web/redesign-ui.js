@@ -16,19 +16,45 @@
       });
     });
   }
+
   var toolbarFullscreen = document.getElementById('toolbar-fullscreen');
   var existingFullscreen = document.getElementById('fs');
   if (toolbarFullscreen && existingFullscreen) {
     toolbarFullscreen.addEventListener('click', function () { existingFullscreen.click(); });
   }
+
   var toolbarSettings = document.getElementById('toolbar-settings');
   var controls = document.getElementById('kbd');
-  if (toolbarSettings && controls) {
-    toolbarSettings.addEventListener('click', function () {
-      document.body.classList.add('settings-open');
-    });
+  var closeSettings = document.getElementById('kbd-close');
+  var previousFocus = null;
+
+  function openSettings(event) {
+    if (!controls) return;
+    if (event) event.preventDefault();
+    previousFocus = document.activeElement;
+    controls.classList.add('is-open');
+    controls.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('settings-open');
+    if (closeSettings) closeSettings.focus();
   }
-  if (controls) { var close = document.getElementById('kbd-close'); if (close) close.addEventListener('click', function(){ document.body.classList.remove('settings-open'); }); document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.body.classList.contains('settings-open'))document.body.classList.remove('settings-open');}); }
+
+  function hideSettings() {
+    if (!controls) return;
+    controls.classList.remove('is-open');
+    controls.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('settings-open');
+    if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+  }
+
+  if (toolbarSettings && controls) toolbarSettings.addEventListener('click', openSettings);
+  if (closeSettings) closeSettings.addEventListener('click', hideSettings);
+  if (controls) controls.addEventListener('click', function (event) {
+    if (event.target === controls) hideSettings();
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && controls && controls.classList.contains('is-open')) hideSettings();
+  });
+
   var controlsToggle = document.getElementById('mobile-controls-toggle');
   if (controlsToggle && controls) {
     controlsToggle.addEventListener('click', function (event) {
