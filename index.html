@@ -551,17 +551,13 @@
 <section class="content-section" id="screenshots">
   <p class="section-label">IN-GAME SCREENSHOTS</p>
   <h2>Project I.G.I. gameplay gallery</h2>
-  <p>These screenshots are included in this repository as gameplay references. They show scenes from the game, not promotional artwork for an official release.</p>
+  <p>Gameplay scenes rotate automatically. Use the dots to choose a screenshot.</p>
   <div class="igi-carousel" data-igi-carousel aria-roledescription="carousel" aria-label="Project I.G.I. gameplay screenshots">
-  <div class="igi-slide is-active"><img src="/images/project-igi-gameplay-compound.jpg" alt="First-person view of an outdoor military compound with a rifle visible in the foreground" width="768" height="432" loading="lazy" decoding="async"><span>Outdoor compound approach</span></div>
-  <div class="igi-slide"><img src="/images/project-igi-gameplay-yard.jpg" alt="First-person view across an open yard with perimeter fencing and a pistol visible" width="320" height="180" loading="lazy" decoding="async"><span>Open perimeter area</span></div>
-  <div class="igi-slide"><img src="/images/project-igi-gameplay-interior.jpg" alt="First-person view down an indoor barracks corridor with a fallen guard and a rifle in the foreground" width="768" height="432" loading="lazy" decoding="async"><span>Interior mission environment</span></div>
-  <div class="igi-dots" role="group" aria-label="Choose screenshot">
-    <button type="button" class="is-active" aria-label="Show screenshot 1" aria-current="true"></button>
-    <button type="button" aria-label="Show screenshot 2"></button>
-    <button type="button" aria-label="Show screenshot 3"></button>
+    <div class="igi-slide is-active"><img src="/images/project-igi-gameplay-compound.jpg" alt="First-person view of an outdoor military compound with a rifle visible in the foreground" width="768" height="432" loading="lazy" decoding="async"><span>Outdoor compound approach</span></div>
+    <div class="igi-slide"><img src="/images/project-igi-gameplay-yard.jpg" alt="First-person view across an open yard with perimeter fencing and a pistol visible" width="320" height="180" loading="lazy" decoding="async"><span>Open perimeter area</span></div>
+    <div class="igi-slide"><img src="/images/project-igi-gameplay-interior.jpg" alt="First-person view down an indoor barracks corridor with a fallen guard and a rifle in the foreground" width="768" height="432" loading="lazy" decoding="async"><span>Interior mission environment</span></div>
+    <div class="igi-dots" role="group" aria-label="Choose screenshot"><button type="button" class="is-active" aria-label="Show screenshot 1" aria-current="true"></button><button type="button" aria-label="Show screenshot 2"></button><button type="button" aria-label="Show screenshot 3"></button></div>
   </div>
-</div>
 </section><noscript><p>This is an unofficial browser port of Project I.G.I.: I'm Going In (2000). Bring your own legally obtained game files; this site does not host or distribute the commercial game data. See the <a href="/play">browser guide</a>, <a href="/controls">controls</a> and <a href="/disclaimer">fan-project disclaimer</a>.</p></noscript>
 
 
@@ -732,6 +728,7 @@
   <div class="game-toolbar" aria-label="Game actions"><div class="toolbar-actions"><button id="toolbar-fullscreen" type="button">⛶ Fullscreen</button><button id="toolbar-settings" type="button" aria-haspopup="dialog" aria-controls="kbd">⚙ Settings</button></div></div>
   <!-- GAME: DO NOT EDIT — existing controls/settings logic targets below are preserved. -->
   <aside id="kbd" role="dialog" aria-modal="true" aria-label="Game settings" aria-hidden="true">
+    <div class="settings-dialog">
     <div class="kbd-head"><div><span class="settings-kicker">PLAYER PREFERENCES</span><b>Game settings</b></div>
       <button id="kbd-close" type="button" aria-label="Hide controls" title="Hide">×</button>
     </div>
@@ -755,6 +752,7 @@
     <details class="settings-group"><summary>Graphics / Performance</summary><p>Use the available screen-width option in the controls above. For smoother play, close memory-heavy tabs and use an up-to-date browser.</p></details>
     <details class="settings-group"><summary>Audio</summary><p>Audio may start after your first click or key press. Adjust your device volume; the game runtime manages in-game sound.</p></details>
     <details class="settings-group"><summary>Saved Data</summary><p>Runtime data and supported saves may use local browser storage. Avoid clearing site data if you want to retain local progress.</p></details>
+      </div>
   </aside>
 <!-- /GAME: DO NOT EDIT -->
 <div class="game-stats"><div class="stat-chip">✦ Free site access · bring your own game files</div><div class="stat-chip">▣ WebAssembly-powered</div><div class="stat-chip">⌨ Keyboard + mouse</div><div class="stat-chip">◫ Touch UI available</div></div>
