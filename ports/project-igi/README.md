@@ -82,6 +82,11 @@ memory (mission 6: 345 of 600 opens). `web/loader.js` now defaults every browser
 (engine memory ~0.5 GB instead of ~1.8 GB grown at start; `?mem=full` restores the old one) and polls the GPU
 queue every 8 ms instead of 1.
 
+COM objects (2026-10-30): `host/com.c` has 65536 slots; sound buffers (no destroy) leaked ~56/s in a mission and
+the engine aborted ("too many live COM objects") after ~16 min, which is what players called "stuck". Fixed with
+destroy routines in `host/dsound.c` (buffer + notify/3D views, shared sample memory) and `com_free` for texture
+views in `host/ddraw7.c`. `RC_COM_LOG=1` logs live counts per interface every 2048 creations.
+
 Testing switches: `RC_MEMSNAP=frame:addr:len:path`, `RC_POKE=frame:addr:hexbytes`, `RC_DUMP=frame:addr:len`
 (an address may be a pointer chain, `base>off>off`: each `>off` loads the dword so far and adds off, resolved
 at that frame — for objects on the heap), `RC_ZOOM_LOG=1`

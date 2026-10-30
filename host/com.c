@@ -57,6 +57,18 @@ uint32_t com_new(ComInterface *it, int type, void *data) {
     W32(g + 4, (uint32_t)idx);
     W32(g + 8, 0xC0C0C0C0u);  /* marker so com_get can reject foreign pointers */
     g_objs[idx] = (ComObj){ it, 1, type, data, g };
+    /* RC_COM_LOG=1: live objects per interface every 2048 creations (a leak shows as a count that only grows) */
+    static int logit = -1; static unsigned made;
+    if (logit < 0) logit = getenv("RC_COM_LOG") != NULL;
+    if (logit && ++made % 2048 == 0) {
+        struct { ComInterface *it; int n; } tab[32]; int nt = 0, live = 0;
+        for (int i = 1; i < g_nobjs; i++) if (g_objs[i].guest) {
+            live++; int k; for (k = 0; k < nt; k++) if (tab[k].it == g_objs[i].iface) break;
+            if (k == nt && nt < 32) { tab[nt].it = g_objs[i].iface; tab[nt].n = 0; nt++; }
+            if (k < 32) tab[k].n++;
+        }
+        fprintf(stderr, "[com] %d live of %d slots used:", live, g_nobjs); for (int k = 0; k < nt; k++) fprintf(stderr, " %s=%d", tab[k].it->name, tab[k].n); fprintf(stderr, "\n");
+    }
     pthread_mutex_unlock(&g_com_lock);
     if (g_log_d3d) fprintf(stderr, "[com] new %s %08x\n", it->name, g);
     return g;
@@ -71,6 +83,20 @@ ComObj *com_get(uint32_t g) {
 void *com_data(uint32_t g) {
     ComObj *o = com_get(g);
     return o ? o->data : NULL;
+}
+
+/* Drops an object the host made for itself (never handed to the game, so never Released by it), e.g. a
+   texture view when its surface dies: the slot is recycled; the data is the caller's to free. */
+void com_free(uint32_t g) {
+    ComObj *o = com_get(g);
+    if (!o) return;
+    o->data = NULL; o->refs = 0;
+    W32(o->guest + 8, 0);
+    heap_free(o->guest);
+    pthread_mutex_lock(&g_com_lock);
+    o->guest = 0;
+    g_free_idx[g_nfree++] = (int)(o - g_objs);
+    pthread_mutex_unlock(&g_com_lock);
 }
 
 void com_QueryInterface(CPU *c) {

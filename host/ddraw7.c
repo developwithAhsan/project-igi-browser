@@ -234,8 +234,8 @@ static void destroy_surf(void *p) {
     DDSurf *s = p;
     if (s->tex) {
         if (g_render->destroy_texture) g_render->destroy_texture(s->tex);
-        ComObj *o = com_get(s->tex_obj);
-        if (o) { o->data = NULL; W32(o->guest + 8, 0); }
+        com_free(s->tex_obj);   /* the view's slot comes back (it used to stay used for good: ~3 leaked a second) */
+        s->tex_obj = 0;
         free(s->tex);
     }
     if (s->mip_next) release(s->mip_next);

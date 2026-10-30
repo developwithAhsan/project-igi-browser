@@ -69,6 +69,13 @@ static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a differe
   which spares phones a storage round trip per open. The compact memory layout is the default in every
   browser now: the engine's memory stays near 0.5 GB and grows as the game allocates, instead of 1.8 GB
   grown at start (`web/loader.js`, `?mem=full` restores the old layout).
+- **Long sessions**: DirectSound buffers had no destroy, so every sound the game created or duplicated stayed
+  in the COM object table (65536 slots) and in the mixer's list for the whole session, about 56 a second in a
+  mission: after some 16 minutes the engine aborted with "too many live COM objects" and the picture froze
+  (the reported "stuck in mission 3 / 6"). Buffers and their notify / 3D views are now released when the game
+  releases them (`host/dsound.c`, sample memory shared between a buffer and its duplicates by count), and a
+  texture's view object is recycled with its surface (`host/ddraw7.c`, `com_free`). `RC_COM_LOG=1` prints live
+  objects per interface. Verified: 17 minutes of mission 6 natively and 20 minutes unattended in the browser.
 - **Crash reports**: a browser that runs out of memory kills the page and reloads it (a black screen, then
   the landing page). The running game keeps a heartbeat in `sessionStorage`, cleared on an orderly unload;
   a start that finds one tells the player what happened and posts the device, memory, time played and
