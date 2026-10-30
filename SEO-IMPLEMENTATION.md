@@ -95,7 +95,7 @@ The supplied notes about a brand-only title, long description, missing canonical
 
 ### Sampled SERP/research results
 
-Search samples for the four requested intents surfaced established game-reference and gaming pages including PCGamingWiki, IGDB, Steam, Wikipedia and MobyGames, as well as browser-port/community pages. The result sample was not a location-fixed, rank-ordered Google top 10. Rankings can vary by location, device and personalization. People Also Ask extraction was not available, so no PAA questions are claimed as observed.
+Search samples for the four requested intents surfaced established game-reference and gaming pages including PCGamingWiki, IGDB, Steam, Wikipedia and MobyGames, as well as browser-port/community pages. A relevant live browser-port result, OpenIGI, separates a browser option from desktop builds and explicitly lists browser/device information and touch controls; it is an adjacent SERP competitor, not the requested Sagar Infosec site. The result sample was not a location-fixed, rank-ordered Google top 10. Rankings can vary by location, device and personalization. People Also Ask questions and live autocomplete predictions were not directly captured, so no PAA/autocomplete phrases are claimed as observed. Google's documentation notes that autocomplete can vary by language, location, trends and user activity.
 
 ### Ten practical opportunities
 
@@ -199,7 +199,7 @@ Generated image paths:
 - \`/icon-512.png\`: 512×512 PNG.
 - \`/og-project-igi.png\`: 1200×630 PNG social card derived from the repository's text-and-grid SVG artwork, not original game art.
 
-The reproducible generator is \`tools/generate-brand-assets.py\`; workflow \`.github/workflows/generate-brand-assets.yml\` runs on the existing \`redesign-oct30\` branch. The exact generated files and deployed MIME types must be checked after that workflow has completed.
+The reproducible generator is \`tools/generate-brand-assets.py\`; workflow \`.github/workflows/generate-brand-assets.yml\` ran successfully on the existing \`redesign-oct30\` branch. Generated repository file sizes: \`favicon.ico\` 8,032 bytes; \`favicon.svg\` 55,341 bytes; \`apple-touch-icon.png\` 48,293 bytes; \`icon-192.png\` 53,626 bytes; \`icon-512.png\` 255,896 bytes; \`og-project-igi.png\` 89,236 bytes. MIME types and cache behavior still require production HTTP verification.
 
 JSON-LD types:
 - Home and player: WebSite, Organization, VideoGame and FAQPage.
