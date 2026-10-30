@@ -552,11 +552,16 @@
   <p class="section-label">IN-GAME SCREENSHOTS</p>
   <h2>Project I.G.I. gameplay gallery</h2>
   <p>These screenshots are included in this repository as gameplay references. They show scenes from the game, not promotional artwork for an official release.</p>
-  <div class="screenshot-gallery">
-    <figure><img src="/images/project-igi-gameplay-compound.jpg" alt="First-person view of an outdoor military compound with a rifle visible in the foreground" width="768" height="432" loading="lazy" decoding="async"><figcaption>Outdoor compound approach</figcaption></figure>
-    <figure><img src="/images/project-igi-gameplay-yard.jpg" alt="First-person view across an open yard with perimeter fencing and a pistol visible" width="320" height="180" loading="lazy" decoding="async"><figcaption>Open perimeter area</figcaption></figure>
-    <figure><img src="/images/project-igi-gameplay-interior.jpg" alt="First-person view down an indoor barracks corridor with a fallen guard and a rifle in the foreground" width="768" height="432" loading="lazy" decoding="async"><figcaption>Interior mission environment</figcaption></figure>
+  <div class="igi-carousel" data-igi-carousel aria-roledescription="carousel" aria-label="Project I.G.I. gameplay screenshots">
+  <div class="igi-slide is-active"><img src="/images/project-igi-gameplay-compound.jpg" alt="First-person view of an outdoor military compound with a rifle visible in the foreground" width="768" height="432" loading="lazy" decoding="async"><span>Outdoor compound approach</span></div>
+  <div class="igi-slide"><img src="/images/project-igi-gameplay-yard.jpg" alt="First-person view across an open yard with perimeter fencing and a pistol visible" width="320" height="180" loading="lazy" decoding="async"><span>Open perimeter area</span></div>
+  <div class="igi-slide"><img src="/images/project-igi-gameplay-interior.jpg" alt="First-person view down an indoor barracks corridor with a fallen guard and a rifle in the foreground" width="768" height="432" loading="lazy" decoding="async"><span>Interior mission environment</span></div>
+  <div class="igi-dots" role="group" aria-label="Choose screenshot">
+    <button type="button" class="is-active" aria-label="Show screenshot 1" aria-current="true"></button>
+    <button type="button" aria-label="Show screenshot 2"></button>
+    <button type="button" aria-label="Show screenshot 3"></button>
   </div>
+</div>
 </section><noscript><p>This is an unofficial browser port of Project I.G.I.: I'm Going In (2000). Bring your own legally obtained game files; this site does not host or distribute the commercial game data. See the <a href="/play">browser guide</a>, <a href="/controls">controls</a> and <a href="/disclaimer">fan-project disclaimer</a>.</p></noscript>
 
 
@@ -568,6 +573,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path id="fs-icon" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
     </button>
+    <button id="stage-settings" type="button" aria-label="Open game settings" title="Settings">⚙</button>
     <div id="soundtip" class="hidden">Tap the game or press a key to turn on sound</div>
     <button id="refull" type="button" aria-label="Enter fullscreen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
@@ -723,10 +729,10 @@
       </div>
     </div>
   </div>
-  <div class="game-toolbar" aria-label="Game actions"><div class="toolbar-actions"><button id="toolbar-fullscreen" type="button">⛶ Fullscreen</button><button id="toolbar-settings" type="button">⚙ Controls &amp; settings</button></div></div>
+  <div class="game-toolbar" aria-label="Game actions"><div class="toolbar-actions"><button id="toolbar-fullscreen" type="button">⛶ Fullscreen</button><button id="toolbar-settings" type="button" aria-haspopup="dialog" aria-controls="kbd">⚙ Settings</button></div></div>
   <!-- GAME: DO NOT EDIT — existing controls/settings logic targets below are preserved. -->
-  <aside id="kbd" aria-label="Keyboard controls">
-    <div class="kbd-head"><b>Controls &amp; settings</b><button class="mobile-controls-toggle" id="mobile-controls-toggle" type="button" aria-expanded="true">Collapse</button>
+  <aside id="kbd" role="dialog" aria-modal="true" aria-label="Game settings" aria-hidden="true">
+    <div class="kbd-head"><div><span class="settings-kicker">PLAYER PREFERENCES</span><b>Game settings</b></div>
       <button id="kbd-close" type="button" aria-label="Hide controls" title="Hide">×</button>
     </div>
 <div class="game-facts-mini"><strong>Project I.G.I. (2000)</strong><p>Developer: Innerloop Studios</p><p>Genre: Tactical first-person shooter</p><p>Original campaign: single-player. This browser project adds a separate 1v1 online-room option.</p></div>
@@ -767,6 +773,19 @@
     
   </aside>
 
+  <aside id="controls-rail" aria-label="Static game controls">
+  <div class="rail-heading"><span class="rail-kicker">FIELD MANUAL</span><strong>Static controls</strong><p>Keyboard + mouse</p></div>
+  <div class="rail-control"><span>Move</span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></div>
+  <div class="rail-control"><span>Look / aim</span><kbd>Mouse</kbd></div>
+  <div class="rail-control"><span>Fire</span><kbd>Left click</kbd></div>
+  <div class="rail-control"><span>Scope / alternate</span><kbd>RMB</kbd> / <kbd>Backspace</kbd></div>
+  <div class="rail-control"><span>Reload</span><kbd>Enter</kbd></div>
+  <div class="rail-control"><span>Use / activate</span><kbd>Right Shift</kbd></div>
+  <div class="rail-control"><span>Crouch / jump</span><kbd>Right Ctrl</kbd> / <kbd>Numpad 0</kbd></div>
+  <div class="rail-control"><span>Peek / binoculars</span><kbd>Numpad 1</kbd> / <kbd>Space</kbd></div>
+  <div class="rail-control"><span>Map / menu</span><kbd>C</kbd> / <kbd>Esc</kbd></div>
+  <div class="rail-control"><span>Fullscreen</span><kbd>Alt</kbd> + <kbd>Enter</kbd></div>
+</aside>
   <button id="kbd-show" type="button" aria-label="Show keyboard controls" title="Show keyboard controls">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <rect x="2.5" y="6" width="19" height="12" rx="2"/>
@@ -871,5 +890,18 @@
     setTimeout(loadAds, 10000);
   } // Third-party ad frames load only after idle or user interaction.
 </script>
-<script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd");if(st&&k)st.addEventListener("click",function(){k.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})});var h=k&&k.querySelector(".kbd-head");if(h&&k)h.addEventListener("click",function(e){if(innerWidth<=800&&e.target.id!=="kbd-close"){var c=k.classList.toggle("mobile-collapsed");h.setAttribute("aria-expanded",String(!c))}})})();</script><script src="redesign-ui.js" defer></script></body>
+<script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd");if(st&&k)st.addEventListener("click",function(){k.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})});var h=k&&k.querySelector(".kbd-head");if(h&&k)h.addEventListener("click",function(e){if(innerWidth<=800&&e.target.id!=="kbd-close"){var c=k.classList.toggle("mobile-collapsed");h.setAttribute("aria-expanded",String(!c))}})})();</script><script src="redesign-ui.js" defer></script><script>(function(){
+  var box=document.getElementById('kbd'),openers=[document.getElementById('toolbar-settings'),document.getElementById('stage-settings')],close=document.getElementById('kbd-close'),previous=null;
+  function open(){if(!box)return;previous=document.activeElement;box.classList.add('is-open');box.setAttribute('aria-hidden','false');document.body.classList.add('settings-open');if(close)close.focus();}
+  function shut(){if(!box)return;box.classList.remove('is-open');box.setAttribute('aria-hidden','true');document.body.classList.remove('settings-open');if(previous&&previous.focus)previous.focus();}
+  openers.forEach(function(b){if(b)b.addEventListener('click',open)});if(close)close.addEventListener('click',shut);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&box&&box.classList.contains('is-open'))shut()});
+  if(box)box.addEventListener('click',function(e){if(e.target===box)shut()});
+  document.querySelectorAll('[data-igi-carousel]').forEach(function(carousel){var slides=[...carousel.querySelectorAll('.igi-slide')],dots=[...carousel.querySelectorAll('.igi-dots button')],index=0,timer;
+    function show(n){index=(n+slides.length)%slides.length;slides.forEach(function(s,i){s.classList.toggle('is-active',i===index)});dots.forEach(function(d,i){d.classList.toggle('is-active',i===index);if(i===index)d.setAttribute('aria-current','true');else d.removeAttribute('aria-current')})}
+    function start(){clearInterval(timer);if(!matchMedia('(prefers-reduced-motion: reduce)').matches)timer=setInterval(function(){show(index+1)},2400)}
+    dots.forEach(function(d,i){d.addEventListener('click',function(){show(i);start()})});carousel.addEventListener('mouseenter',function(){clearInterval(timer)});carousel.addEventListener('mouseleave',start);carousel.addEventListener('focusin',function(){clearInterval(timer)});carousel.addEventListener('focusout',start);show(0);start();
+  });
+})();</script>
+</body>
 </html>

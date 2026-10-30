@@ -453,3 +453,35 @@ body.settings-open:before{content:"";position:fixed;inset:0;background:rgba(4,12
 .game-intro .text-link{font-size:14px;font-weight:750;text-decoration:underline;text-underline-offset:3px;color:var(--primary-dark)}
 @media(max-width:760px){.screenshot-gallery{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.screenshot-gallery{grid-template-columns:1fr}.site-brand .brand-tagline{font-size:9px}}
+
+/* Interactive single-frame gameplay carousel */
+.igi-carousel{position:relative;max-width:920px;margin:22px auto 0;padding:12px;border:1px solid var(--border);border-radius:18px;background:var(--surface);box-shadow:0 12px 32px rgba(25,55,20,.10)}
+.igi-slide{display:none;position:relative;overflow:hidden;border-radius:12px;aspect-ratio:16/9;background:#101810}
+.igi-slide.is-active{display:block;animation:igiFade .32s ease}
+.igi-slide img{display:block;width:100%;height:100%;object-fit:cover}
+.igi-slide span{position:absolute;left:14px;bottom:14px;padding:7px 12px;border-radius:999px;background:rgba(0,0,0,.68);color:#fff;font-size:13px;font-weight:700}
+.igi-dots{display:flex;justify-content:center;align-items:center;gap:10px;padding:12px 0 2px}
+.igi-dots button{width:10px;height:10px;min-height:10px;padding:0;border:0;border-radius:50%;background:#bdc9b1;cursor:pointer;transition:transform .18s,background .18s}
+.igi-dots button.is-active{background:var(--primary);transform:scale(1.35)}
+@keyframes igiFade{from{opacity:.35}to{opacity:1}}
+/* The keyboard cheat sheet is now a static field manual; settings are a modal opened on demand. */
+#controls-rail{position:fixed;left:14px;top:50%;transform:translateY(-50%);z-index:5;width:210px;max-height:calc(100vh - 30px);overflow:auto;padding:15px;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.96);color:var(--ink);box-shadow:0 12px 34px rgba(25,55,20,.16);font-size:12px}
+#controls-rail .rail-heading{padding-bottom:10px;margin-bottom:8px;border-bottom:1px solid var(--border)}
+#controls-rail .rail-kicker,.settings-kicker{display:block;color:var(--olive);font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+#controls-rail .rail-heading strong{display:block;font-family:"Barlow Condensed",sans-serif;font-size:22px;line-height:1.1;text-transform:uppercase}
+#controls-rail .rail-heading p{margin:2px 0 0;color:var(--muted)}
+#controls-rail .rail-control{display:flex;justify-content:space-between;align-items:center;gap:5px;padding:6px 0;border-bottom:1px solid #edf1e7;color:var(--muted);font-size:11px}
+#controls-rail kbd{display:inline-block;padding:2px 4px;border:1px solid var(--border);border-radius:5px;background:var(--surface-2);color:var(--ink);font:700 10px ui-monospace,monospace;white-space:nowrap}
+#stage-settings{position:absolute;right:60px;bottom:12px;z-index:3;width:40px;height:40px;min-height:40px;display:grid;place-items:center;padding:0;border:1px solid rgba(255,255,255,.25);border-radius:10px;background:rgba(0,0,0,.62);color:#fff;font-size:19px;backdrop-filter:blur(5px)}
+#stage-settings:hover{background:rgba(0,0,0,.82)}
+#kbd{position:fixed!important;inset:0!important;z-index:100!important;display:none!important;place-items:center!important;width:100vw!important;max-height:none!important;overflow:auto!important;transform:none!important;padding:24px!important;border:0!important;border-radius:0!important;background:rgba(7,13,8,.68)!important;color:var(--ink)!important;backdrop-filter:blur(7px)!important;box-shadow:none!important}
+#kbd.is-open{display:grid!important}
+#kbd>*{width:min(100%,560px);max-height:min(82vh,760px);overflow:auto;padding:22px;border:1px solid var(--border);border-radius:18px;background:#fff;box-shadow:0 24px 70px rgba(0,0,0,.32)}
+#kbd .kbd-head{position:sticky;top:-22px;z-index:2;background:#fff;padding:0 0 14px}
+#kbd .kbd-head b{display:block;font-family:"Barlow Condensed",sans-serif;font-size:25px;text-transform:uppercase;color:var(--ink)}
+#kbd-close{margin-left:auto}
+body.settings-open{overflow:hidden}
+@media(max-width:1350px){#controls-rail{width:184px;left:8px;padding:10px}#controls-rail .rail-control{font-size:10px}}
+@media(max-width:1120px){#controls-rail{display:none}#stage-settings{right:60px}}
+@media(max-width:700px){.igi-carousel{padding:7px;border-radius:13px}.igi-slide span{left:8px;bottom:8px;font-size:11px}#stage-settings{right:58px;bottom:10px;width:38px;height:38px}}
+@media(prefers-reduced-motion:reduce){.igi-slide.is-active{animation:none}.igi-dots button{transition:none}}
