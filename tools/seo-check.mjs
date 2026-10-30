@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 
 const ROOT = "web";
@@ -33,9 +33,7 @@ function getAttr(tag, name) {
 function getMeta(html, name, property = false) {
   const selector = property ? "property" : "name";
   const tags = [...html.matchAll(/<meta\b[^>]*>/gi)].map(match => match[0]);
-  const tag = tags.find(item => {
-    return new RegExp("\\b" + selector + "=[\\\"']" + escapeRegExp(name) + "[\\\"']", "i").test(item);
-  });
+  const tag = tags.find(item => new RegExp("\\b" + selector + "=[\\\"']" + escapeRegExp(name) + "[\\\"']", "i").test(item));
   return tag ? getAttr(tag, "content") : "";
 }
 function routeForFile(file) {
@@ -59,8 +57,10 @@ function jsonLdObjects(html, file) {
 }
 
 const files = await walk(ROOT);
+const pageHtml = new Map();
 for (const file of files) {
   const html = await readFile(file, "utf8");
+  pageHtml.set(routeForFile(file), html);
   const rel = relative(ROOT, file).split(/[\\/]/).join("/");
   const route = routeForFile(file);
   const expectedCanonical = BASE + route;
@@ -104,26 +104,79 @@ for (const file of files) {
   if (ogWidth !== "1200" || ogHeight !== "630") errors.push(rel + ": expected 1200x630 social image dimensions");
   if (twitterCard !== "summary_large_image") errors.push(rel + ": missing large-image Twitter card");
   if (twitterImage !== ogImage) errors.push(rel + ": twitter:image must equal og:image");
-  if (!["website", "article"].includes(ogType)) errors.push(rel + ": invalid og:type");
   if (!html.includes('rel="manifest"') || !html.includes('rel="apple-touch-icon"') || !html.includes('rel="icon"')) errors.push(rel + ": missing icon or manifest links");
   if (!html.includes('class="legal-note"')) errors.push(rel + ": missing fan-project/legal footer note");
   if (/project-igi-online\.vercel\.app/i.test(html)) errors.push(rel + ": contains old Vercel host");
   if (/free/i.test(title) && !/own legally obtained|legally obtained game files/i.test(description)) errors.push(rel + ": uses free in title without own-copy clarification");
   if (route !== "/" && route !== "/play" && !schemaTypes.includes("BreadcrumbList")) errors.push(rel + ": missing BreadcrumbList JSON-LD");
+  if (route === "/faq" && !schemaTypes.includes("FAQPage")) errors.push(rel + ": missing FAQPage JSON-LD");
+  if (route !== "/faq" && schemaTypes.includes("FAQPage")) errors.push(rel + ": duplicate FAQPage schema outside the full FAQ page");
   if (rel.startsWith("blogs/") && rel !== "blogs/index.html") {
     if (ogType !== "article") errors.push(rel + ": blog post should use og:type=article");
     if (!schemaTypes.includes("Article")) errors.push(rel + ": missing Article JSON-LD");
   }
   if ((route === "/" || route === "/play") && !schemaTypes.includes("VideoGame")) errors.push(rel + ": missing VideoGame JSON-LD");
-  if ((route === "/faq" || route === "/play" || route === "/is-project-igi-online-safe") && !schemaTypes.includes("FAQPage")) errors.push(rel + ": missing FAQPage JSON-LD");
   if (route === "/") {
-    if (!html.includes("<noscript")) errors.push(rel + ": missing crawlable noscript summary");
-    if (!/Play Project I\.G\.I\. Online/i.test(html)) errors.push(rel + ": missing core search intent in page content");
+    if (!/Project I\.G\.I\. Online Play/i.test(title)) errors.push(rel + ": title must contain Project I.G.I. and Online Play");
+    if (!html.includes("<noscript")) errors.push(rel + ": missing a short noscript summary");
+    const main = html.indexOf('<main id="main-content">');
+    const h1 = html.indexOf("<h1", main);
+    const about = html.indexOf('id="about-game"', main);
+    const gallery = html.indexOf('id="screenshots"', main);
+    const stage = html.indexOf('<div id="stage"', main);
+    if (!(main >= 0 && h1 > main && about > h1 && gallery > about && stage > gallery)) errors.push(rel + ": H1, About and screenshots must appear before the game stage in source order");
+    if (/Checking your browser…/.test(html)) errors.push(rel + ": static loading placeholder is present in crawlable HTML");
+    if (!/<p id="status"[^>]*>\s*<\/p>/.test(html)) errors.push(rel + ": loader status must start empty and be populated on demand");
+    if (!/<div id="crashnote"[^>]*>\s*<\/div>/.test(html)) errors.push(rel + ": crash message must be rendered only after an actual crash");
+    if (/Field notes before deployment|Comments area reserved|All rights reserved/i.test(html)) errors.push(rel + ": a removed placeholder or old footer phrase remains");
+    if (/id="disqus_thread"|class="comments-section"|class="promo-head"/.test(html)) errors.push(rel + ": a disabled comments/ad placeholder remains");
+    if (/if mapped/i.test(html)) errors.push(rel + ": hedged key-binding wording remains");
   }
+  if (route === "/play") {
+    if (schemaTypes.includes("FAQPage")) errors.push(rel + ": player page duplicates FAQ schema");
+    if (/id="faq"[^>]*>[\s\S]*?Frequently asked questions/i.test(html)) errors.push(rel + ": duplicate FAQ block on player page");
+    if (/Comments area reserved|All rights reserved|Field notes before deployment/i.test(html)) errors.push(rel + ": old placeholder/footer copy remains");
+  }
+
+  // Every content image needs an alt attribute. Empty alt is allowed for decorative logos/background art.
+  for (const image of html.matchAll(/<img\b[^>]*>/gi)) {
+    if (!/\balt=["'][^"']*["']/i.test(image[0])) errors.push(rel + ": image missing alt attribute: " + image[0].slice(0, 100));
+  }
+  if (/vercel\.app/i.test(html)) errors.push(rel + ": old Vercel hostname remains in public HTML");
 }
 
-if (canonicals.size !== expectedRoutes.length) {
-  errors.push("Expected " + expectedRoutes.length + " canonical pages; found " + canonicals.size);
+if (canonicals.size !== expectedRoutes.length) errors.push("Expected " + expectedRoutes.length + " canonical pages; found " + canonicals.size);
+
+// The deployed root file must be the real home page, not a redirect stub.
+const rootIndex = await readFile("index.html", "utf8");
+const webIndex = await readFile("web/index.html", "utf8");
+if (rootIndex !== webIndex) errors.push("root index.html must match the full web/index.html game page");
+if (/Opening IGI Online|window\.location\.replace\('\/web\/'\)|http-equiv="refresh"/i.test(rootIndex)) errors.push("root index.html is still a redirect stub");
+
+// Home-only requirements.
+const home = pageHtml.get("/");
+if (home && !home.includes("Original campaign: single-player")) errors.push("Home page must distinguish the original single-player campaign from browser netplay");
+if (home && !home.includes("separate 1v1 online-room option")) errors.push("Home page must explain the added browser-only 1v1 feature");
+
+// Screenshot assets and descriptive names.
+for (const asset of [
+  "images/project-igi-gameplay-compound.jpg",
+  "images/project-igi-gameplay-yard.jpg",
+  "images/project-igi-gameplay-interior.jpg"
+]) {
+  try { await stat(asset); } catch { errors.push("Missing screenshot asset: " + asset); }
+}
+
+// Only the full FAQ page should carry the FAQ schema/content.
+const faq = pageHtml.get("/faq") || "";
+if ((faq.match(/<details\b/gi) || []).length < 8) errors.push("The full FAQ page should retain its grouped, detailed answers");
+if ((faq.match(/<script\b[^>]*application\/ld\+json/gi) || []).length < 2) errors.push("The FAQ page should keep its BreadcrumbList and FAQPage schema");
+
+// Site-wide navigation links should be absolute clean routes, not anchor-only section shortcuts.
+for (const [route, html] of pageHtml) {
+  if (!html.includes('href="/play"') || !html.includes('href="/controls"') || !html.includes('href="/faq"') || !html.includes('href="/blog"')) {
+    errors.push(route + ": header navigation must use clean /play, /controls, /faq and /blog URLs");
+  }
 }
 const robots = await readFile("robots.txt", "utf8");
 if (!robots.includes("User-agent: *") || !robots.includes("Allow: /")) errors.push("robots.txt: crawler access rules missing");
@@ -135,6 +188,7 @@ for (const route of expectedRoutes) {
   if (!sitemap.includes("<loc>" + BASE + route + "</loc>")) errors.push("sitemap.xml: missing " + route);
 }
 if (/vercel\.app/i.test(sitemap)) errors.push("sitemap.xml: old Vercel host remains");
+
 const key = (await readFile("indexnow-key.txt", "utf8")).trim();
 const pingScript = await readFile("tools/indexnow-ping.mjs", "utf8");
 if (!key || !pingScript.includes(key)) errors.push("IndexNow key does not match the submission script");
@@ -143,8 +197,14 @@ const manifest = JSON.parse(await readFile("site.webmanifest", "utf8"));
 if (!manifest.icons?.some(icon => icon.src === "/icon-192.png")) errors.push("site.webmanifest: missing 192px PNG icon");
 if (!manifest.icons?.some(icon => icon.src === "/icon-512.png")) errors.push("site.webmanifest: missing 512px PNG icon");
 
+const about = pageHtml.get("/about") || "";
+const aboutArticle = about.match(/<article class="inner-card about-article">([\s\S]*?)<\/article>/)?.[1] || "";
+const aboutWords = (aboutArticle.replace(/<[^>]+>/g, " ").replace(/&amp;/g, " ").match(/\b[\w’'-]+\b/g) || []).length;
+if (aboutWords < 800 || aboutWords > 1200) errors.push("About page must contain 800–1,200 words; found " + aboutWords);
+if (!about.includes("images/project-igi-gameplay-compound.jpg") || !about.includes("alt=")) errors.push("About page needs its screenshot gallery with alt text");
+
 if (errors.length) {
   console.error("SEO validation failed:\n- " + errors.join("\n- "));
   process.exit(1);
 }
-console.log("SEO validation passed: " + titles.size + " HTML pages, " + canonicals.size + " unique canonicals, " + expectedRoutes.length + " sitemap routes.");
+console.log("SEO validation passed: " + titles.size + " HTML pages, " + canonicals.size + " canonicals, root page, screenshot gallery and FAQ uniqueness. About: " + aboutWords + " words.");
