@@ -247,3 +247,17 @@ body.ads-wide:not(.playing):not(.kbd-off) main #stage{width:100%;max-width:none;
 #kbd .settings-group[open] summary{margin-bottom:10px}
 #kbd .settings-group p{margin:5px 0;color:var(--muted);font-size:12px;line-height:1.55}
 #kbd .settings-group #kbd-mouse,#kbd .settings-group #kbd-binds{min-width:0}
+
+
+/* Requested desktop flip: game stage on the left, controls/settings on the right. */
+@media(min-width:801px){
+  main:not(.inner-main){grid-template-columns:minmax(0,2.35fr) minmax(280px,.95fr)}
+  main:not(.inner-main) #stage{grid-column:1!important;grid-row:3!important}
+  main:not(.inner-main) #kbd{grid-column:2!important;grid-row:3!important}
+}
+.browser-prompt{display:flex;align-items:center;gap:5px;margin:8px 0 5px!important;color:var(--primary-dark)!important;font-size:clamp(18px,2vw,24px)!important;font-weight:800;letter-spacing:.01em}
+.typing-caret{display:inline-block;width:2px;height:1.12em;flex:0 0 2px;background:var(--primary);vertical-align:middle;animation:typing-caret-blink .82s steps(1,end) infinite}
+@keyframes typing-caret-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+.game-intro-note{margin:0!important}
+@media(prefers-reduced-motion:reduce){.typing-caret{animation:none;opacity:1}}
+@media(max-width:800px){.browser-prompt{font-size:18px!important}}
