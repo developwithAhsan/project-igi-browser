@@ -1,20 +1,21 @@
-name: IndexNow after deployment
+name: IndexNow after production deployment
 on:
+  deployment_status:
   workflow_dispatch:
-    inputs:
-      site_url:
-        description: "Deployed site URL"
-        required: false
-        default: "https://project-igi-online.vercel.app"
 jobs:
   ping:
+    if: github.event_name == 'workflow_dispatch' || (github.event.deployment_status.state == 'success' && github.event.deployment.ref == 'redesign-oct30')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: redesign-oct30
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - name: Submit canonical sitemap URLs to IndexNow
         env:
-          SITE_URL: ${{ inputs.site_url }}
+          SITE_URL: https://project-igi.online
         run: node tools/indexnow-ping.mjs
