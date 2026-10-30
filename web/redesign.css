@@ -236,3 +236,5 @@ body.coarse.playing #kbd,body.touch.playing #kbd,body.coarse.playing #sitefoot,b
 /* Preserve legible light text inside the original dark game launcher and follow gate. */
 #panel{color:#eef4ef}
 #iggate{color:#eef4ef;--fg:#eef4ef;--muted:#a9b8ab;--faint:#8da092;--accent:#e9a820;--accent-hi:#f5c45c;--line:rgba(255,255,255,.16)}
+
+body.ads-wide:not(.playing):not(.kbd-off) main #stage{width:100%;max-width:none;margin:0;grid-column:2}
