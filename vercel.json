@@ -3,6 +3,28 @@
   "trailingSlash": false,
   "redirects": [
     {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "key": "host",
+          "value": ".*\\.vercel\\.app"
+        }
+      ],
+      "destination": "https://project-igi.online/:path*",
+      "statusCode": 301
+    },
+    {
+      "source": "/web/",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/web/index.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
       "source": "/index.html",
       "destination": "/",
       "permanent": true
@@ -329,5 +351,6 @@
         }
       ]
     }
-  ]
+  ],
+  "$schema": "https://openapi.vercel.sh/vercel.json"
 }
