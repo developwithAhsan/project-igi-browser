@@ -782,7 +782,21 @@
       <path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M7 14h10"/>
     </svg>
   </button>
-</main>
+</main><section class="comments-section site-comments" id="comments" aria-labelledby="comments-title"><h2 id="comments-title">Join the discussion</h2><p>Share your feedback, questions or gameplay tips with the Project IGI community.</p><div id="disqus_thread"></div><noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript></section>
+<script>
+  var disqus_config = function () {
+    var canonical = document.querySelector('link[rel="canonical"]');
+    this.page.url = canonical ? canonical.href : window.location.href.split('#')[0];
+    this.page.identifier = this.page.url;
+    this.page.title = document.title;
+  };
+  (function () {
+    var d = document, s = d.createElement('script');
+    s.src = 'https://igi-3.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+  })();
+</script>
 <script>(function(){var note=document.getElementById('crashnote');if(!note)return;var reveal=function(){if(!note.classList.contains('hidden')&&!note.textContent.trim()){note.textContent='The game stopped and the browser reloaded the page. On a phone, this can happen when memory runs low. Close other tabs and apps before starting again.';}};new MutationObserver(reveal).observe(note,{attributes:true,attributeFilter:['class']});reveal();})();</script>
 <script defer src="netplay.js"></script>
 <script defer src="controls.js?v=8"></script>
