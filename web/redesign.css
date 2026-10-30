@@ -386,3 +386,37 @@ body.settings-open:before{content:"";position:fixed;inset:0;background:rgba(4,12
  #kbd .kbd-head{top:-16px;margin:-16px -16px 14px;padding:14px 16px}
  #kbd .kbd-foot{align-items:flex-start;flex-direction:column}
 }
+
+/* Desktop: game on the LEFT, static controls rail on the RIGHT. */
+@media(min-width:801px){
+ body main#main-content{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(250px,310px)!important;grid-template-rows:auto auto auto auto;align-items:start;column-gap:22px;row-gap:16px}
+ body main#main-content>.game-intro{grid-column:1/-1!important;grid-row:1!important}
+ body main#main-content>.game-info-card{grid-column:1!important;grid-row:2!important;position:static!important;width:100%}
+ body main#main-content>#stage{grid-column:1!important;grid-row:3!important;width:100%!important;max-width:none!important;aspect-ratio:16/9!important;max-height:none!important}
+ body main#main-content>.game-toolbar{grid-column:1!important;grid-row:4!important;width:100%!important;margin:0!important;justify-content:flex-start!important}
+ body main#main-content>#controls-rail{grid-column:2!important;grid-row:2 / span 3!important;position:sticky!important;top:88px!important;align-self:start!important;width:100%!important;max-height:calc(100vh - 108px);overflow:auto}
+ body main#main-content>.game-stats,body main#main-content>.content-section,body main#main-content>.comments-section{grid-column:1/-1!important}
+}
+/* The controls rail is a static reference only; settings remain exclusively in the Settings dialog. */
+#controls-rail .rail-note{display:none!important}
+#controls-rail{min-width:0}
+#controls-rail .rail-control{flex-wrap:wrap}
+#controls-rail kbd{white-space:normal}
+/* Mobile: game and its settings actions first, static controls directly below. */
+@media(max-width:800px){
+ body main#main-content{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:14px!important;padding:16px 12px 34px!important}
+ body main#main-content>.game-intro{order:1!important}
+ body main#main-content>.game-info-card{order:2!important;width:100%!important}
+ body main#main-content>#stage{order:3!important;width:100%!important;max-width:none!important;aspect-ratio:16/9!important;max-height:none!important}
+ body main#main-content>.game-toolbar{order:4!important;width:100%!important;margin:0!important;justify-content:flex-start!important}
+ body main#main-content>#controls-rail{order:5!important;position:static!important;width:100%!important;max-height:none!important;overflow:visible!important}
+ body main#main-content>.game-stats{order:6!important}
+ body main#main-content>.content-section{order:7!important}
+ .game-toolbar .toolbar-actions{width:100%;justify-content:flex-start!important}
+ .game-toolbar .toolbar-actions button{min-width:0;flex:1 1 140px}
+}
+@media(max-width:420px){
+ #controls-rail{padding:15px!important}
+ #controls-rail .rail-control{font-size:11px;gap:7px}
+ #controls-rail kbd{font-size:9px;padding:3px 5px}
+}
