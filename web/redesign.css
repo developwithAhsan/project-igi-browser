@@ -261,3 +261,79 @@ body.ads-wide:not(.playing):not(.kbd-off) main #stage{width:100%;max-width:none;
 .game-intro-note{margin:0!important}
 @media(prefers-reduced-motion:reduce){.typing-caret{animation:none;opacity:1}}
 @media(max-width:800px){.browser-prompt{font-size:18px!important}}
+
+
+/* Final requested composition: title and settings on the right, game on the left;
+   compact the stage slightly and place polished action controls directly underneath it. */
+@media(min-width:801px){
+  main:not(.inner-main){
+    grid-template-columns:minmax(0,2.2fr) minmax(280px,.9fr);
+    column-gap:clamp(18px,2.2vw,32px);
+    row-gap:18px;
+    align-items:start;
+  }
+  main:not(.inner-main) .game-intro{
+    grid-column:2!important;
+    grid-row:1!important;
+    align-self:end;
+    padding:0 0 6px;
+  }
+  main:not(.inner-main) .game-intro h1{
+    margin:0;
+    max-width:13ch;
+    font-size:clamp(2rem,3.5vw,3.2rem);
+  }
+  main:not(.inner-main) #stage{
+    grid-column:1!important;
+    grid-row:1 / span 2!important;
+    width:96%!important;
+    max-width:100%!important;
+    justify-self:center;
+    align-self:start;
+  }
+  main:not(.inner-main) #kbd{
+    grid-column:2!important;
+    grid-row:2!important;
+    position:relative;
+    top:auto;
+    max-height:calc(100vh - 170px);
+    align-self:start;
+  }
+  main:not(.inner-main) .game-toolbar{
+    grid-column:1!important;
+    grid-row:3!important;
+    width:96%;
+    justify-self:center;
+    justify-content:flex-end;
+    min-height:0;
+    padding:0;
+    border:0;
+    border-radius:0;
+    background:transparent;
+    box-shadow:none;
+  }
+}
+.game-intro .breadcrumb,.game-intro .eyebrow,.game-intro .browser-prompt,.game-intro .game-intro-note{display:none!important}
+.game-intro h1{margin:0!important}
+.game-toolbar .toolbar-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.game-toolbar .toolbar-actions button{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:42px;padding:9px 16px;border:1px solid #cbd8c5;border-radius:11px;
+  background:linear-gradient(180deg,#fff 0%,#f4f8f1 100%);color:#245d2b;
+  box-shadow:0 3px 9px rgba(24,65,29,.09),inset 0 1px 0 rgba(255,255,255,.9);
+  font-size:13px;font-weight:800;letter-spacing:.01em;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,background .16s ease;
+}
+.game-toolbar .toolbar-actions button:hover{
+  transform:translateY(-1px);border-color:#8fb88a;
+  background:#fff;box-shadow:0 6px 14px rgba(24,65,29,.13);
+}
+.game-toolbar .toolbar-actions button:focus-visible{outline:3px solid rgba(47,125,50,.28);outline-offset:2px}
+@media(max-width:800px){
+  main:not(.inner-main) .game-intro{grid-column:1;grid-row:1;padding:0 0 4px}
+  main:not(.inner-main) #stage{grid-column:1;grid-row:2;width:98%;justify-self:center}
+  main:not(.inner-main) .game-toolbar{grid-column:1;grid-row:3;width:98%;justify-self:center;justify-content:flex-end}
+  main:not(.inner-main) #kbd{grid-column:1;grid-row:4}
+  .game-toolbar .toolbar-actions{width:100%;justify-content:flex-end}
+  .game-toolbar .toolbar-actions button{flex:0 1 auto;min-width:140px}
+}
