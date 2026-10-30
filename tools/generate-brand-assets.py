@@ -2,7 +2,6 @@
 """Generate web icons and a social preview from repository-owned brand assets."""
 from pathlib import Path
 import base64
-import io
 
 from PIL import Image, ImageOps
 
@@ -44,14 +43,7 @@ png_bytes = cairosvg.svg2png(url=str(social_svg), output_width=1200, output_heig
 out = ROOT / "og-project-igi.png"
 out.write_bytes(png_bytes)
 if out.stat().st_size > 300 * 1024:
-    image = Image.open(io.BytesIO(png_bytes)).convert("RGB")
-    jpg = ROOT / "og-project-igi.jpg"
-    image.save(jpg, "JPEG", quality=88, optimize=True, progressive=True)
-    if jpg.stat().st_size > 300 * 1024:
-        raise SystemExit("Open Graph image exceeds 300 KB after JPEG optimization")
-    out.unlink()
-    print(f"Generated {jpg.name}: {jpg.stat().st_size} bytes")
-else:
-    print(f"Generated {out.name}: {out.stat().st_size} bytes")
+    raise SystemExit("Open Graph PNG exceeds 300 KB; optimize the SVG source before publishing")
+print(f"Generated {out.name}: {out.stat().st_size} bytes")
 for name in ["favicon.ico", "favicon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png"]:
     print(f"Generated {name}: {(ROOT / name).stat().st_size} bytes")
