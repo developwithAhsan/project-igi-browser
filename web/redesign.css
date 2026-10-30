@@ -509,3 +509,51 @@ body.inner-page .site-comments>p{color:var(--muted);margin:0 0 16px}
 body.inner-page #disqus_thread{width:100%;min-height:180px;padding:16px 0;background:transparent}
 @media(max-width:900px){body.inner-page main.inner-main{width:min(calc(100% - 32px),100%);gap:18px}body.inner-page .blog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){body.inner-page main.inner-main{width:calc(100% - 24px)}body.inner-page .blog-grid{grid-template-columns:1fr}body.inner-page .site-comments{width:calc(100% - 24px);padding:18px}body.inner-page .inner-card{padding:22px 18px}}
+
+
+/* Game controls/settings follow-up: visible dialog, right-aligned actions, document-flow reference rail. */
+.game-toolbar{
+  display:flex!important;
+  justify-content:flex-end!important;
+  width:100%;
+}
+.game-toolbar .toolbar-actions{
+  display:flex!important;
+  justify-content:flex-end!important;
+  align-items:center;
+  margin-left:auto!important;
+  margin-right:0!important;
+}
+#toolbar-fullscreen,#toolbar-settings{order:initial}
+#controls-rail{
+  position:static!important;
+  inset:auto!important;
+  transform:none!important;
+  float:none!important;
+  display:block!important;
+  width:min(260px,calc(100% - 28px))!important;
+  max-height:none!important;
+  overflow:visible!important;
+  margin:18px 14px 22px auto!important;
+}
+@media(max-width:1119px){
+  #controls-rail{
+    display:block!important;
+    width:calc(100% - 28px)!important;
+    max-width:720px!important;
+    margin:16px auto 22px!important;
+  }
+}
+@media(max-width:800px){
+  .game-toolbar{justify-content:flex-end!important}
+  .game-toolbar .toolbar-actions{width:auto!important;justify-content:flex-end!important}
+  .game-toolbar .toolbar-actions button{flex:0 0 auto!important}
+  #controls-rail{position:static!important;transform:none!important}
+}
+/* The inline legacy fullscreen rule hides the dialog when the game is not fullscreen.
+   Explicitly reopen it when Settings is activated. */
+body.settings-open #kbd.is-open,
+body:not(.kbd-off) #stage:not(:fullscreen) ~ #kbd.is-open{
+  display:grid!important;
+}
+#kbd.is-open{visibility:visible!important;pointer-events:auto!important}
