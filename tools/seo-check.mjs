@@ -169,8 +169,8 @@ for (const asset of [
 
 // Only the full FAQ page should carry the FAQ schema/content.
 const faq = pageHtml.get("/faq") || "";
-if ((faq.match(/<details\b/gi) || []).length < 8) errors.push("The full FAQ page should retain its grouped, detailed answers");
-if ((faq.match(/<script\b[^>]*application\/ld\+json/gi) || []).length < 2) errors.push("The FAQ page should keep its BreadcrumbList and FAQPage schema");
+if ((faq.match(/<h2\b/gi) || []).length < 12) errors.push("The full FAQ page should retain its expanded question-and-answer headings");
+if (!/"@type"\s*:\s*"FAQPage"/.test(faq) || !/"@type"\s*:\s*"BreadcrumbList"/.test(faq)) errors.push("The FAQ page should keep its BreadcrumbList and FAQPage schema");
 
 // Site-wide navigation links should be absolute clean routes, not anchor-only section shortcuts.
 for (const [route, html] of pageHtml) {
