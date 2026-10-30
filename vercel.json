@@ -197,6 +197,50 @@
     {
       "source": "/blog/:slug",
       "destination": "/web/blogs/:slug.html"
+    },
+    {
+      "source": "/redesign.css",
+      "destination": "/web/redesign.css"
+    },
+    {
+      "source": "/poster.jpg",
+      "destination": "/web/poster.jpg"
+    },
+    {
+      "source": "/netplay.js",
+      "destination": "/web/netplay.js"
+    },
+    {
+      "source": "/controls.js",
+      "destination": "/web/controls.js"
+    },
+    {
+      "source": "/touch.js",
+      "destination": "/web/touch.js"
+    },
+    {
+      "source": "/loader.js",
+      "destination": "/web/loader.js"
+    },
+    {
+      "source": "/redesign-ui.js",
+      "destination": "/web/redesign-ui.js"
+    },
+    {
+      "source": "/audio-worklet.js",
+      "destination": "/web/audio-worklet.js"
+    },
+    {
+      "source": "/ad.html",
+      "destination": "/web/ad.html"
+    },
+    {
+      "source": "/build/:path*",
+      "destination": "/web/build/:path*"
+    },
+    {
+      "source": "/game/:path*",
+      "destination": "/web/game/:path*"
     }
   ],
   "headers": [
