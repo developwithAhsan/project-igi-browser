@@ -6,6 +6,7 @@ on:
       - "logo.png"
       - "og-project-igi.svg"
       - "tools/generate-brand-assets.py"
+      - ".github/workflows/generate-brand-assets.yml"
   workflow_dispatch:
 permissions:
   contents: write
