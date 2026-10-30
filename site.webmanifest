@@ -1,0 +1,18 @@
+{
+  "name": "IGI Online – Project I.G.I. Browser Edition",
+  "short_name": "IGI Online",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F5F7EE",
+  "theme_color": "#2F7D32",
+  "description": "Unofficial browser port for your own legally obtained copy of Project I.G.I.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
