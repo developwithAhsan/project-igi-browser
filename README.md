@@ -1,8 +1,8 @@
 # Project I.G.I. in the browser
 
 [Project I.G.I.](https://en.wikipedia.org/wiki/Project_I.G.I.) (Innerloop Studios / Eidos, 2000) running in a
-browser tab, on desktop and on phones. Play it at **https://igi.sagarinfosec.site** with your own copy of the
-game (the page downloads nothing you don't already own: this repo has no game files and no game code).
+browser tab, on desktop and on supported phones and tablets. The public site is **https://project-igi.online**.
+Players must import their own legally obtained game folder; this repository contains the browser port and host/runtime code, but no copyrighted commercial game data.
 
 This is a port of [Dhaiwat Pandya's cricket07-browser](https://github.com/Dhaiwat10/cricket07-browser), a
 static x86-to-C-to-WebAssembly recompiler with a Windows API layer, to a different game. What it adds:
