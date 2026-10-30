@@ -169,3 +169,12 @@ main{width:min(100% - 40px,1440px);min-height:100vh;margin:0 auto;display:grid;g
 @media(prefers-reduced-motion:reduce){
   *,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* Final layout placement: the header is a full-width sibling of main; stage and settings share row 3. */
+#stage{grid-row:3}
+#kbd{grid-row:3}
+#kbd .kbd-head{cursor:pointer}
+#kbd .kbd-head:after{content:"";display:none}
+#kbd.mobile-collapsed .kbd-head{margin-bottom:0}
+#kbd.mobile-collapsed .game-facts-mini,#kbd.mobile-collapsed #kbd-mouse,#kbd.mobile-collapsed #kbd-binds,#kbd.mobile-collapsed h3,#kbd.mobile-collapsed .row:not(.kbd-head),#kbd.mobile-collapsed .kbd-foot{visibility:hidden}
+@media(max-width:800px){#stage{grid-row:auto}#kbd{grid-row:auto}#kbd .kbd-head:after{content:"Tap header to expand / collapse";display:block;margin-left:auto;color:var(--muted);font-size:10px;font-family:Inter,system-ui,sans-serif}}
