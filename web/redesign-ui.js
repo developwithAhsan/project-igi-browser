@@ -32,7 +32,6 @@
     });
   }
   var controlsToggle = document.getElementById('mobile-controls-toggle');
-  var controlsHead = controls && controls.querySelector('.kbd-head');
   if (controlsToggle && controls) {
     controlsToggle.addEventListener('click', function (event) {
       event.stopPropagation();
