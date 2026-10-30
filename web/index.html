@@ -760,24 +760,6 @@
     </svg>
   </button>
 </main>
-<script>
-  // Visitor counter (same-origin count.php; a third-party badge would be blocked by COEP). Counts once per
-  // browser session so reloads don't inflate it; still shows the total to returning visitors.
-  (function () {
-    try {
-      var first = !sessionStorage.getItem('igi_v');
-      sessionStorage.setItem('igi_v', '1');
-      fetch('count.php' + (first ? '?hit=1' : ''), { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          var el = document.getElementById('visits');
-          var n = d && d.count != null ? Number(d.count) : null;
-          var compact = n == null ? '' : n < 1000 ? String(n) : (n / 1000).toFixed(2).replace(/\.?0+$/, '') + 'k';
-          if (el && n != null) el.textContent = '\u{1F441} ' + compact + ' visitors';
-        }).catch(function () {});
-    } catch (e) {}
-  })();
-</script>
 <script defer src="netplay.js"></script>
 <script defer src="controls.js?v=8"></script>
 <script defer src="touch.js?v=12"></script>
