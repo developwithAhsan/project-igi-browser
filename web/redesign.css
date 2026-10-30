@@ -238,3 +238,12 @@ body.coarse.playing #kbd,body.touch.playing #kbd,body.coarse.playing #sitefoot,b
 #iggate{color:#eef4ef;--fg:#eef4ef;--muted:#a9b8ab;--faint:#8da092;--accent:#e9a820;--accent-hi:#f5c45c;--line:rgba(255,255,255,.16)}
 
 body.ads-wide:not(.playing):not(.kbd-off) main #stage{width:100%;max-width:none;margin:0;grid-column:2}
+
+#kbd .settings-group{margin:10px 0;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:#fbfcf8;color:var(--muted)}
+#kbd .settings-group summary{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:28px;cursor:pointer;color:var(--primary-dark);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;list-style:none}
+#kbd .settings-group summary::-webkit-details-marker{display:none}
+#kbd .settings-group summary:after{content:"+";font-size:18px;color:var(--primary)}
+#kbd .settings-group[open] summary:after{content:"−"}
+#kbd .settings-group[open] summary{margin-bottom:10px}
+#kbd .settings-group p{margin:5px 0;color:var(--muted);font-size:12px;line-height:1.55}
+#kbd .settings-group #kbd-mouse,#kbd .settings-group #kbd-binds{min-width:0}
