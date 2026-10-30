@@ -550,19 +550,19 @@
 
 /* Final game-page layout overrides: settings must open outside fullscreen; controls stay in document flow. */
 @media(min-width:801px){
-  body main#main-content>.game-toolbar{justify-content:flex-end!important}
-  body main#main-content>.game-toolbar .toolbar-actions{justify-content:flex-end!important;margin-left:auto!important}
-  body main#main-content>#controls-rail{
+  html body main#main-content>.game-toolbar{justify-content:flex-end!important}
+  html body main#main-content>.game-toolbar .toolbar-actions{justify-content:flex-end!important;margin-left:auto!important}
+  html body main#main-content>#controls-rail{
     position:static!important;inset:auto!important;top:auto!important;left:auto!important;right:auto!important;
     transform:none!important;align-self:start!important;grid-column:2!important;grid-row:2 / span 3!important;
-    width:100%!important;max-height:none!important;overflow:visible!important;margin:0!important;
+    display:block!important;width:100%!important;max-height:none!important;overflow:visible!important;margin:0!important;
   }
 }
 @media(max-width:800px){
-  body main#main-content>.game-toolbar{justify-content:flex-end!important}
-  body main#main-content>.game-toolbar .toolbar-actions{width:auto!important;justify-content:flex-end!important;margin-left:auto!important}
-  body main#main-content>.game-toolbar .toolbar-actions button{flex:0 0 auto!important}
-  body main#main-content>#controls-rail{position:static!important;inset:auto!important;transform:none!important;display:block!important;max-height:none!important;overflow:visible!important}
+  html body main#main-content>.game-toolbar{justify-content:flex-end!important}
+  html body main#main-content>.game-toolbar .toolbar-actions{width:auto!important;justify-content:flex-end!important;margin-left:auto!important}
+  html body main#main-content>.game-toolbar .toolbar-actions button{flex:0 0 auto!important}
+  html body main#main-content>#controls-rail{position:static!important;inset:auto!important;transform:none!important;display:block!important;max-height:none!important;overflow:visible!important}
 }
 body.settings-open #kbd.is-open,
 body:not(.kbd-off) #stage:not(:fullscreen) ~ #kbd.is-open{
@@ -571,7 +571,7 @@ body:not(.kbd-off) #stage:not(:fullscreen) ~ #kbd.is-open{
 body.settings-open:before{z-index:99!important}
 #kbd.is-open{z-index:100!important}
 </style>
-<link rel="preload" href="/redesign.css?v=20261030-3" as="style"><link rel="stylesheet" href="/redesign.css?v=20261030-3">
+<link rel="preload" href="/redesign.css?v=20261030-4" as="style"><link rel="stylesheet" href="/redesign.css?v=20261030-4">
 
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://project-igi.online/#website","url":"https://project-igi.online/","name":"Project IGI Online","inLanguage":"en"},{"@type":"Organization","@id":"https://project-igi.online/#organization","name":"IGI Online Team","url":"https://project-igi.online/"},{"@type":"VideoGame","@id":"https://project-igi.online/#game","name":"Project I.G.I.: I'm Going In","datePublished":"2000","genre":"Tactical first-person shooter","gamePlatform":"Web browser","applicationCategory":"Game","gameMode":"SinglePlayer","author":{"@type":"Organization","name":"Innerloop Studios"},"publisher":{"@type":"Organization","name":"Eidos Interactive"}}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://project-igi.online/"},{"@type":"ListItem","position":2,"name":"Play Project I.G.I. Online","item":"https://project-igi.online/play"}]}</script>
@@ -917,7 +917,7 @@ body.settings-open:before{z-index:99!important}
     setTimeout(loadAds, 10000);
   } // Third-party ad frames load only after idle or user interaction.
 </script>
-<script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd"),close=document.getElementById("kbd-close"),previous=null;function openSettings(){if(!k)return;previous=document.activeElement;k.classList.add("is-open");k.setAttribute("aria-hidden","false");document.body.classList.add("settings-open");if(close)close.focus()}function closeSettings(){if(!k)return;k.classList.remove("is-open");k.setAttribute("aria-hidden","true");document.body.classList.remove("settings-open");if(previous&&previous.focus)previous.focus()}if(st)st.addEventListener("click",openSettings);if(close)close.addEventListener("click",closeSettings);document.addEventListener("keydown",function(e){if(e.key==="Escape"&&k&&k.classList.contains("is-open"))closeSettings()});if(k)k.addEventListener("click",function(e){if(e.target===k)closeSettings()})})();</script><script src="redesign-ui.js?v=20261030-3" defer></script><script>(function(){
+<script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd"),close=document.getElementById("kbd-close"),previous=null;function openSettings(){if(!k)return;previous=document.activeElement;k.classList.add("is-open");k.setAttribute("aria-hidden","false");document.body.classList.add("settings-open");if(close)close.focus()}function closeSettings(){if(!k)return;k.classList.remove("is-open");k.setAttribute("aria-hidden","true");document.body.classList.remove("settings-open");if(previous&&previous.focus)previous.focus()}if(st)st.addEventListener("click",openSettings);if(close)close.addEventListener("click",closeSettings);document.addEventListener("keydown",function(e){if(e.key==="Escape"&&k&&k.classList.contains("is-open"))closeSettings()});if(k)k.addEventListener("click",function(e){if(e.target===k)closeSettings()})})();</script><script src="redesign-ui.js?v=20261030-4" defer></script><script>(function(){
   var box=document.getElementById('kbd'),openers=[document.getElementById('toolbar-settings')],close=document.getElementById('kbd-close'),previous=null;
   function open(){if(!box)return;previous=document.activeElement;box.classList.add('is-open');box.setAttribute('aria-hidden','false');document.body.classList.add('settings-open');if(close)close.focus();}
   function shut(){if(!box)return;box.classList.remove('is-open');box.setAttribute('aria-hidden','true');document.body.classList.remove('settings-open');if(previous&&previous.focus)previous.focus();}
