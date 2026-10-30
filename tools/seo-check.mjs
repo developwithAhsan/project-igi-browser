@@ -6,12 +6,12 @@ const BASE = "https://project-igi.online";
 const errors = [];
 const titles = new Map();
 const canonicals = new Map();
-const routes = new Set([
+const expectedRoutes = [
   "/", "/play", "/project-igi-1-online", "/project-igi-3-online-does-it-exist",
   "/is-project-igi-online-safe", "/controls", "/faq", "/about", "/contact",
   "/privacy", "/terms", "/dmca", "/disclaimer", "/cookie-policy", "/blog",
   "/blog/getting-started", "/blog/stealth-tactics", "/blog/browser-performance"
-]);
+];
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -23,34 +23,64 @@ async function walk(dir) {
   }
   return out;
 }
-function attr(tag, name) {
-  return tag.match(new RegExp('(?:^|\\s)' + name + '=["\\']([^"\\']*)["\\']', "i"))?.[1] ?? "";
+function escapeRegExp(value) {
+  return value.replace(/[|\\{}()[\]^$+*?.-]/g, "\\$&");
 }
-function meta(html, key, property = false) {
-  const tags = [...html.matchAll(/<meta\\b[^>]*>/gi)].map(m => m[0]);
-  const tag = tags.find(t => new RegExp((property ? 'property' : 'name') + '=["\\']' + key.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&') + '["\\']', "i").test(t));
-  return tag ? attr(tag, "content") : "";
+function getAttr(tag, name) {
+  const match = tag.match(new RegExp("\\b" + escapeRegExp(name) + "=[\\\"']([^\\\"']*)[\\\"']", "i"));
+  return match ? match[1] : "";
 }
-function expectedPath(file) {
-  const p = relative(ROOT, file).replaceAll("\\", "/");
-  if (p === "index.html") return "/";
-  if (p === "play.html") return "/play";
-  if (p === "blogs/index.html") return "/blog";
-  return "/" + p.replace(/^blogs\\//, "blog/").replace(/\\.html$/, "");
+function getMeta(html, name, property = false) {
+  const selector = property ? "property" : "name";
+  const tags = [...html.matchAll(/<meta\b[^>]*>/gi)].map(match => match[0]);
+  const tag = tags.find(item => {
+    return new RegExp("\\b" + selector + "=[\\\"']" + escapeRegExp(name) + "[\\\"']", "i").test(item);
+  });
+  return tag ? getAttr(tag, "content") : "";
 }
-for (const file of await walk(ROOT)) {
+function routeForFile(file) {
+  const path = relative(ROOT, file).split(/[\\/]/).join("/");
+  if (path === "index.html") return "/";
+  if (path === "play.html") return "/play";
+  if (path === "blogs/index.html") return "/blog";
+  return "/" + path.replace(/^blogs\//, "blog/").replace(/\.html$/, "");
+}
+function jsonLdObjects(html, file) {
+  const blocks = [...html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  const objects = [];
+  for (const block of blocks) {
+    try {
+      objects.push(JSON.parse(block[1]));
+    } catch (error) {
+      errors.push(file + ": invalid JSON-LD: " + error.message);
+    }
+  }
+  return objects;
+}
+
+const files = await walk(ROOT);
+for (const file of files) {
   const html = await readFile(file, "utf8");
-  const rel = relative(ROOT, file).replaceAll("\\", "/");
-  const expected = BASE + expectedPath(file);
-  const title = html.match(/<title>([\\s\\S]*?)<\\/title>/i)?.[1]?.trim() ?? "";
-  const description = meta(html, "description");
-  const canonical = html.match(/<link\\s+rel=["']canonical["']\\s+href=["']([^"']+)["']/i)?.[1] ?? "";
-  const h1Count = (html.match(/<h1\\b/gi) || []).length;
-  const ogUrl = meta(html, "og:url", true);
-  const ogImage = meta(html, "og:image", true);
-  const twitterCard = meta(html, "twitter:card");
-  const twitterImage = meta(html, "twitter:image");
-  const ogType = meta(html, "og:type", true);
+  const rel = relative(ROOT, file).split(/[\\/]/).join("/");
+  const route = routeForFile(file);
+  const expectedCanonical = BASE + route;
+  const title = html.match(/<title>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? "";
+  const description = getMeta(html, "description");
+  const canonical = html.match(/<link\s+rel=["']canonical["']\s+href=["']([^"']+)["']/i)?.[1] ?? "";
+  const h1Count = (html.match(/<h1\b/gi) || []).length;
+  const ogUrl = getMeta(html, "og:url", true);
+  const ogImage = getMeta(html, "og:image", true);
+  const ogWidth = getMeta(html, "og:image:width", true);
+  const ogHeight = getMeta(html, "og:image:height", true);
+  const twitterCard = getMeta(html, "twitter:card");
+  const twitterImage = getMeta(html, "twitter:image");
+  const ogType = getMeta(html, "og:type", true);
+  const schemas = jsonLdObjects(html, rel);
+  const schemaTypes = schemas.flatMap(value => {
+    if (!value || typeof value !== "object") return [];
+    if (Array.isArray(value["@graph"])) return value["@graph"].map(item => item["@type"]).filter(Boolean);
+    return [value["@type"]].filter(Boolean);
+  });
 
   if (!title) errors.push(rel + ": missing title");
   else {
@@ -62,38 +92,59 @@ for (const file of await walk(ROOT)) {
   else if (description.length >= 160) errors.push(rel + ": description is " + description.length + " chars (must be under 160)");
   if (!canonical) errors.push(rel + ": missing canonical");
   else {
-    if (canonical !== expected) errors.push(rel + ": canonical mismatch; expected " + expected + ", got " + canonical);
+    if (canonical !== expectedCanonical) errors.push(rel + ": canonical mismatch; expected " + expectedCanonical + ", got " + canonical);
     if (canonicals.has(canonical)) errors.push(rel + ": duplicate canonical with " + canonicals.get(canonical));
     canonicals.set(canonical, rel);
   }
   if (h1Count !== 1) errors.push(rel + ": expected exactly one H1, found " + h1Count);
-  if (!meta(html, "robots")) errors.push(rel + ": missing robots meta");
-  if (!meta(html, "author")) errors.push(rel + ": missing author meta");
+  if (getMeta(html, "robots") !== "index,follow,max-image-preview:large") errors.push(rel + ": missing or invalid robots meta");
+  if (!getMeta(html, "author")) errors.push(rel + ": missing author meta");
   if (ogUrl !== canonical) errors.push(rel + ": og:url must equal canonical");
-  if (!ogImage.startsWith(BASE + "/") || !ogImage.endsWith(".png")) errors.push(rel + ": og:image must be a canonical-domain PNG");
+  if (!ogImage.startsWith(BASE + "/") || !ogImage.endsWith(".png")) errors.push(rel + ": og:image must be a primary-domain PNG");
+  if (ogWidth !== "1200" || ogHeight !== "630") errors.push(rel + ": expected 1200x630 social image dimensions");
   if (twitterCard !== "summary_large_image") errors.push(rel + ": missing large-image Twitter card");
   if (twitterImage !== ogImage) errors.push(rel + ": twitter:image must equal og:image");
   if (!["website", "article"].includes(ogType)) errors.push(rel + ": invalid og:type");
   if (!html.includes('rel="manifest"') || !html.includes('rel="apple-touch-icon"') || !html.includes('rel="icon"')) errors.push(rel + ": missing icon or manifest links");
   if (!html.includes('class="legal-note"')) errors.push(rel + ": missing fan-project/legal footer note");
-  if (/project-igi-online\\.vercel\\.app/i.test(html)) errors.push(rel + ": contains old Vercel canonical host");
+  if (/project-igi-online\.vercel\.app/i.test(html)) errors.push(rel + ": contains old Vercel host");
   if (/free/i.test(title) && !/own legally obtained|legally obtained game files/i.test(description)) errors.push(rel + ": uses free in title without own-copy clarification");
-  if (/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i.test(html) === false) errors.push(rel + ": description meta ordering could not be validated");
-  if (rel.startsWith("blogs/") && rel !== "blogs/index.html" && !/"@type"\\s*:\\s*"Article"/.test(html)) errors.push(rel + ": missing Article JSON-LD");
+  if (route !== "/" && route !== "/play" && !schemaTypes.includes("BreadcrumbList")) errors.push(rel + ": missing BreadcrumbList JSON-LD");
+  if (rel.startsWith("blogs/") && rel !== "blogs/index.html") {
+    if (ogType !== "article") errors.push(rel + ": blog post should use og:type=article");
+    if (!schemaTypes.includes("Article")) errors.push(rel + ": missing Article JSON-LD");
+  }
+  if ((route === "/" || route === "/play") && !schemaTypes.includes("VideoGame")) errors.push(rel + ": missing VideoGame JSON-LD");
+  if ((route === "/faq" || route === "/play" || route === "/is-project-igi-online-safe") && !schemaTypes.includes("FAQPage")) errors.push(rel + ": missing FAQPage JSON-LD");
+  if (route === "/") {
+    if (!html.includes("<noscript")) errors.push(rel + ": missing crawlable noscript summary");
+    if (!/Play Project I\.G\.I\. Online/i.test(html)) errors.push(rel + ": missing core search intent in page content");
+  }
 }
 
-// Site-level crawl directives must expose only the primary-domain sitemap.
-const robots = await readFile("robots.txt", "utf8");
-if (!robots.includes("Sitemap: " + BASE + "/sitemap.xml")) errors.push("robots.txt: missing primary-domain sitemap reference");
-if (/vercel\\.app/i.test(robots)) errors.push("robots.txt: old Vercel host remains");
-const sitemap = await readFile("sitemap.xml", "utf8");
-for (const url of routes) {
-  if (!sitemap.includes("<loc>" + BASE + url + "</loc>")) errors.push("sitemap.xml: missing canonical URL " + url);
+if (canonicals.size !== expectedRoutes.length) {
+  errors.push("Expected " + expectedRoutes.length + " canonical pages; found " + canonicals.size);
 }
-if (/vercel\\.app/i.test(sitemap)) errors.push("sitemap.xml: old Vercel host remains");
+const robots = await readFile("robots.txt", "utf8");
+if (!robots.includes("User-agent: *") || !robots.includes("Allow: /")) errors.push("robots.txt: crawler access rules missing");
+if (!robots.includes("Sitemap: " + BASE + "/sitemap.xml")) errors.push("robots.txt: missing primary-domain sitemap reference");
+if (/vercel\.app/i.test(robots)) errors.push("robots.txt: old Vercel host remains");
+
+const sitemap = await readFile("sitemap.xml", "utf8");
+for (const route of expectedRoutes) {
+  if (!sitemap.includes("<loc>" + BASE + route + "</loc>")) errors.push("sitemap.xml: missing " + route);
+}
+if (/vercel\.app/i.test(sitemap)) errors.push("sitemap.xml: old Vercel host remains");
+const key = (await readFile("indexnow-key.txt", "utf8")).trim();
+const pingScript = await readFile("tools/indexnow-ping.mjs", "utf8");
+if (!key || !pingScript.includes(key)) errors.push("IndexNow key does not match the submission script");
+
+const manifest = JSON.parse(await readFile("site.webmanifest", "utf8"));
+if (!manifest.icons?.some(icon => icon.src === "/icon-192.png")) errors.push("site.webmanifest: missing 192px PNG icon");
+if (!manifest.icons?.some(icon => icon.src === "/icon-512.png")) errors.push("site.webmanifest: missing 512px PNG icon");
 
 if (errors.length) {
-  console.error("SEO validation failed:\\n- " + errors.join("\\n- "));
+  console.error("SEO validation failed:\n- " + errors.join("\n- "));
   process.exit(1);
 }
-console.log("SEO validation passed: " + titles.size + " HTML pages, " + canonicals.size + " unique canonicals.");
+console.log("SEO validation passed: " + titles.size + " HTML pages, " + canonicals.size + " unique canonicals, " + expectedRoutes.length + " sitemap routes.");
