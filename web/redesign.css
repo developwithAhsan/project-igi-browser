@@ -340,3 +340,49 @@ body.ads-wide:not(.playing):not(.kbd-off) main #stage{width:100%;max-width:none;
 
 /* Responsive IGI redesign: preserve the canvas and runtime IDs. */
 main{grid-template-columns:minmax(0,1fr) minmax(250px,300px);gap:18px 22px;padding-top:30px}#stage{grid-column:1;grid-row:3;aspect-ratio:16/10;max-height:calc(100vh - 210px);border:1px solid #789b75;box-shadow:0 18px 46px #142d1830}.game-info-card{grid-column:2;grid-row:3;position:sticky;top:90px;padding:18px;border:1px solid var(--border);border-radius:16px;background:#fff;box-shadow:0 10px 28px #142d1814}.game-info-card img{width:58px;height:58px;object-fit:contain}.info-brand{display:flex;align-items:center;gap:12px}.game-info-card dl{display:grid;gap:8px}.game-info-card dl div{display:flex;justify-content:space-between;gap:8px;font-size:12px}.game-info-card dd{margin:0;font-weight:700}.game-info-card p{font-size:13px;color:var(--muted)}#kbd{display:none;position:fixed!important;z-index:1001!important;inset:50% auto auto 50%!important;transform:translate(-50%,-50%);width:min(92vw,560px)!important;max-height:84dvh!important;overflow:auto!important;box-shadow:0 28px 90px #06150dcc!important}body.settings-open:before{content:"";position:fixed;inset:0;background:#06120dcc;backdrop-filter:blur(5px);z-index:1000}body.settings-open #kbd{display:block!important}#kbd .kbd-head{position:sticky;top:-18px;z-index:2;background:#fff}#sitefoot{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:22px;padding:28px!important;border:1px solid var(--border)!important;border-radius:18px!important;background:#fff!important}#sitefoot .footer-brand p{font-weight:800;color:var(--primary-dark)}.brand-logo{width:44px;height:44px;object-fit:contain;vertical-align:middle}@media(max-width:850px){main{grid-template-columns:1fr;padding:18px 14px 36px}.game-info-card,#stage{grid-column:1;grid-row:auto}.game-info-card{position:static;order:4}#stage{aspect-ratio:4/3;max-height:none}#sitefoot{grid-template-columns:1fr;gap:14px}}@media(max-width:520px){.game-intro h1{font-size:clamp(2rem,10vw,2.8rem)}.toolbar-actions{display:grid;grid-template-columns:1fr 1fr}.site-header{min-height:62px;padding-inline:14px}.site-header .site-cta{display:none}}
+
+/* Split the previous combined panel: static controls rail + closed-by-default settings dialog. */
+@media(min-width:801px){
+  body main:not(.inner-main){display:grid;grid-template-columns:minmax(245px,290px) minmax(0,1fr);grid-auto-flow:row;align-items:start;gap:18px 24px;padding:26px clamp(16px,3vw,42px) 54px;width:100%;max-width:1600px}
+  body main:not(.inner-main) .game-intro{grid-column:2!important;grid-row:1!important}
+  body main:not(.inner-main) .game-info-card{grid-column:2!important;grid-row:2!important;position:static!important}
+  body main:not(.inner-main) #stage{grid-column:2!important;grid-row:3!important;width:100%!important;max-width:none!important;aspect-ratio:16/9;max-height:none;margin:0!important}
+  body main:not(.inner-main) .game-toolbar{grid-column:2!important;grid-row:4!important;width:100%;margin:0}
+  body main:not(.inner-main) #controls-rail{grid-column:1!important;grid-row:1 / span 4!important;position:sticky;top:88px;align-self:start;display:block!important}
+  body main:not(.inner-main) .game-stats,body main:not(.inner-main) .content-section{grid-column:1/-1}
+}
+#controls-rail{display:block;padding:20px;border:1px solid var(--border);border-radius:16px;background:#fff;color:var(--ink);box-shadow:0 10px 28px rgba(18,55,24,.08)}
+#controls-rail .rail-heading{padding-bottom:14px;margin-bottom:8px;border-bottom:1px solid var(--border)}
+#controls-rail .rail-kicker,.settings-kicker{display:block;color:var(--primary);font-size:10px;font-weight:850;letter-spacing:.13em;text-transform:uppercase}
+#controls-rail h2{margin:4px 0;font:800 27px/1.05 "Barlow Condensed",Inter,sans-serif;text-transform:uppercase;color:var(--ink)}
+#controls-rail .rail-heading p{margin:0;color:var(--muted);font-size:12px}
+#controls-rail .rail-control{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--ink)}
+#controls-rail .rail-control>span{font-weight:650}
+#controls-rail kbd{display:inline-block;padding:3px 6px;border:1px solid #d5dfd0;border-bottom-width:2px;border-radius:6px;background:#f5f8f2;color:#263d27;font:700 10px/1.3 Inter,system-ui,sans-serif;white-space:nowrap}
+#controls-rail .rail-note{margin-top:14px;padding:11px;border-radius:9px;background:#f2f7ef;color:#586b58;font-size:11px;line-height:1.55}
+#toolbar-settings{font-weight:800}
+#kbd{display:none;position:fixed!important;inset:50% auto auto 50%!important;transform:translate(-50%,-50%)!important;width:min(92vw,620px)!important;max-height:min(86dvh,780px)!important;overflow:auto!important;z-index:1202!important;padding:22px!important;border:1px solid var(--border)!important;border-radius:18px!important;background:#fff!important;color:var(--ink)!important;box-shadow:0 28px 90px rgba(0,0,0,.5)!important}
+#kbd.is-open{display:block!important}
+body.settings-open{overflow:hidden}
+body.settings-open:before{content:"";position:fixed;inset:0;background:rgba(4,12,7,.76);backdrop-filter:blur(5px);z-index:1201}
+#kbd .kbd-head{position:sticky;top:-22px;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:16px;margin:-22px -22px 16px;padding:18px 22px;background:#fff;border-bottom:1px solid var(--border)}
+#kbd .kbd-head b{display:block;margin-top:3px;color:var(--ink);font:800 25px/1.1 "Barlow Condensed",Inter,sans-serif;text-transform:uppercase}
+#kbd-close{width:38px;height:38px;border:1px solid var(--border);border-radius:10px;background:#f7f9f5;color:var(--ink);font-size:24px}
+#kbd .settings-group{margin:12px 0;padding:13px;border:1px solid var(--border);border-radius:12px;background:#fbfcf9;color:var(--ink)}
+#kbd .settings-group summary{cursor:pointer;font-weight:800;color:var(--primary-dark);font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+#kbd .settings-group p{color:var(--muted);font-size:13px;line-height:1.6}
+#kbd .kbd-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+#kbd .small{color:var(--muted);font-size:11px;line-height:1.5}
+@media(max-width:800px){
+ body main:not(.inner-main){display:flex;flex-direction:column;align-items:stretch;width:100%;padding:18px 14px 36px;gap:14px}
+ body main:not(.inner-main) .game-intro{order:1}
+ body main:not(.inner-main) .game-info-card{order:2;position:static!important}
+ body main:not(.inner-main) #stage{order:3;width:100%!important;max-width:none!important;aspect-ratio:4/3;max-height:none}
+ body main:not(.inner-main) .game-toolbar{order:4;width:100%;margin:0}
+ body main:not(.inner-main) #controls-rail{order:5;width:100%;position:static;display:block!important}
+ body main:not(.inner-main) .game-stats{order:6}
+ body main:not(.inner-main) .content-section{order:7}
+ #kbd{width:calc(100vw - 24px)!important;max-height:88dvh!important;padding:16px!important}
+ #kbd .kbd-head{top:-16px;margin:-16px -16px 14px;padding:14px 16px}
+ #kbd .kbd-foot{align-items:flex-start;flex-direction:column}
+}

@@ -705,34 +705,36 @@
       </div>
     </div>
   </div>
-  <div class="game-toolbar" aria-label="Game actions"><div class="toolbar-actions"><button id="toolbar-fullscreen" type="button">⛶ Fullscreen</button><button id="toolbar-settings" type="button">⚙ Controls &amp; settings</button></div></div>
-  <!-- GAME: DO NOT EDIT — existing controls/settings logic targets below are preserved. -->
-  <aside id="kbd" aria-label="Keyboard controls">
-    <div class="kbd-head"><b>Controls &amp; settings</b><button class="mobile-controls-toggle" id="mobile-controls-toggle" type="button" aria-expanded="true">Collapse</button>
-      <button id="kbd-close" type="button" aria-label="Hide controls" title="Hide">×</button>
+  <div class="game-toolbar" aria-label="Game actions"><div class="toolbar-actions"><button id="toolbar-fullscreen" type="button">⛶ Fullscreen</button><button id="toolbar-settings" type="button" aria-haspopup="dialog" aria-controls="kbd">⚙ Settings</button></div></div>
+  <!-- Static reference rail: no settings are shown here. -->
+  <aside id="controls-rail" aria-label="Game controls">
+    <div class="rail-heading"><span class="rail-kicker">FIELD MANUAL</span><h2>Controls</h2><p>Keyboard &amp; mouse reference</p></div>
+    <div class="rail-control"><span>Move</span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></div>
+    <div class="rail-control"><span>Look / Aim</span><kbd>Mouse</kbd></div>
+    <div class="rail-control"><span>Fire</span><kbd>Left click</kbd></div>
+    <div class="rail-control"><span>Alternate fire</span><kbd>Backspace</kbd></div>
+    <div class="rail-control"><span>Change weapon</span><kbd>Scroll</kbd> / <kbd>O</kbd></div>
+    <div class="rail-control"><span>Weapon slots</span><kbd>2</kbd> <kbd>4</kbd>–<kbd>9</kbd></div>
+    <div class="rail-control"><span>Map computer</span><kbd>C</kbd></div>
+    <div class="rail-control"><span>Game menu</span><kbd>Esc</kbd></div>
+    <div class="rail-control"><span>Fullscreen</span><kbd>Alt</kbd> + <kbd>Enter</kbd></div>
+    <div class="rail-note">Need to change sensitivity, display or input options? Open <b>Settings</b> below the game.</div>
+  </aside>
+  <!-- Settings dialog: runtime-generated mouse options and key bindings remain mounted in their original IDs. -->
+  <aside id="kbd" role="dialog" aria-modal="true" aria-label="Game settings" aria-hidden="true">
+    <div class="kbd-head"><div><span class="settings-kicker">PLAYER PREFERENCES</span><b>Game settings</b></div>
+      <button id="kbd-close" type="button" aria-label="Close settings" title="Close">×</button>
     </div>
-<div class="game-facts-mini"><strong>Project I.G.I. (2000)</strong><p>Developer: Innerloop Studios</p><p>Genre: Tactical first-person shooter</p><p>Play as David Jones in a single-player infiltration campaign.</p></div>
-    <details class="settings-group" open><summary>Keyboard &amp; Mouse</summary>
-    <!-- Mouse buttons and sensitivity, then the rebindable keys: rendered by loader.js (click a key to change it). -->
-    <div id="kbd-mouse"></div>
-    <div id="kbd-binds"></div>
-    <h3>Fixed keys</h3>
-    <div class="row"><span class="label">Change weapon</span><div class="keys">scroll · <kbd>O</kbd></div></div>
-    <div class="row"><span class="label">Weapon slots</span><div class="keys"><kbd>2</kbd> <kbd>4</kbd>–<kbd>9</kbd></div></div>
-    <div class="row"><span class="label">Alternate fire</span><div class="keys"><kbd>Backspace</kbd></div></div>
-    <div class="row"><span class="label">Map computer</span><div class="keys"><kbd>C</kbd></div></div>
-    <div class="row"><span class="label">Menu</span><div class="keys"><kbd>Esc</kbd></div></div>
-    <div class="row"><span class="label">Fullscreen</span><div class="keys"><kbd>Alt</kbd>+<kbd>Enter</kbd></div></div>
-    <div class="kbd-foot">
-      <span class="small">Click a key, then press the new one (<kbd>Esc</kbd> cancels, <kbd>Backspace</kbd> unbinds). Walk and crouch act while held. This game has no prone.</span>
-      <button id="kbd-reset" type="button" class="btn ghost">Reset</button>
-    </div>
+    <details class="settings-group" open><summary>Screen &amp; input</summary>
+      <!-- Mouse sensitivity and configurable input options are populated by the existing loader. -->
+      <div id="kbd-mouse"></div>
+      <div id="kbd-binds"></div>
+      <div class="kbd-foot"><span class="small">Select a key and press its replacement. Esc cancels; Backspace unbinds.</span><button id="kbd-reset" type="button" class="btn ghost">Reset controls</button></div>
     </details>
-    <details class="settings-group"><summary>Graphics / Performance</summary><p>Use the available screen-width option in the controls above. For smoother play, close memory-heavy tabs and use an up-to-date browser.</p></details>
+    <details class="settings-group"><summary>Graphics / Performance</summary><p>Choose the screen layout supported by your device. For smoother play, close memory-heavy tabs and use an up-to-date browser.</p></details>
     <details class="settings-group"><summary>Audio</summary><p>Audio may start after your first click or key press. Adjust your device volume; the game runtime manages in-game sound.</p></details>
     <details class="settings-group"><summary>Saved Data</summary><p>Runtime data and supported saves may use local browser storage. Avoid clearing site data if you want to retain local progress.</p></details>
   </aside>
-<!-- /GAME: DO NOT EDIT -->
 <div class="game-stats"><div class="stat-chip">✦ Free site access · bring your own game files</div><div class="stat-chip">▣ WebAssembly-powered</div><div class="stat-chip">⌨ Keyboard + mouse</div><div class="stat-chip">◫ Touch UI available</div></div>
 <section class="content-section soft" id="quick-answer"><p class="section-label">QUICK ANSWER</p><h2>Can you play Project I.G.I. online in a browser?</h2><p>Yes, this browser port can run the original Project I.G.I.: I'm Going In (2000), but it does not include or distribute the commercial game files. Select your own legally obtained game folder when prompted; the browser copies the files into private storage on your device.</p><p>This page is free to access, with no account or installer required. “Free” refers to access to this website, not a free copy or download of the original game.</p></section>
 <section class="content-section" id="play-guide-copy"><p class="section-label">BROWSER PLAY GUIDE</p><h2>How the Project I.G.I. browser edition works</h2>
@@ -867,5 +869,5 @@
     setTimeout(loadAds, 10000);
   } // Third-party ad frames load only after idle or user interaction.
 </script>
-<script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd");if(st&&k)st.addEventListener("click",function(){k.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})});var h=k&&k.querySelector(".kbd-head");if(h&&k)h.addEventListener("click",function(e){if(innerWidth<=800&&e.target.id!=="kbd-close"){var c=k.classList.toggle("mobile-collapsed");h.setAttribute("aria-expanded",String(!c))}})})();</script><script src="redesign-ui.js" defer></script></body>
+<script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd"),close=document.getElementById("kbd-close"),previous=null;function openSettings(){if(!k)return;previous=document.activeElement;k.classList.add("is-open");k.setAttribute("aria-hidden","false");document.body.classList.add("settings-open");if(close)close.focus()}function closeSettings(){if(!k)return;k.classList.remove("is-open");k.setAttribute("aria-hidden","true");document.body.classList.remove("settings-open");if(previous&&previous.focus)previous.focus()}if(st)st.addEventListener("click",openSettings);if(close)close.addEventListener("click",closeSettings);document.addEventListener("keydown",function(e){if(e.key==="Escape"&&k&&k.classList.contains("is-open"))closeSettings()});if(k)k.addEventListener("click",function(e){if(e.target===k)closeSettings()})})();</script><script src="redesign-ui.js" defer></script></body>
 </html>
