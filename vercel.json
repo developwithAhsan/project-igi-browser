@@ -3,6 +3,11 @@
   "trailingSlash": false,
   "redirects": [
     {
+      "source": "/web/redesign.css",
+      "destination": "/redesign.css",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "has": [
         {
@@ -211,10 +216,6 @@
       "destination": "/web/blogs/:slug.html"
     },
     {
-      "source": "/redesign.css",
-      "destination": "/web/redesign.css"
-    },
-    {
       "source": "/poster.jpg",
       "destination": "/web/poster.jpg"
     },
@@ -348,6 +349,19 @@
         {
           "key": "Cross-Origin-Embedder-Policy",
           "value": "require-corp"
+        }
+      ]
+    },
+    {
+      "source": "/redesign.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         }
       ]
     }
