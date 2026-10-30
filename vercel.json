@@ -1,0 +1,179 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/index.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/web",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/web/index.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/web/play.html",
+      "destination": "/play",
+      "permanent": true
+    },
+    {
+      "source": "/web/about.html",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/web/contact.html",
+      "destination": "/contact",
+      "permanent": true
+    },
+    {
+      "source": "/web/disclaimer.html",
+      "destination": "/disclaimer",
+      "permanent": true
+    },
+    {
+      "source": "/about.html",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/contact.html",
+      "destination": "/contact",
+      "permanent": true
+    },
+    {
+      "source": "/disclaimer.html",
+      "destination": "/disclaimer",
+      "permanent": true
+    },
+    {
+      "source": "/blogs/index.html",
+      "destination": "/blog",
+      "permanent": true
+    },
+    {
+      "source": "/blogs/:slug.html",
+      "destination": "/blog/:slug",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/web/index.html"
+    },
+    {
+      "source": "/play",
+      "destination": "/web/play.html"
+    },
+    {
+      "source": "/project-igi-1-online",
+      "destination": "/web/project-igi-1-online.html"
+    },
+    {
+      "source": "/project-igi-3-online-does-it-exist",
+      "destination": "/web/project-igi-3-online-does-it-exist.html"
+    },
+    {
+      "source": "/is-project-igi-online-safe",
+      "destination": "/web/is-project-igi-online-safe.html"
+    },
+    {
+      "source": "/controls",
+      "destination": "/web/controls.html"
+    },
+    {
+      "source": "/faq",
+      "destination": "/web/faq.html"
+    },
+    {
+      "source": "/about",
+      "destination": "/web/about.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/web/contact.html"
+    },
+    {
+      "source": "/disclaimer",
+      "destination": "/web/disclaimer.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/web/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/web/terms.html"
+    },
+    {
+      "source": "/dmca",
+      "destination": "/web/dmca.html"
+    },
+    {
+      "source": "/cookie-policy",
+      "destination": "/web/cookie-policy.html"
+    },
+    {
+      "source": "/blog",
+      "destination": "/web/blogs/index.html"
+    },
+    {
+      "source": "/blog/:slug",
+      "destination": "/web/blogs/:slug.html"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap.xml"
+    },
+    {
+      "source": "/site.webmanifest",
+      "destination": "/site.webmanifest"
+    },
+    {
+      "source": "/favicon.svg",
+      "destination": "/favicon.svg"
+    },
+    {
+      "source": "/og-project-igi.svg",
+      "destination": "/og-project-igi.svg"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    }
+  ]
+}
