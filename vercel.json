@@ -12,7 +12,7 @@
       "has": [
         {
           "type": "host",
-          "value": ".*\\.vercel\\.app"
+          "value": "^(project-igi-online|project-igi-browser-tostoreusefuldata-7699)\\.vercel\\.app$"
         }
       ],
       "destination": "https://project-igi.online/:path*",
