@@ -14,19 +14,24 @@
       "statusCode": 301
     },
     {
+      "source": "/web",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
       "source": "/web/",
       "destination": "/",
-      "permanent": true
+      "statusCode": 301
     },
     {
       "source": "/web/index.html",
       "destination": "/",
-      "permanent": true
+      "statusCode": 301
     },
     {
       "source": "/index.html",
       "destination": "/",
-      "permanent": true
+      "statusCode": 301
     },
     {
       "source": "/web/play.html",
@@ -145,10 +150,6 @@
     }
   ],
   "rewrites": [
-    {
-      "source": "/",
-      "destination": "/web/index.html"
-    },
     {
       "source": "/play",
       "destination": "/web/play.html"
