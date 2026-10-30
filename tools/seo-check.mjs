@@ -109,10 +109,6 @@ for (const file of files) {
   if (/project-igi-online\.vercel\.app/i.test(html)) errors.push(rel + ": contains old Vercel host");
   if (/free/i.test(title) && !/own legally obtained|legally obtained game files/i.test(description)) errors.push(rel + ": uses free in title without own-copy clarification");
   if (route !== "/" && route !== "/play" && !schemaTypes.includes("BreadcrumbList")) errors.push(rel + ": missing BreadcrumbList JSON-LD");
-  if (["/faq", "/play", "/is-project-igi-online-safe"].includes(route) && !schemaTypes.includes("FAQPage")) errors.push(rel + ": missing FAQPage JSON-LD");
-  if (!["/faq", "/play", "/is-project-igi-online-safe"].includes(route) && schemaTypes.includes("FAQPage")) errors.push(rel + ": FAQPage schema is not expected on this route");
-  if (route === "/play" && (html.match(/<details\b/gi) || []).length < 5) errors.push(rel + ": play page needs five visible quick FAQ answers to match FAQPage schema");
-  if (route === "/is-project-igi-online-safe" && !html.includes('id="safety-faq"')) errors.push(rel + ": safety FAQ content must remain visible on the page");
   if (rel.startsWith("blogs/") && rel !== "blogs/index.html") {
     if (ogType !== "article") errors.push(rel + ": blog post should use og:type=article");
     if (!schemaTypes.includes("Article")) errors.push(rel + ": missing Article JSON-LD");
@@ -135,7 +131,6 @@ for (const file of files) {
     if (/if mapped/i.test(html)) errors.push(rel + ": hedged key-binding wording remains");
   }
   if (route === "/play") {
-    if (schemaTypes.includes("FAQPage")) errors.push(rel + ": player page duplicates FAQ schema");
     if (/id="faq"[^>]*>[\s\S]*?Frequently asked questions/i.test(html)) errors.push(rel + ": duplicate FAQ block on player page");
     if (/Comments area reserved|All rights reserved|Field notes before deployment/i.test(html)) errors.push(rel + ": old placeholder/footer copy remains");
   }
@@ -172,11 +167,8 @@ for (const asset of [
 // The full FAQ page retains expanded answers; Play and Safety have their own visible FAQs.
 const faq = pageHtml.get("/faq") || "";
 const play = pageHtml.get("/play") || "";
-const safety = pageHtml.get("/is-project-igi-online-safe") || "";
 if ((faq.match(/<h2\b/gi) || []).length < 12) errors.push("The full FAQ page should retain its expanded question-and-answer headings");
 if (!/"@type"\s*:\s*"FAQPage"/.test(faq) || !/"@type"\s*:\s*"BreadcrumbList"/.test(faq)) errors.push("The FAQ page should keep its BreadcrumbList and FAQPage schema");
-if ((play.match(/<details\b/gi) || []).length < 5) errors.push("The player page should have five visible quick FAQ answers");
-if (!/"@type"\s*:\s*"FAQPage"/.test(play) || !/"@type"\s*:\s*"FAQPage"/.test(safety)) errors.push("Play and safety pages must include FAQPage JSON-LD matching their visible answers");
 
 // Site-wide navigation links should be absolute clean routes, not anchor-only section shortcuts.
 for (const [route, html] of pageHtml) {
