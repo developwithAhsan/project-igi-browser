@@ -8,16 +8,6 @@
       "permanent": true
     },
     {
-      "source": "/web",
-      "destination": "/",
-      "permanent": true
-    },
-    {
-      "source": "/web/index.html",
-      "destination": "/",
-      "permanent": true
-    },
-    {
       "source": "/web/play.html",
       "destination": "/play",
       "permanent": true
