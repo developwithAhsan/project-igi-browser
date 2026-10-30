@@ -146,8 +146,8 @@ Note: The /play page uses the same existing player markup/runtime files. No load
 1. Confirm the primary production domain and configure it in Vercel.
 2. Upload the PNG assets listed in the handoff table and update icon/OG references.
 3. Add the verified contact email to Contact, About, Privacy and DMCA pages.
-4. Add Google Search Console URL-prefix verification and submit /sitemap.xml.
-5. Add Bing Webmaster verification and import Search Console data.
+4. Create a Google Search Console URL-prefix property for https://project-igi-online.vercel.app/ (not a Domain property on the shared vercel.app domain), add the supplied verification meta tag, and submit /sitemap.xml.
+5. Add the supplied Bing Webmaster verification meta tag and import Search Console data.
 6. Run the IndexNow workflow after the production deployment.
 7. Request indexing for Home, Play, IGI 1, IGI 3 explainer, Safety and Controls.
 8. Check Search Console at day 3, 7, 14 and 30 using the schedule below.
