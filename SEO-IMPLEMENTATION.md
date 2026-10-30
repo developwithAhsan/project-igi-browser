@@ -127,11 +127,11 @@ Note: The /play page uses the same existing player markup/runtime files. No load
 
 ## Verification status
 
-- Static HTML title/description lengths: checked for newly authored SEO pages; a CI check is being added.
+- Static HTML title/description lengths: audited across 18 indexable HTML pages; one H1 and unique canonical checks are enforced by a core-branch CI workflow.
 - Canonicals, robots and sitemap: added in source; live HTTP response not verified because the deployment host was not reachable in this session.
 - JSON-LD: WebSite, Organization and VideoGame on home; BreadcrumbList on inner pages; FAQPage on FAQ, play and safety pages. Live Rich Results Test not run.
 - Social preview: an SVG fallback is included. Upload a 1200×630 PNG/JPG under 300 KB for reliable social-card support; do not treat SVG preview as final validation.
-- Lighthouse, Core Web Vitals, live mobile layout, ad CLS, broken live links and browser gameplay: not measured. Do not report scores until run against the deployed URL.
+- Lighthouse, Core Web Vitals, live mobile layout, ad CLS, external live-link status and browser gameplay: not measured. Static internal route targets were reviewed and no unmapped root-relative route was found. Do not report scores until run against the deployed URL.
 - Search Console and Bing verification tokens were not supplied; no fake verification token was inserted.
 
 ## Owner inputs still required
