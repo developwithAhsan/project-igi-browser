@@ -749,7 +749,7 @@
     <div class="promo-head"><b>Sponsored</b><span class="promo-tag">Ad</span></div>
   </aside>
   <aside id="kbd" aria-label="Keyboard controls">
-    <div class="kbd-head"><b>Controls &amp; settings</b>
+    <div class="kbd-head"><b>Controls &amp; settings</b><button class="mobile-controls-toggle" id="mobile-controls-toggle" type="button" aria-expanded="true">Collapse</button>
       <button id="kbd-close" type="button" aria-label="Hide controls" title="Hide">×</button>
     </div>
 <div class="game-facts-mini"><strong>Project I.G.I. (2000)</strong><p>Developer: Innerloop Studios</p><p>Genre: Tactical first-person shooter</p><p>Play as David Jones in a single-player infiltration campaign.</p></div>\n    <!-- Mouse buttons and sensitivity, then the rebindable keys: rendered by loader.js (click a key to change it). -->
@@ -880,5 +880,5 @@
     }
   })();
 </script>
-<script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd");if(st&&k)st.addEventListener("click",function(){k.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})});var h=k&&k.querySelector(".kbd-head");if(h&&k)h.addEventListener("click",function(e){if(innerWidth<=800&&e.target.id!=="kbd-close"){var c=k.classList.toggle("mobile-collapsed");h.setAttribute("aria-expanded",String(!c))}})})();</script></body>
+<script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd");if(st&&k)st.addEventListener("click",function(){k.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})});var h=k&&k.querySelector(".kbd-head");if(h&&k)h.addEventListener("click",function(e){if(innerWidth<=800&&e.target.id!=="kbd-close"){var c=k.classList.toggle("mobile-collapsed");h.setAttribute("aria-expanded",String(!c))}})})();</script><script src="redesign-ui.js" defer></script></body>
 </html>
