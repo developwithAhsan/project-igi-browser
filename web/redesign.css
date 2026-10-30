@@ -203,3 +203,10 @@ main.inner-main{width:min(100% - 40px,980px);min-height:auto;margin:0 auto 42px;
 .back-link{display:inline-block;margin-top:18px;font-weight:800;text-decoration:none}
 .inner-page .site-footer{width:min(100% - 40px,1440px);margin:0 auto 28px}
 @media(max-width:800px){.inner-page .site-header{flex-wrap:wrap;padding-block:10px}.inner-page .site-nav{display:flex;position:static;order:3;flex-basis:100%;flex-wrap:wrap;justify-content:center;padding:4px 0 0;border:0;box-shadow:none;gap:6px 14px}.inner-page .site-nav a{padding:4px;font-size:12px}.inner-page .site-nav a:after{display:none}.inner-page .site-cta{display:none}main.inner-main{width:min(100% - 28px,720px)}.page-hero{margin-top:16px}}
+
+/* Override legacy viewport-width constraints without touching their runtime selectors. */
+body:not(.kbd-off) main #stage{width:100%;max-width:none;margin:0}
+body.ads-wide:not(.playing) main #stage{width:100%;max-width:none;margin:0}
+body.coarse #kbd,body.touch #kbd{display:block!important}
+body.coarse #sitefoot,body.touch #sitefoot{display:grid!important}
+body.coarse main{width:100%;padding:18px 14px 36px}
