@@ -61,6 +61,76 @@
       "source": "/blogs/:slug.html",
       "destination": "/blog/:slug",
       "permanent": true
+    },
+    {
+      "source": "/blogs",
+      "destination": "/blog",
+      "permanent": true
+    },
+    {
+      "source": "/web/blogs",
+      "destination": "/blog",
+      "permanent": true
+    },
+    {
+      "source": "/web/blogs/index.html",
+      "destination": "/blog",
+      "permanent": true
+    },
+    {
+      "source": "/web/blogs/:slug.html",
+      "destination": "/blog/:slug",
+      "permanent": true
+    },
+    {
+      "source": "/web/project-igi-1-online.html",
+      "destination": "/project-igi-1-online",
+      "permanent": true
+    },
+    {
+      "source": "/web/project-igi-3-online-does-it-exist.html",
+      "destination": "/project-igi-3-online-does-it-exist",
+      "permanent": true
+    },
+    {
+      "source": "/web/is-project-igi-online-safe.html",
+      "destination": "/is-project-igi-online-safe",
+      "permanent": true
+    },
+    {
+      "source": "/web/controls.html",
+      "destination": "/controls",
+      "permanent": true
+    },
+    {
+      "source": "/web/faq.html",
+      "destination": "/faq",
+      "permanent": true
+    },
+    {
+      "source": "/web/privacy.html",
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/web/terms.html",
+      "destination": "/terms",
+      "permanent": true
+    },
+    {
+      "source": "/web/dmca.html",
+      "destination": "/dmca",
+      "permanent": true
+    },
+    {
+      "source": "/web/cookie-policy.html",
+      "destination": "/cookie-policy",
+      "permanent": true
+    },
+    {
+      "source": "/play.html",
+      "destination": "/play",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -127,26 +197,6 @@
     {
       "source": "/blog/:slug",
       "destination": "/web/blogs/:slug.html"
-    },
-    {
-      "source": "/robots.txt",
-      "destination": "/robots.txt"
-    },
-    {
-      "source": "/sitemap.xml",
-      "destination": "/sitemap.xml"
-    },
-    {
-      "source": "/site.webmanifest",
-      "destination": "/site.webmanifest"
-    },
-    {
-      "source": "/favicon.svg",
-      "destination": "/favicon.svg"
-    },
-    {
-      "source": "/og-project-igi.svg",
-      "destination": "/og-project-igi.svg"
     }
   ],
   "headers": [
