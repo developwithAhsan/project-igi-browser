@@ -1112,7 +1112,7 @@ async function boot() {
       await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null) ||
       await navigator.gpu.requestAdapter({ forceFallbackAdapter: true }).catch(() => null);
     if (!adapter) {
-      const firefox = /Firefox\\//.test(navigator.userAgent);
+      const firefox = /Firefox\//.test(navigator.userAgent);
       graphicsProblem = 'No usable graphics adapter was found. ' +
         (firefox ? 'Firefox only enables WebGPU for some GPUs and drivers (see about:support, "WebGPU"); try current Chrome or Edge. '
           : 'Turn on browser hardware acceleration and update the graphics driver if possible. ') +
@@ -1232,9 +1232,7 @@ async function boot() {
     return;
   }
   if (!(await readMarker())) {
-    // Hosted page (always, on phone or desktop): start the one-time download straight away, no click to
-    // waste. On failure the click handler re-shows the button to retry. Without a hosted folder (desktop
-    // dev), the player picks their own copy.
+    // Show manual import first; hosted download remains an explicit alternative button.
     if (hosted) {
       $('download').textContent = 'Download game automatically';
       $('download').classList.remove('hidden');
