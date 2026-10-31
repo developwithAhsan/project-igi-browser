@@ -1176,6 +1176,9 @@ async function boot() {
     status(msg);
     $('download').textContent = 'Download the game (one time)';
     $('download').classList.remove('hidden');
+    // If the hosted download is unavailable, keep the player's own-folder import available too.
+    $('pick').classList.remove('hidden');
+    $('help').classList.remove('hidden');
   };
   // The browser's private storage refused: Safari's private windows and some locked-down profiles have none
   // ("The operation failed for an unknown transient reason", QuotaExceededError), and the game can't be kept.
@@ -1194,7 +1197,11 @@ async function boot() {
   $('reset').onclick = (e) => {
     e.preventDefault();
     show('loading');
-    if (hosted) offerDownload('Reload the game again.'); else showPicker('Choose your Project I.G.I. folder.');
+    showPicker('Choose your Project I.G.I. folder. Your selected files are copied only into this browser on your device.');
+    if (hosted) {
+      $('download').textContent = 'Or download the hosted game again';
+      $('download').classList.remove('hidden');
+    }
   };
   if (!(await readMarker())) {
     // Hosted page (always, on phone or desktop): start the one-time download straight away, no click to
