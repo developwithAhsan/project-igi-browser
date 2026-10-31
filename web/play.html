@@ -571,7 +571,7 @@ body:not(.kbd-off) #stage:not(:fullscreen) ~ #kbd.is-open{
 body.settings-open:before{z-index:99!important}
 #kbd.is-open{z-index:100!important}
 </style>
-<link rel="preload" href="/redesign.css?v=20261031-1" as="style"><link rel="stylesheet" href="/redesign.css?v=20261031-1">
+<link rel="preload" href="/redesign.css?v=20261031-2" as="style"><link rel="stylesheet" href="/redesign.css?v=20261031-2">
 
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://project-igi.online/#website","url":"https://project-igi.online/","name":"Project IGI Online","inLanguage":"en"},{"@type":"Organization","@id":"https://project-igi.online/#organization","name":"IGI Online Team","url":"https://project-igi.online/"},{"@type":"VideoGame","@id":"https://project-igi.online/#game","name":"Project I.G.I.: I'm Going In","datePublished":"2000","genre":"Tactical first-person shooter","gamePlatform":"Web browser","applicationCategory":"Game","gameMode":"SinglePlayer","author":{"@type":"Organization","name":"Innerloop Studios"},"publisher":{"@type":"Organization","name":"Eidos Interactive"}}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://project-igi.online/"},{"@type":"ListItem","position":2,"name":"Play Project I.G.I. Online","item":"https://project-igi.online/play"}]}</script>
@@ -581,7 +581,6 @@ body.settings-open:before{z-index:99!important}
 <main id="main-content"><noscript><section class="content-section" aria-label="About this browser edition"><p><strong>Project I.G.I. Browser Edition</strong></p><p>This is an unofficial browser port of Project I.G.I.: I'm Going In (2000). You must import your own legally obtained game files. This website does not host or distribute the original game data.</p><p><a href="/play">Read the browser play guide</a> · <a href="/controls">Controls guide</a> · <a href="/disclaimer">Fan project disclaimer</a></p></section></noscript>
 
   <!-- GAME: DO NOT EDIT — existing game stage, canvas, overlays and runtime DOM. -->
-  <div class="game-toolbar" aria-label="Game actions"><div class="toolbar-actions"><button id="toolbar-fullscreen" type="button">⛶ Fullscreen</button><button id="toolbar-settings" type="button" aria-haspopup="dialog" aria-controls="kbd">⚙ Settings</button></div></div>
   <div id="stage">
     <canvas id="canvas" width="1024" height="768" tabindex="0"></canvas>
     <div id="netstatus" class="hidden"></div>
@@ -751,7 +750,7 @@ body.settings-open:before{z-index:99!important}
       </div>
     </div>
   </div>
-  
+    <div class="game-toolbar" aria-label="Game actions"><div class="toolbar-actions"><button id="toolbar-fullscreen" type="button">⛶ Fullscreen</button><button id="toolbar-settings" type="button" aria-haspopup="dialog" aria-controls="kbd">⚙ Settings</button></div></div>
   <!-- Static reference rail: no settings are shown here. -->
   <aside id="controls-rail" aria-label="Game controls">
     <div class="rail-heading"><span class="rail-kicker">FIELD MANUAL</span><div role="presentation">Controls</div><p>Keyboard &amp; mouse reference</p></div>
@@ -766,22 +765,34 @@ body.settings-open:before{z-index:99!important}
     <div class="rail-control"><span>Fullscreen</span><kbd>Alt</kbd> + <kbd>Enter</kbd></div>
     
   </aside>
-  <!-- Settings dialog: runtime-generated mouse options and key bindings remain mounted in their original IDs. -->
+  <!-- Settings dialog: game display and aiming preferences only. Keyboard controls remain in the field manual. -->
   <aside id="kbd" role="dialog" aria-modal="true" aria-label="Game settings" aria-hidden="true">
     <div class="settings-dialog">
-    <div class="kbd-head"><div><span class="settings-kicker">PLAYER PREFERENCES</span><b>Game settings</b></div>
-      <button id="kbd-close" type="button" aria-label="Close settings" title="Close">×</button>
-    </div>
-    <details class="settings-group" open><summary>Screen &amp; input</summary>
-      <!-- Mouse sensitivity and configurable input options are populated by the existing loader. -->
-      <div id="kbd-mouse"></div>
-      <div id="kbd-binds" aria-hidden="true" style="display:none"></div>
-      
-    </details>
-    <details class="settings-group"><summary>Graphics / Performance</summary><p>Choose the screen layout supported by your device. For smoother play, close memory-heavy tabs and use an up-to-date browser.</p></details>
-    <details class="settings-group"><summary>Audio</summary><p>Audio may start after your first click or key press. Adjust your device volume; the game runtime manages in-game sound.</p></details>
-    <details class="settings-group"><summary>Saved Data</summary><p>Runtime data and supported saves may use local browser storage. Avoid clearing site data if you want to retain local progress.</p></details>
+      <div class="kbd-head">
+        <div><span class="settings-kicker">PLAYER PREFERENCES</span><b>Game settings</b></div>
+        <button id="kbd-close" type="button" aria-label="Close settings" title="Close">×</button>
       </div>
+      <details class="settings-group" open>
+        <summary>Display format</summary>
+        <div id="settings-display"></div>
+      </details>
+      <details class="settings-group" open>
+        <summary>Mouse &amp; aiming</summary>
+        <div id="settings-mouse"></div>
+      </details>
+      <details class="settings-group">
+        <summary>Touch &amp; gyroscope</summary>
+        <div id="settings-touch"></div>
+      </details>
+      <details class="settings-group">
+        <summary>Performance</summary>
+        <p>For smoother play, close memory-heavy tabs and use an up-to-date browser. The available display format depends on your screen and graphics hardware.</p>
+      </details>
+      <div class="kbd-foot">
+        <span class="small">Changes save automatically in this browser.</span>
+        <button id="kbd-reset" type="button" class="btn ghost">Reset settings</button>
+      </div>
+    </div>
   </aside>
 <div class="game-stats"><div class="stat-chip">✦ Free site access · bring your own game files</div><div class="stat-chip">▣ WebAssembly-powered</div><div class="stat-chip">⌨ Keyboard + mouse</div><div class="stat-chip">◫ Touch UI available</div></div>
 <section class="content-section soft" id="quick-answer"><p class="section-label">QUICK ANSWER</p><div role="presentation">Can you play Project I.G.I. online in a browser?</div><p>Yes, this browser port can run the original Project I.G.I.: I'm Going In (2000), but it does not include or distribute the commercial game files. Select your own legally obtained game folder when prompted; the browser copies the files into private storage on your device.</p><p>This page is free to access, with no account or installer required. “Free” refers to access to this website, not a free copy or download of the original game.</p></section>
@@ -844,7 +855,7 @@ body.settings-open:before{z-index:99!important}
 <script defer src="netplay.js"></script>
 <script defer src="controls.js?v=8"></script>
 <script defer src="touch.js?v=12"></script>
-<script defer src="loader.js?v=34"></script>
+<script defer src="loader.js?v=35"></script>
 <style>
 .home-import-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:14px auto 0}
 .home-import-btn{display:inline-flex!important;align-items:center;justify-content:center;min-height:42px;padding:10px 16px;cursor:pointer}
@@ -949,13 +960,7 @@ body.settings-open:before{z-index:99!important}
     setTimeout(loadAds, 10000);
   } // Third-party ad frames load only after idle or user interaction.
 </script>
-<script>(function(){var m=document.getElementById("menu-toggle"),n=document.getElementById("site-nav");if(m&&n){m.addEventListener("click",function(){var o=n.classList.toggle("open");m.setAttribute("aria-expanded",String(o));m.setAttribute("aria-label",o?"Close navigation":"Open navigation")});n.querySelectorAll("a").forEach(function(a){a.addEventListener("click",function(){n.classList.remove("open");m.setAttribute("aria-expanded","false")})})}var f=document.getElementById("toolbar-fullscreen"),nativeFs=document.getElementById("fs");if(f&&nativeFs)f.addEventListener("click",function(){nativeFs.click()});var st=document.getElementById("toolbar-settings"),k=document.getElementById("kbd"),close=document.getElementById("kbd-close"),previous=null;function openSettings(){if(!k)return;previous=document.activeElement;k.classList.add("is-open");k.setAttribute("aria-hidden","false");document.body.classList.add("settings-open");if(close)close.focus()}function closeSettings(){if(!k)return;k.classList.remove("is-open");k.setAttribute("aria-hidden","true");document.body.classList.remove("settings-open");if(previous&&previous.focus)previous.focus()}if(st)st.addEventListener("click",openSettings);if(close)close.addEventListener("click",closeSettings);document.addEventListener("keydown",function(e){if(e.key==="Escape"&&k&&k.classList.contains("is-open"))closeSettings()});if(k)k.addEventListener("click",function(e){if(e.target===k)closeSettings()})})();</script><script src="redesign-ui.js?v=20261030-4" defer></script><script>(function(){
-  var box=document.getElementById('kbd'),openers=[document.getElementById('toolbar-settings')],close=document.getElementById('kbd-close'),previous=null;
-  function open(){if(!box)return;previous=document.activeElement;box.classList.add('is-open');box.setAttribute('aria-hidden','false');document.body.classList.add('settings-open');if(close)close.focus();}
-  function shut(){if(!box)return;box.classList.remove('is-open');box.setAttribute('aria-hidden','true');document.body.classList.remove('settings-open');if(previous&&previous.focus)previous.focus();}
-  openers.forEach(function(b){if(b)b.addEventListener('click',open)});if(close)close.addEventListener('click',shut);
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&box&&box.classList.contains('is-open'))shut()});
-  if(box)box.addEventListener('click',function(e){if(e.target===box)shut()});
+<script src="redesign-ui.js?v=20261031-1" defer></script><script>(function(){
   document.querySelectorAll('[data-igi-carousel]').forEach(function(carousel){var slides=[...carousel.querySelectorAll('.igi-slide')],dots=[...carousel.querySelectorAll('.igi-dots button')],index=0,timer;
     function show(n){index=(n+slides.length)%slides.length;slides.forEach(function(s,i){s.classList.toggle('is-active',i===index)});dots.forEach(function(d,i){d.classList.toggle('is-active',i===index);if(i===index)d.setAttribute('aria-current','true');else d.removeAttribute('aria-current')})}
     function start(){clearInterval(timer);if(!matchMedia('(prefers-reduced-motion: reduce)').matches)timer=setInterval(function(){show(index+1)},2400)}
