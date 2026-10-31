@@ -627,7 +627,7 @@ body.settings-open:before{z-index:99!important}
             </label>
           </div>
         </div>
-        <p id="help" class="small home-import-help">Choose the Project I.G.I. folder containing <b>igi.exe</b>, <b>MISSIONS</b> and <b>COMMON</b>. Folder selection is best because it preserves subfolders. Files are copied only into this browser's private storage.</p>
+        <p id="help" class="small home-import-help">Choose the Project I.G.I. folder containing <b>igi.exe</b>, <b>MISSIONS</b> and <b>COMMON</b>. Use “Choose game folder” so COMMON and MISSIONS keep their paths. Selecting individual files can flatten folders and prevent the game from starting. Files stay only in this browser.</p>
         <div id="tips" class="tips hidden" aria-live="polite"><span class="tip-eyebrow">INTEL</span><span class="tip-text"></span></div>
       </section>
 
@@ -662,7 +662,7 @@ body.settings-open:before{z-index:99!important}
             <input id="home-files" type="file" multiple hidden>
           </label>
         </div>
-        <p class="small home-import-help">Folder selection keeps subfolders when your browser supports it. On file-only pickers, select the game files; files are copied only into this browser.</p>
+        <p class="small home-import-help">Use “Choose game folder” whenever possible. The game needs COMMON and MISSIONS to retain their folder paths; selecting files individually may flatten them. Files stay only in this browser.</p>
         
       </section>
 
@@ -844,7 +844,7 @@ body.settings-open:before{z-index:99!important}
 <script defer src="netplay.js"></script>
 <script defer src="controls.js?v=8"></script>
 <script defer src="touch.js?v=12"></script>
-<script defer src="loader.js?v=33"></script>
+<script defer src="loader.js?v=34"></script>
 <style>
 .home-import-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:14px auto 0}
 .home-import-btn{display:inline-flex!important;align-items:center;justify-content:center;min-height:42px;padding:10px 16px;cursor:pointer}
