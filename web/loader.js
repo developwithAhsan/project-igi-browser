@@ -217,9 +217,12 @@ async function readMarker() {
     // "igi.exe: No such file", and the page waits forever). No executable: treat it as not installed. The
     // host maps names case-insensitively, so look through the folder rather than ask for one spelling.
     if (typeof dir.keys !== 'function') return m;   // no folder listing in this browser: trust the marker
-    let exe = false;
-    for await (const name of dir.keys()) if (/^igi\.exe$/i.test(name)) { exe = true; break; }
-    if (!exe) { console.warn('the game folder has no executable: installing again'); return null; }
+    const rootEntries = new Set();
+    for await (const name of dir.keys()) rootEntries.add(name.toLowerCase());
+    if (!rootEntries.has('igi.exe') || !rootEntries.has('common') || !rootEntries.has('missions')) {
+      console.warn('the saved game folder is missing igi.exe, COMMON or MISSIONS: importing again');
+      return null;
+    }
     return m;
   } catch { return null; }
 }
