@@ -1121,10 +1121,7 @@ async function boot() {
       console.warn('WebGPU: only a software (fallback) adapter is available; the game may run slowly');
     }
   }
-  if (!navigator.storage?.getDirectory) {
-    status('This browser has no Origin Private File System, so it cannot keep imported game files on this device. ' + graphicsProblem);
-    return;
-  }
+  const storageAvailable = !!navigator.storage?.getDirectory;
   let onlineReady = false;
   const goOnline = () => {
     if (!onlineReady) { setupOnline(); onlineReady = true; }
@@ -1164,17 +1161,22 @@ async function boot() {
   const handlePickedFiles = async (input) => {
     const files = input.files;
     if (!files || !files.length) return;
-    $('pick').classList.add('hidden');
+    if (!storageAvailable) {
+      status('This browser cannot save imported game files because local Origin Private File System storage is unavailable. The file chooser is working, but import needs a supported browser profile.');
+      input.value = '';
+      return;
+    }
     try {
       await importFromPicker(files);
       input.value = '';
       ready();
     } catch (err) {
       status(err.message);
-      $('pick').classList.remove('hidden');
     }
   };
   $('folder').onchange = (e) => handlePickedFiles(e.target);
+  const filesInput = $('game-files');
+  if (filesInput) filesInput.onchange = (e) => handlePickedFiles(e.target);
   const homeFolder = $('home-folder');
   const homeFiles = $('home-files');
   if (homeFolder) homeFolder.onchange = (e) => handlePickedFiles(e.target);
@@ -1182,6 +1184,7 @@ async function boot() {
   const showPicker = (msg) => {
     status(msg);
     $('pick').classList.remove('hidden');
+    $('pick-files')?.classList.remove('hidden');
     $('help').classList.remove('hidden');
   };
 
@@ -1195,6 +1198,7 @@ async function boot() {
     $('download').classList.remove('hidden');
     // If the hosted download is unavailable, keep the player's own-folder import available too.
     $('pick').classList.remove('hidden');
+    $('pick-files')?.classList.remove('hidden');
     $('help').classList.remove('hidden');
   };
   // The browser's private storage refused: Safari's private windows and some locked-down profiles have none
@@ -1207,8 +1211,11 @@ async function boot() {
   };
   $('download').onclick = async () => {
     $('download').classList.add('hidden');
-    $('pick').classList.add('hidden');
-    try { await importFromServer(hosted); ready(); }
+    try {
+      if (!storageAvailable) throw new Error('This browser cannot store game files locally. Open this page in a supported, non-private Chrome/Edge browser profile.');
+      await importFromServer(hosted);
+      ready();
+    }
     catch (err) { offerDownload(storageProblem(err) || err.message); }
   };
   $('reset').onclick = (e) => {
@@ -1220,14 +1227,20 @@ async function boot() {
       $('download').classList.remove('hidden');
     }
   };
+  if (!storageAvailable) {
+    showPicker('This browser does not support the local storage needed to import game files. You can still open the chooser, but use a current Chrome/Edge browser in a normal (not private) window to complete the import.');
+    return;
+  }
   if (!(await readMarker())) {
     // Hosted page (always, on phone or desktop): start the one-time download straight away, no click to
     // waste. On failure the click handler re-shows the button to retry. Without a hosted folder (desktop
     // dev), the player picks their own copy.
-    if (hosted) { $('download').click(); return; }
-    showPicker(graphicsProblem
-      ? 'Graphics compatibility warning: ' + graphicsProblem + ' You can still choose your Project I.G.I. folder now.'
-      : 'Choose your Project I.G.I. folder to start.');
+    if (hosted) {
+      $('download').textContent = 'Download game automatically';
+      $('download').classList.remove('hidden');
+    }
+    showPicker((graphicsProblem ? 'Graphics compatibility warning: ' + graphicsProblem + ' ' : '') +
+      'Choose your Project I.G.I. folder or select your game files. You can also use the download button.');
     return;
   }
   if (hosted) await refreshConfig(hosted);
