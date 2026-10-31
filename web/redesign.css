@@ -780,3 +780,34 @@ html body.coarse.playing #kbd.is-open,html body.touch.playing #kbd.is-open,html 
 #kbd .kbd-foot{padding-top:10px;border-top:1px solid #e1e8dc}
 #kbd .kbd-foot .btn{min-height:36px;padding:7px 12px;border:1px solid #d5e0d1;border-radius:9px;background:#f7faf5;color:#2e6033;font-size:12px;font-weight:750}
 @media(max-width:520px){.setting-select-row{grid-template-columns:1fr}.settings-segment button{flex:1 1 100px}#kbd .kbd-foot{align-items:stretch;flex-direction:column}}
+
+
+/* 2026-10-31 hotfix: eliminate all top offset before the game and make Settings open reliably. */
+html body main#main-content{
+  margin-block-start:0!important;
+  padding-block-start:0!important;
+  align-content:start!important;
+  grid-auto-rows:min-content!important;
+}
+html body main#main-content>#stage{
+  margin-block-start:0!important;
+  align-self:start!important;
+  transform:none!important;
+}
+html body main#main-content>.game-toolbar{
+  margin-block-start:0!important;
+}
+html body #kbd[aria-hidden="false"],
+html body #kbd.is-open{
+  display:grid!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+  z-index:2147483000!important;
+}
+html body #kbd>.settings-dialog{
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+html body.settings-open:before{z-index:2147482999!important}
