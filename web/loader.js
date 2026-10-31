@@ -558,79 +558,122 @@ loadControls();
 
 // The keyboard panel (index.html #kbd) doubles as the rebind UI: click a key, then press the new one.
 function setupControls() {
-  const host = $('kbd-binds');
-  if (!host) return;
-  let capturing = null;   // id being rebound
-  const groups = [];
-  for (const c of CONTROLS) {
-    let g = groups.find((x) => x.name === c[4]);
-    if (!g) groups.push(g = { name: c[4], items: [] });
-    g.items.push(c);
-  }
-  const render = () => {
-    host.innerHTML = '<h3>Keyboard layout</h3><div class="seg kbd-preset">' +
-      Object.entries(PRESETS).map(([k, label]) => `<button type="button" data-preset="${k}"${preset === k ? ' class="on"' : ''}>${label}</button>`).join('') +
-      '</div><p class="kbd-note">' + (preset === 'original'
-        ? 'The keys the game ships with. No numpad or right Ctrl on your laptop? X jumps, left Ctrl crouches, Q peeks — or click any key to change it.'
-        : 'WASD, Shift walk, Ctrl crouch, Space jump, R reload. Click any key to change it.') + '</p>' +
-      groups.map((g) =>
-      `<h3>${g.name}</h3>` + g.items.map(([id, label]) =>
-        `<div class="row"><span class="label">${label}</span>` +
-        `<button class="kbd-rebind${capturing === id ? ' capturing' : ''}" data-id="${id}">` +
-        `${capturing === id ? 'press…' : keyLabel(userKeys[id])}</button></div>`).join('')).join('');
-    host.querySelectorAll('.kbd-rebind').forEach((b) => {
-      b.onclick = () => { capturing = capturing === b.dataset.id ? null : b.dataset.id; render(); };
-    });
-    host.querySelectorAll('.kbd-preset button').forEach((b) => {
-      b.onclick = () => { applyPreset(b.dataset.preset); capturing = null; render(); };
-    });
-  };
-  setupControls.render = render;
-  // While rebinding, grab the next key in the capture phase so it reaches neither the page nor the game.
-  window.addEventListener('keydown', (e) => {
-    if (!capturing) return;
-    e.preventDefault(); e.stopPropagation();
-    if (e.code === 'Backspace' || e.code === 'Delete') { userKeys[capturing] = null; saveControls(); rebuildRemap(); }   // unbind
-    else if (e.code !== 'Escape' && HID[e.code] !== undefined) { userKeys[capturing] = e.code; saveControls(); rebuildRemap(); }
-    capturing = null; render();
-  }, true);
-  // Mouse buttons and sensitivity (controls.js): which action each button does in a mission, and a multiplier
-  // on the mouse motion on top of the game's own sensitivity setting.
-  const mouseHost = $('kbd-mouse');
-  const renderMouse = () => {
-    if (!mouseHost) return;
-    const C = RcControls, s = C.get();
-    const sel = (btn) => `<select data-btn="${btn}">` + C.MOUSE_CHOICES.map((a) =>
-      `<option value="${a}"${s.mouse[btn] === a ? ' selected' : ''}>${C.ACTIONS[a].label}</option>`).join('') + '</select>';
-    mouseHost.innerHTML = '<h3>Screen</h3><div class="seg kbd-preset kbd-wide">' +
-      `<button type="button" data-wide="1"${s.wide ? ' class="on"' : ''}>Full screen (wide)</button>` +
-      `<button type="button" data-wide="0"${!s.wide ? ' class="on"' : ''}>Original 4:3</button></div>` +
-      '<p class="kbd-note">Wide: the 3D view fills a widescreen display with a wider field of view; menus stay 4:3.</p>' +
-      '<h3>Mouse</h3>' +
-      `<div class="row"><span class="label">Left</span>${sel(0)}</div>` +
-      `<div class="row"><span class="label">Right</span>${sel(2)}</div>` +
-      `<div class="row"><span class="label">Middle</span>${sel(1)}</div>` +
-      '<div class="row"><span class="label">Scroll</span><div class="keys">next / prev weapon</div></div>' +
-      `<div class="row"><span class="label">Sensitivity</span><output data-for="mouseSens">${s.mouseSens.toFixed(1)}×</output></div>` +
-      `<input class="kbd-range" type="range" min="0.2" max="3" step="0.1" value="${s.mouseSens}" data-k="mouseSens" aria-label="Mouse sensitivity">` +
-      `<div class="row"><span class="label">Scoped</span><output data-for="scopeSens">${s.scopeSens.toFixed(1)}×</output></div>` +
-      `<input class="kbd-range" type="range" min="0.3" max="3" step="0.1" value="${s.scopeSens}" data-k="scopeSens" aria-label="Scoped sensitivity">` +
-      '<p class="kbd-note">Scoped: while zoomed in (scope or binoculars), on top of the game\'s own slow-down by the zoom.</p>';
-    mouseHost.querySelectorAll('select').forEach((e) => { e.onchange = () => RcControls.setMouse(Number(e.dataset.btn), e.value); });
-    mouseHost.querySelectorAll('.kbd-wide button').forEach((b) => { b.onclick = () => { RcControls.set('wide', b.dataset.wide === '1'); renderMouse(); }; });
-    mouseHost.querySelectorAll('input[type=range]').forEach((range) => {
-      range.oninput = () => { RcControls.set(range.dataset.k, Number(range.value)); mouseHost.querySelector(`output[data-for="${range.dataset.k}"]`).textContent = Number(range.value).toFixed(1) + '×'; };
-    });
-  };
-  const reset = $('kbd-reset');
-  if (reset) reset.onclick = () => {
-    applyPreset(preset); capturing = null; render();
-    RcControls.reset(); renderMouse();
-  };
-  render();
-  renderMouse();
-}
+  // This modal contains only game settings. Keyboard reference/rebinding remains outside it.
+  const displayHost = $('settings-display');
+  const mouseHost = $('settings-mouse');
+  const touchHost = $('settings-touch');
+  const C = RcControls;
+  if (!displayHost && !mouseHost && !touchHost) return;
 
+  const fmt = (value) => Number(value).toFixed(1) + '×';
+  const slider = (label, key, min, max, step, value) =>
+    '<label class="setting-slider"><span>' + label +
+    '<output data-output="' + key + '">' + fmt(value) + '</output></span>' +
+    '<input type="range" min="' + min + '" max="' + max + '" step="' + step +
+    '" value="' + value + '" data-setting="' + key + '" aria-label="' + label + '"></label>';
+
+  const render = () => {
+    const s = C.get();
+
+    if (displayHost) {
+      displayHost.innerHTML =
+        '<p class="settings-help">Choose how the 3D game view fits your screen. The original menus remain in their native 4:3 layout.</p>' +
+        '<div class="settings-segment" data-choice="wide">' +
+          '<button type="button" data-value="1"' + (s.wide ? ' class="selected" aria-pressed="true"' : ' aria-pressed="false"') + '>Widescreen</button>' +
+          '<button type="button" data-value="0"' + (!s.wide ? ' class="selected" aria-pressed="true"' : ' aria-pressed="false"') + '>Original 4:3</button>' +
+        '</div>';
+      displayHost.querySelectorAll('[data-choice="wide"] button').forEach((button) => {
+        button.addEventListener('click', () => { C.set('wide', button.dataset.value === '1'); render(); });
+      });
+    }
+
+    if (mouseHost) {
+      const select = (button) => '<select data-mouse-button="' + button + '" aria-label="Mouse button ' + button + '">' +
+        C.MOUSE_CHOICES.map((action) => '<option value="' + action + '"' +
+          (s.mouse[button] === action ? ' selected' : '') + '>' + C.ACTIONS[action].label + '</option>').join('') + '</select>';
+      mouseHost.innerHTML =
+        '<div class="settings-subsection"><h3>Mouse buttons</h3>' +
+          '<div class="setting-select-row"><label>Left button' + select(0) + '</label>' +
+          '<label>Middle button' + select(1) + '</label>' +
+          '<label>Right button' + select(2) + '</label></div>' +
+        '</div>' +
+        '<div class="settings-subsection"><h3>Mouse &amp; aiming sensitivity</h3>' +
+          slider('Mouse sensitivity', 'mouseSens', 0.2, 3, 0.1, s.mouseSens) +
+          slider('Sensitivity while scoped', 'scopeSens', 0.3, 3, 0.1, s.scopeSens) +
+        '</div>';
+      mouseHost.querySelectorAll('select[data-mouse-button]').forEach((selectEl) => {
+        selectEl.addEventListener('change', () => C.setMouse(Number(selectEl.dataset.mouseButton), selectEl.value));
+      });
+      mouseHost.querySelectorAll('input[type="range"]').forEach((range) => {
+        range.addEventListener('input', () => {
+          C.set(range.dataset.setting, Number(range.value));
+          const output = mouseHost.querySelector('[data-output="' + range.dataset.setting + '"]');
+          if (output) output.textContent = fmt(range.value);
+        });
+      });
+    }
+
+    if (touchHost) {
+      const gyroModes = [['off', 'Off'], ['scope', 'Scoped only'], ['on', 'Always']];
+      const zooms = [2, 4, 6, 8];
+      touchHost.innerHTML =
+        '<div class="settings-subsection"><h3>Touch aiming</h3>' +
+          slider('Swipe sensitivity', 'look', 0.3, 3, 0.1, s.look) +
+          '<div class="setting-choice-row"><span>Scope button zoom level</span><div class="settings-segment compact" data-choice="scopeZoom">' +
+          zooms.map((zoom) => '<button type="button" data-value="' + zoom + '"' +
+            (s.scopeZoom === zoom ? ' class="selected" aria-pressed="true"' : ' aria-pressed="false"') + '>' + zoom + '×</button>').join('') +
+          '</div></div>' +
+        '</div>' +
+        '<div class="settings-subsection"><h3>Gyroscope</h3>' +
+          '<div class="setting-choice-row"><span>Gyroscope aiming</span><div class="settings-segment" data-choice="gyro">' +
+          gyroModes.map(([value, label]) => '<button type="button" data-value="' + value + '"' +
+            (s.gyro === value ? ' class="selected" aria-pressed="true"' : ' aria-pressed="false"') + '>' + label + '</button>').join('') +
+          '</div></div>' +
+          slider('Gyroscope sensitivity', 'gyroSens', 0.2, 3, 0.1, s.gyroSens) +
+          '<div class="settings-checks">' +
+            '<label><input type="checkbox" data-setting-check="gyroInvY"' + (s.gyroInvY ? ' checked' : '') + '> Invert up / down</label>' +
+            '<label><input type="checkbox" data-setting-check="gyroInvX"' + (s.gyroInvX ? ' checked' : '') + '> Invert left / right</label>' +
+          '</div><p class="settings-help" id="gyro-status"></p>' +
+        '</div>';
+      touchHost.querySelectorAll('input[type="range"]').forEach((range) => {
+        range.addEventListener('input', () => {
+          C.set(range.dataset.setting, Number(range.value));
+          const output = touchHost.querySelector('[data-output="' + range.dataset.setting + '"]');
+          if (output) output.textContent = fmt(range.value);
+        });
+      });
+      touchHost.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+        checkbox.addEventListener('change', () => C.set(checkbox.dataset.settingCheck, checkbox.checked));
+      });
+      touchHost.querySelectorAll('[data-choice="scopeZoom"] button').forEach((button) => {
+        button.addEventListener('click', () => { C.set('scopeZoom', Number(button.dataset.value)); render(); });
+      });
+      touchHost.querySelectorAll('[data-choice="gyro"] button').forEach((button) => {
+        button.addEventListener('click', async () => {
+          C.set('gyro', button.dataset.value);
+          render();
+          if (button.dataset.value !== 'off') {
+            await C.gyroEnable();
+            window.setTimeout(render, 1600);
+          }
+        });
+      });
+      const gyroStatus = touchHost.querySelector('#gyro-status');
+      if (gyroStatus) {
+        const state = C.gyroState();
+        gyroStatus.textContent = s.gyro === 'off' ? 'Gyroscope aiming is off.'
+          : state === 'denied' ? 'Motion permission was denied. Allow motion access in browser site settings and try again.'
+          : state === 'none' ? 'No gyroscope was detected on this device.'
+          : state === 'on' ? (s.gyro === 'scope' ? 'Aiming activates while scoped.' : 'Gyroscope aiming is enabled.')
+          : 'Waiting for motion permission or the first sensor reading.';
+      }
+    }
+  };
+
+  const reset = $('kbd-reset');
+  if (reset) reset.addEventListener('click', () => { C.reset(); render(); });
+  render();
+}
 function hookInput(M, net) {
   const canvas = $('canvas');
   if (net) {
@@ -1537,7 +1580,7 @@ function setupKbdHelp() {
   const off = () => { try { return localStorage.getItem('rc-kbd') === 'hide'; } catch { return false; } };
   const save = (v) => { try { localStorage.setItem('rc-kbd', v); } catch { /* storage blocked */ } };
   const apply = () => document.body.classList.toggle('kbd-off', off());
-  $('kbd-close').onclick = () => { save('hide'); apply(); };
+  // The Settings modal owns #kbd-close; this helper only controls the separate reference rail.
   $('kbd-show').onclick = () => { save('show'); apply(); };
   apply();
 }
