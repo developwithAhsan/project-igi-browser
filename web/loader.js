@@ -1090,31 +1090,37 @@ function followGate(next) {
 }
 
 async function boot() {
-  // Friendly, device-specific message when the browser can't run the game (WebGPU + cross-origin isolation
-  // arrived on iPhone/iPad in iOS 26). Avoids developer jargon the tester would read as an error.
+  // Check graphics compatibility without blocking the game-file import/download screen.
+  // Low-power is tried first for integrated and entry-level GPUs; software fallback is last.
   const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const needHint = isIOS
     ? 'On iPhone or iPad this needs iOS 26 or later, opened in Safari. Please update iOS and try again.'
     : 'Please use an up-to-date Chrome or Edge (Android or desktop), or Safari 26+ on Apple devices.';
-  if (!crossOriginIsolated) { status('This browser can’t run the game yet — it’s missing a feature the game needs (cross-origin isolation). ' + needHint); return; }
-  if (!navigator.gpu) { status('This browser doesn’t support WebGPU, which the game needs for graphics. ' + needHint); return; }
-  // navigator.gpu can exist with no usable adapter (GPU or driver blocklisted, hardware acceleration off,
-  // Remote Desktop / VM): say so instead of starting a game that can only show a black screen
-  const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null) ||
-    await navigator.gpu.requestAdapter().catch(() => null) ||
-    await navigator.gpu.requestAdapter({ forceFallbackAdapter: true }).catch(() => null);
-  if (!adapter) {
-    const firefox = /Firefox\//.test(navigator.userAgent);
-    status('WebGPU is switched on in this browser but it found no usable graphics adapter. ' +
-      (firefox ? 'Firefox only enables WebGPU for some GPUs and drivers (see about:support, "WebGPU"); Chrome or Edge usually work. '
-        : 'Check that hardware acceleration is on in the browser settings and the graphics driver is up to date. ') +
-      'Remote Desktop and virtual machines often have no GPU for the browser.');
+  let graphicsProblem = '';
+  if (!crossOriginIsolated) {
+    graphicsProblem = 'This browser is missing a required security feature (cross-origin isolation). ' + needHint;
+  } else if (!navigator.gpu) {
+    graphicsProblem = 'This browser does not expose WebGPU graphics support. ' + needHint;
+  } else {
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'low-power' }).catch(() => null) ||
+      await navigator.gpu.requestAdapter().catch(() => null) ||
+      await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null) ||
+      await navigator.gpu.requestAdapter({ forceFallbackAdapter: true }).catch(() => null);
+    if (!adapter) {
+      const firefox = /Firefox\\//.test(navigator.userAgent);
+      graphicsProblem = 'No usable graphics adapter was found. ' +
+        (firefox ? 'Firefox only enables WebGPU for some GPUs and drivers (see about:support, "WebGPU"); try current Chrome or Edge. '
+          : 'Turn on browser hardware acceleration and update the graphics driver if possible. ') +
+        'This device may still let you import the game files, but gameplay needs a working WebGPU adapter.';
+    } else if (adapter.isFallbackAdapter || adapter.info?.isFallbackAdapter) {
+      console.warn('WebGPU: only a software (fallback) adapter is available; the game may run slowly');
+    }
+  }
+  if (!navigator.storage?.getDirectory) {
+    status('This browser has no Origin Private File System, so it cannot keep imported game files on this device. ' + graphicsProblem);
     return;
   }
-  if (adapter.isFallbackAdapter || adapter.info?.isFallbackAdapter)
-    console.warn('WebGPU: only a software (fallback) adapter is available; the game will be slow');
-  if (!navigator.storage?.getDirectory) { status('This browser has no Origin Private File System.'); return; }
   let onlineReady = false;
   const goOnline = () => {
     if (!onlineReady) { setupOnline(); onlineReady = true; }
@@ -1124,11 +1130,31 @@ async function boot() {
   const ready = () => {
     show('home');
     crashCheck();
-    if (params.get('join')) goOnline();   // an invite link goes straight to joining
-    if (params.has('autoplay')) $('play').click();
+    if (graphicsProblem) {
+      const note = $('crashnote');
+      note.textContent = 'Your game files are ready. ' + graphicsProblem + ' You can change or import your game folder below; gameplay will start once this device/browser has compatible graphics support.';
+      note.classList.remove('hidden');
+      $('play').disabled = true;
+      $('play').title = 'A compatible WebGPU graphics adapter is required to play';
+      $('reset').textContent = 'Choose / change game folder';
+    } else {
+      $('play').disabled = false;
+      $('play').removeAttribute('title');
+    }
+    if (params.get('join') && !graphicsProblem) goOnline();   // an invite link goes straight to joining
+    if (params.has('autoplay') && !graphicsProblem) $('play').click();
   };
   migratePreset(!!(await readMarker()));   // the keyboard layout for players from before the layouts existed
-  $('play').onclick = () => followGate(() => run().catch(fail));
+  $('play').onclick = () => {
+    if (graphicsProblem) {
+      const note = $('crashnote');
+      note.textContent = 'The game cannot start on this graphics adapter yet. Your imported game files are safe. ' + graphicsProblem;
+      note.classList.remove('hidden');
+      show('home');
+      return;
+    }
+    followGate(() => run().catch(fail));
+  };
   $('go-online').onclick = () => followGate(goOnline);
   for (const b of document.querySelectorAll('[data-go]')) b.onclick = () => show(b.dataset.go);
   $('folder').onchange = async (e) => {
@@ -1175,7 +1201,9 @@ async function boot() {
     // waste. On failure the click handler re-shows the button to retry. Without a hosted folder (desktop
     // dev), the player picks their own copy.
     if (hosted) { $('download').click(); return; }
-    showPicker('Choose your Project I.G.I. folder to start.');
+    showPicker(graphicsProblem
+      ? 'Graphics compatibility warning: ' + graphicsProblem + ' You can still choose your Project I.G.I. folder now.'
+      : 'Choose your Project I.G.I. folder to start.');
     return;
   }
   if (hosted) await refreshConfig(hosted);
