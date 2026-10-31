@@ -23,18 +23,21 @@
     toolbarFullscreen.addEventListener('click', function () { existingFullscreen.click(); });
   }
 
-  var toolbarSettings = document.getElementById('toolbar-settings');
   var controls = document.getElementById('kbd');
   var closeSettings = document.getElementById('kbd-close');
   var previousFocus = null;
 
   function openSettings(event) {
     if (!controls) return;
-    if (event) event.preventDefault();
+    if (event) { event.preventDefault(); event.stopPropagation(); }
     previousFocus = document.activeElement;
     controls.classList.add('is-open');
     controls.setAttribute('aria-hidden', 'false');
     document.body.classList.add('settings-open');
+    controls.style.setProperty('display', 'grid', 'important');
+    controls.style.setProperty('visibility', 'visible', 'important');
+    controls.style.setProperty('opacity', '1', 'important');
+    controls.style.setProperty('pointer-events', 'auto', 'important');
     if (closeSettings) closeSettings.focus();
   }
 
@@ -43,25 +46,27 @@
     controls.classList.remove('is-open');
     controls.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('settings-open');
+    controls.style.removeProperty('display');
+    controls.style.removeProperty('visibility');
+    controls.style.removeProperty('opacity');
+    controls.style.removeProperty('pointer-events');
     if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
   }
 
-  if (toolbarSettings && controls) toolbarSettings.addEventListener('click', openSettings);
-  if (closeSettings) closeSettings.addEventListener('click', hideSettings);
-  if (controls) controls.addEventListener('click', function (event) {
-    if (event.target === controls) hideSettings();
+  // Delegation survives toolbar redraws and covers desktop, touch, and launcher entry points.
+  document.addEventListener('click', function (event) {
+    var settingsButton = event.target.closest && event.target.closest('#toolbar-settings,#stage-settings');
+    if (settingsButton) { openSettings(event); return; }
+    if (event.target.closest && event.target.closest('#kbd-close')) { event.preventDefault(); hideSettings(); return; }
+    if (controls && event.target === controls) hideSettings();
+  }, true);
+
+  if (closeSettings) closeSettings.addEventListener('click', function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    hideSettings();
   });
   document.addEventListener('keydown', function (event) {
     if (event.key === 'Escape' && controls && controls.classList.contains('is-open')) hideSettings();
   });
-
-  var controlsToggle = document.getElementById('mobile-controls-toggle');
-  if (controlsToggle && controls) {
-    controlsToggle.addEventListener('click', function (event) {
-      event.stopPropagation();
-      var collapsed = controls.classList.toggle('mobile-collapsed');
-      controlsToggle.textContent = collapsed ? 'Expand' : 'Collapse';
-      controlsToggle.setAttribute('aria-expanded', String(!collapsed));
-    });
-  }
 })();
