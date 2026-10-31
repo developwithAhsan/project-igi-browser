@@ -618,12 +618,16 @@ body.settings-open:before{z-index:99!important}
         <p id="eta" class="hidden"></p>
         <div>
           <button id="download" class="btn hidden" style="margin-top:16px"></button>
-          <label id="pick" class="btn hidden" style="margin-top:16px">Choose game folder
-            <input id="folder" type="file" webkitdirectory multiple hidden>
-          </label>
+          <div class="home-import-actions" id="manual-import" aria-label="Import your game files">
+            <label id="pick" class="btn home-import-btn">Choose game folder
+              <input id="folder" type="file" webkitdirectory directory multiple hidden>
+            </label>
+            <label id="pick-files" class="btn home-import-btn">Choose game files
+              <input id="game-files" type="file" multiple hidden>
+            </label>
+          </div>
         </div>
-        <p id="help" class="hidden small">Pick your Project I.G.I. folder: the one that holds <b>igi.exe</b>, <b>MISSIONS</b> and <b>COMMON</b>. It is copied
-          into this browser's private storage once (about 600 MB) and never leaves your computer.</p>
+        <p id="help" class="small home-import-help">Choose the Project I.G.I. folder containing <b>igi.exe</b>, <b>MISSIONS</b> and <b>COMMON</b>. Folder selection is best because it preserves subfolders. Files are copied only into this browser's private storage.</p>
         <div id="tips" class="tips hidden" aria-live="polite"><span class="tip-eyebrow">INTEL</span><span class="tip-text"></span></div>
       </section>
 
@@ -834,11 +838,15 @@ body.settings-open:before{z-index:99!important}
 <script defer src="netplay.js"></script>
 <script defer src="controls.js?v=8"></script>
 <script defer src="touch.js?v=12"></script>
-<script defer src="loader.js?v=32"></script>
+<script defer src="loader.js?v=33"></script>
 <style>
 .home-import-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:14px auto 0}
 .home-import-btn{display:inline-flex!important;align-items:center;justify-content:center;min-height:42px;padding:10px 16px;cursor:pointer}
 .home-import-help{max-width:460px;margin:9px auto 0;text-align:center;line-height:1.5}
+#view-loading .home-import-actions{width:100%;margin:18px auto 0}
+#view-loading .home-import-btn{min-width:150px;min-height:46px;font-size:14px}
+#view-loading .home-import-btn input{display:none}
+#view-loading .home-import-help{display:block!important;color:var(--muted);font-size:12px}
 </style>
 <script>
   // Ads (Adsterra; slots switched on in RC_ADS, the network's tags in ad.html). The page is cross-origin
