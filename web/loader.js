@@ -24,9 +24,36 @@ const OPFS_DIR = 'rcgame';
 const MARKER = '.installed.json';   // { version } once every file is copied
 const NETPLAY_BASE = new URL(params.get('netplay') || './', location.href).href.replace(/\/?$/, '/');
 const status = (t) => { $('status').textContent = t; };
+// Errors can be Error objects, browser resource events, or rejected values without a message.
+// Never render "undefined": preserve the useful detail and give resource failures a clear fallback.
+function errorMessage(error, fallback = 'The browser stopped the operation without an error message.') {
+  if (error instanceof Error) return error.message || error.name || fallback;
+  if (typeof error === 'string') return error.trim() || fallback;
+  if (error && typeof error === 'object') {
+    if (typeof error.message === 'string' && error.message.trim()) return error.message;
+    if (error.reason !== undefined) return errorMessage(error.reason, fallback);
+    const target = error.target || error.currentTarget;
+    const url = target && (target.src || target.href);
+    if (url) return 'The browser could not load ' + url;
+    if (error.type) return 'A browser "' + error.type + '" event interrupted the operation.';
+    try {
+      const detail = JSON.stringify(error);
+      if (detail && detail !== '{}') return detail;
+    } catch { /* not serializable */ }
+  }
+  return fallback;
+}
 // the launcher's screens (index.html): loading, home, online, lobby
 const show = (view) => { for (const v of document.querySelectorAll('#panel .view')) v.classList.toggle('hidden', v.id !== 'view-' + view); };
-const fail = (e) => { hideBoot(); status('Error: ' + e.message); $('panel').classList.remove('hidden'); show('loading'); };
+const fail = (error) => {
+  const message = errorMessage(error, 'Unknown error while starting the game.');
+  console.error('Game startup failed:', error);
+  hideBoot();
+  document.body.classList.remove('playing');
+  status('Game could not start: ' + message);
+  $('panel').classList.remove('hidden');
+  show('loading');
+};
 const mb = (n) => (n / 1e6).toFixed(0);
 
 // Rotating "intel" tips: a one-time 500 MB download and the first-mission load both take a minute, so the
@@ -214,36 +241,72 @@ async function fileHandle(dir, relPath, create) {
 const SKIP = /^(directx[^/]*\/|.*\.(mp4|ds_store)$)|(^|\/)\.DS_Store$/i;
 
 async function importFromPicker(fileList) {
-  // Folder-capable browsers provide webkitRelativePath. File-only pickers (common on phones)
-  // provide plain names; preserve those as root-level files so the chooser still works there.
-  const list = [...fileList].map((f) => {
-    const rel = f.webkitRelativePath || '';
-    const dest = rel ? rel.split('/').slice(1).join('/') : f.name;
-    return { f, dest };
-  }).filter((e) => e.dest && !SKIP.test(e.dest));
-  if (!list.some((e) => e.dest.toLowerCase() === 'igi.exe'))
-    throw new Error('No igi.exe in that folder: pick the Project I.G.I. folder itself.');
+  const selected = Array.from(fileList || []);
+  if (!selected.length) throw new Error('No game files were selected.');
+
+  // A file-only picker strips directory names. Flattening a 3D game folder makes COMMON/MISSIONS
+  // unreadable by the game, so require the relative paths returned by the folder picker.
+  const entries = selected.map((f) => ({
+    f,
+    parts: String(f.webkitRelativePath || '').replace(/\\\\/g, '/').split('/').filter(Boolean),
+  })).filter((e) => e.parts.length);
+  if (!entries.length || !selected.some((f) => String(f.webkitRelativePath || '').includes('/'))) {
+    throw new Error('Your browser did not preserve the game folder structure. Please use “Choose game folder” and select the folder containing igi.exe. Selecting files one by one flattens subfolders, so the game cannot run.');
+  }
+
+  // Find the actual game root from igi.exe. This also handles selecting a parent folder that
+  // contains the Project I.G.I. folder, instead of requiring that exact folder to be selected.
+  const exe = entries.find((e) => e.parts[e.parts.length - 1].toLowerCase() === 'igi.exe');
+  if (!exe) throw new Error('No igi.exe was found. Select the installed Project I.G.I. folder, not its installer or archive.');
+  const rootParts = exe.parts.slice(0, -1);
+  const isInsideGameRoot = (parts) => rootParts.every((part, i) => (parts[i] || '').toLowerCase() === part.toLowerCase());
+  const list = entries.map((e) => ({
+    f: e.f,
+    dest: isInsideGameRoot(e.parts) ? e.parts.slice(rootParts.length).join('/') : '',
+  })).filter((e) => e.dest && !SKIP.test(e.dest));
+
+  const topFolders = new Set(list.map((e) => e.dest.split('/')[0].toLowerCase()));
+  if (!list.some((e) => e.dest.toLowerCase() === 'igi.exe')) {
+    throw new Error('The selected folder does not place igi.exe at the game root. Select the folder that contains igi.exe, COMMON and MISSIONS.');
+  }
+  if (!topFolders.has('common') || !topFolders.has('missions')) {
+    throw new Error('The selected folder is incomplete or its subfolders were not preserved. The game root must contain igi.exe, COMMON and MISSIONS. Use “Choose game folder”.');
+  }
+  const seen = new Set();
+  for (const e of list) {
+    const key = e.dest.toLowerCase();
+    if (seen.has(key)) throw new Error('The selected folder contains duplicate file paths: ' + e.dest);
+    seen.add(key);
+  }
+  const total = list.reduce((sum, e) => sum + e.f.size, 0);
+  if (!total) throw new Error('The selected game folder contains no readable files.');
+
+  // Do not remove the previous install until the selected folder passes all structural checks.
   const root = await navigator.storage.getDirectory();
   try { await root.removeEntry(OPFS_DIR, { recursive: true }); } catch {}
   await navigator.storage.persist?.();
   const dir = await gameDir(true);
-  const total = list.reduce((s, e) => s + e.f.size, 0);
   let done = 0;
   $('progress').classList.remove('hidden');
+  $('progress').value = 0;
   for (const e of list) {
-    status(`Copying ${e.dest} (${mb(done)} / ${mb(total)} MB)`);
+    status('Copying ' + e.dest + ' (' + mb(done) + ' / ' + mb(total) + ' MB)');
     const w = await (await fileHandle(dir, e.dest, true)).createWritable();
-    await w.write(e.f);
-    await w.close();
+    try {
+      await w.write(e.f);
+      await w.close();
+    } catch (error) {
+      try { await w.abort(); } catch { /* writable may already be closed */ }
+      throw new Error('Could not save ' + e.dest + ': ' + errorMessage(error));
+    }
     done += e.f.size;
     $('progress').value = done / total;
   }
-  const sig = list.map((e) => `${e.dest}:${e.f.size}`).sort().join('\n');
+  const sig = list.map((e) => e.dest + ':' + e.f.size).sort().join('\\n');
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sig));
   await writeMarker([...new Uint8Array(digest)].slice(0, 6).map((b) => b.toString(16).padStart(2, '0')).join(''));
   $('progress').classList.add('hidden');
 }
-
 // A hosted copy of the game folder: web/serve.py --game DIR serves it at game/, with game/manifest.json
 // listing [{ path, size }]. Each file streams straight into OPFS (a phone couldn't hold 500 MB in memory),
 // and files already there at the right size are kept, so an interrupted download resumes where it stopped.
@@ -855,8 +918,18 @@ async function run(session) {
   if (session) await clearNetSaves(session);
   sizeCanvas();
   const script = document.createElement('script');
-  script.src = 'build/recomp.js?v=16';
-  await new Promise((ok, fail) => { script.onload = ok; script.onerror = fail; document.head.appendChild(script); });
+  script.src = '/build/recomp.js?v=16';
+  await new Promise((resolve, reject) => {
+    script.onload = () => {
+      if (typeof createRecomp !== 'function') {
+        reject(new Error('The browser engine script loaded but did not provide createRecomp. The deployed build files may be incomplete or mismatched.'));
+        return;
+      }
+      resolve();
+    };
+    script.onerror = () => reject(new Error('The compiled game engine is missing or could not be loaded from /build/recomp.js. Imported game files are only the game data; the website also needs its generated recomp.js and matching WebAssembly file.'));
+    document.head.appendChild(script);
+  });
   const M = await createRecomp({
     arguments: ['/opfs/' + OPFS_DIR],
     print: (t) => console.log(t),
@@ -1171,7 +1244,7 @@ async function boot() {
       input.value = '';
       ready();
     } catch (err) {
-      status(err.message);
+      status('Import failed: ' + errorMessage(err));
     }
   };
   $('folder').onchange = (e) => handlePickedFiles(e.target);
@@ -1216,7 +1289,7 @@ async function boot() {
       await importFromServer(hosted);
       ready();
     }
-    catch (err) { offerDownload(storageProblem(err) || err.message); }
+    catch (err) { offerDownload(storageProblem(err) || errorMessage(err, 'The automatic game download failed.')); }
   };
   $('reset').onclick = (e) => {
     e.preventDefault();
@@ -1501,4 +1574,4 @@ setupDevice();
 setupFullscreen();
 setupKbdHelp();
 setupControls();
-boot();
+boot().catch(fail);
