@@ -607,3 +607,89 @@ body .site-comments #disqus_thread{width:100%!important;max-width:none!important
   body .site-footer .legal-note,body .site-footer .copyright{grid-column:1!important}
   body .site-comments{padding:20px!important}
 }
+
+
+/* 2026-10-31 layout repair: remove the phantom intro row and keep controls in page flow. */
+@media (min-width:801px){
+  html body main#main-content{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(260px,310px)!important;
+    grid-template-rows:auto auto auto!important;
+    align-items:start!important;
+    column-gap:clamp(18px,2vw,28px)!important;
+    row-gap:16px!important;
+  }
+  html body main#main-content>.game-info-card{
+    grid-column:1!important;grid-row:1!important;
+    position:static!important;top:auto!important;width:100%!important;
+    align-self:start!important;margin:0!important;
+  }
+  html body main#main-content>#stage{
+    grid-column:1!important;grid-row:2!important;
+    width:100%!important;max-width:none!important;
+    aspect-ratio:16/9!important;max-height:none!important;
+    justify-self:stretch!important;align-self:start!important;
+    margin:0!important;
+  }
+  html body main#main-content>.game-toolbar{
+    grid-column:1!important;grid-row:3!important;
+    width:100%!important;margin:0!important;
+    justify-content:flex-end!important;
+  }
+  html body main#main-content>#controls-rail{
+    grid-column:2!important;grid-row:1 / span 3!important;
+    position:static!important;inset:auto!important;top:auto!important;
+    left:auto!important;right:auto!important;transform:none!important;
+    align-self:start!important;display:block!important;width:100%!important;
+    max-height:none!important;overflow:visible!important;margin:0!important;
+  }
+  html body main#main-content>.game-stats,
+  html body main#main-content>.content-section,
+  html body main#main-content>.final-cta,
+  html body main#main-content>#adrow,
+  html body main#main-content>.site-comments{grid-column:1/-1!important}
+}
+@media (max-width:800px){
+  html body main#main-content{
+    display:flex!important;flex-direction:column!important;
+    align-items:stretch!important;gap:14px!important;
+    padding-top:16px!important;
+  }
+  html body main#main-content>.game-info-card{order:1!important;position:static!important;width:100%!important;margin:0!important}
+  html body main#main-content>#stage{order:2!important;width:100%!important;max-width:none!important;aspect-ratio:16/9!important;max-height:none!important;margin:0!important}
+  html body main#main-content>.game-toolbar{order:3!important;width:100%!important;margin:0!important}
+  html body main#main-content>#controls-rail{order:4!important;position:static!important;inset:auto!important;transform:none!important;display:block!important;width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;margin:0!important}
+  html body main#main-content>.game-stats{order:5!important}
+  html body main#main-content>.content-section{order:6!important}
+}
+/* Settings must show a real, high-contrast dialog above its dimmed backdrop. */
+html body #kbd{
+  position:fixed!important;inset:0!important;z-index:1202!important;
+  display:none!important;place-items:center!important;
+  width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;
+  margin:0!important;padding:20px!important;transform:none!important;
+  border:0!important;border-radius:0!important;
+  background:rgba(5,12,7,.76)!important;
+  overflow:auto!important;visibility:hidden;opacity:0;pointer-events:none;
+}
+html body #kbd.is-open{
+  display:grid!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;
+}
+html body #kbd>.settings-dialog{
+  display:block!important;position:relative!important;z-index:1!important;
+  width:min(100%,620px)!important;max-height:min(84dvh,780px)!important;
+  overflow:auto!important;padding:22px!important;
+  border:1px solid #d9e3d4!important;border-radius:18px!important;
+  background:#fff!important;color:#1d2a1e!important;
+  box-shadow:0 24px 80px rgba(0,0,0,.48)!important;
+}
+html body #kbd .kbd-head{background:#fff!important;color:#1d2a1e!important}
+html body #kbd .kbd-head b{color:#1d2a1e!important}
+html body #kbd .settings-group{background:#f8faf6!important;color:#263b28!important;border-color:#dce5d7!important}
+html body #kbd .settings-group summary{color:#245d2b!important}
+html body.settings-open{overflow:hidden!important}
+html body.settings-open:before{z-index:1201!important}
+@media(max-width:520px){
+  html body #kbd{padding:12px!important}
+  html body #kbd>.settings-dialog{padding:16px!important;max-height:90dvh!important}
+}
