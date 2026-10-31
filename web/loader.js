@@ -248,7 +248,7 @@ async function importFromPicker(fileList) {
   // unreadable by the game, so require the relative paths returned by the folder picker.
   const entries = selected.map((f) => ({
     f,
-    parts: String(f.webkitRelativePath || '').replace(/\\\\/g, '/').split('/').filter(Boolean),
+    parts: String(f.webkitRelativePath || '').split('/').filter(Boolean),
   })).filter((e) => e.parts.length);
   if (!entries.length || !selected.some((f) => String(f.webkitRelativePath || '').includes('/'))) {
     throw new Error('Your browser did not preserve the game folder structure. Please use “Choose game folder” and select the folder containing igi.exe. Selecting files one by one flattens subfolders, so the game cannot run.');
