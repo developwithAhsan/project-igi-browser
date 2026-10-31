@@ -1241,10 +1241,12 @@ async function boot() {
     }
     try {
       await importFromPicker(files);
-      input.value = '';
       ready();
     } catch (err) {
       status('Import failed: ' + errorMessage(err));
+    } finally {
+      // Let the same folder be selected again after a failed import.
+      input.value = '';
     }
   };
   $('folder').onchange = (e) => handlePickedFiles(e.target);
