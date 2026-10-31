@@ -156,6 +156,10 @@
   ],
   "rewrites": [
     {
+      "source": "/disqus-frame",
+      "destination": "/web/disqus-frame.html"
+    },
+    {
       "source": "/play",
       "destination": "/web/play.html"
     },
