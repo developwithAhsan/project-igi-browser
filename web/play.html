@@ -650,6 +650,15 @@ body.settings-open:before{z-index:99!important}
           <button id="home-controls" type="button" class="link-btn">Controls &amp; layout</button>
           <a href="#" id="reset" class="link-btn">Use a different game folder</a>
         </div>
+        <div class="home-import-actions" aria-label="Import your game files">
+          <label class="btn home-import-btn">Choose game folder
+            <input id="home-folder" type="file" webkitdirectory directory multiple hidden>
+          </label>
+          <label class="btn home-import-btn">Choose game files
+            <input id="home-files" type="file" multiple hidden>
+          </label>
+        </div>
+        <p class="small home-import-help">Folder selection keeps subfolders when your browser supports it. On file-only pickers, select the game files; files are copied only into this browser.</p>
         
       </section>
 
@@ -825,7 +834,12 @@ body.settings-open:before{z-index:99!important}
 <script defer src="netplay.js"></script>
 <script defer src="controls.js?v=8"></script>
 <script defer src="touch.js?v=12"></script>
-<script defer src="loader.js?v=31"></script>
+<script defer src="loader.js?v=32"></script>
+<style>
+.home-import-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:14px auto 0}
+.home-import-btn{display:inline-flex!important;align-items:center;justify-content:center;min-height:42px;padding:10px 16px;cursor:pointer}
+.home-import-help{max-width:460px;margin:9px auto 0;text-align:center;line-height:1.5}
+</style>
 <script>
   // Ads (Adsterra; slots switched on in RC_ADS, the network's tags in ad.html). The page is cross-origin
   // isolated, which blocks third-party ad frames, so each unit loads ad.html inside an <iframe credentialless>:
