@@ -693,3 +693,44 @@ html body.settings-open:before{z-index:1201!important}
   html body #kbd{padding:12px!important}
   html body #kbd>.settings-dialog{padding:16px!important;max-height:90dvh!important}
 }
+
+
+/* 2026-10-31: put the game stage directly below the header; remove the redundant information card row. */
+@media (min-width:801px){
+  html body main#main-content{
+    grid-template-columns:minmax(0,1fr) minmax(250px,310px)!important;
+    grid-template-rows:auto auto!important;
+    row-gap:12px!important;
+    padding-top:8px!important;
+  }
+  html body main#main-content>#stage{
+    grid-column:1!important;grid-row:1!important;
+    width:100%!important;max-width:none!important;
+    aspect-ratio:16/9!important;max-height:none!important;margin:0!important;
+  }
+  html body main#main-content>.game-toolbar{
+    grid-column:1!important;grid-row:2!important;
+    width:100%!important;margin:0!important;justify-content:flex-end!important;
+  }
+  html body main#main-content>#controls-rail{
+    grid-column:2!important;grid-row:1 / span 2!important;
+    position:static!important;top:auto!important;
+    align-self:start!important;width:100%!important;margin:0!important;
+  }
+}
+@media (max-width:800px){
+  html body main#main-content{padding-top:8px!important;gap:10px!important}
+  html body main#main-content>#stage{order:1!important;margin:0!important}
+  html body main#main-content>.game-toolbar{order:2!important;margin:0!important}
+  html body main#main-content>#controls-rail{order:3!important;margin:0 auto!important}
+  html body main#main-content>.game-stats{order:4!important}
+  html body main#main-content>.content-section{order:5!important}
+}
+
+/* Disqus comments use the same light surface as the rest of the site. */
+body .site-comments{background:#fff!important;color:#596579!important;border:1px solid #dce3d7!important}
+body .site-comments>h2{color:#253044!important}
+body .site-comments>p{color:#687487!important}
+body .site-comments .disqus-frame-wrap{width:100%;min-height:420px;background:#fff;border-radius:12px}
+body .site-comments #disqus-frame{display:block;width:100%;min-height:420px;height:560px;border:0;border-radius:12px;background:#fff;color:#596579;color-scheme:light}
+body .site-comments .disqus-fallback{background:#fff;color:#687487;border-color:#dce3d7}
