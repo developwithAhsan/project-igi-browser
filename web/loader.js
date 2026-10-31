@@ -214,9 +214,13 @@ async function fileHandle(dir, relPath, create) {
 const SKIP = /^(directx[^/]*\/|.*\.(mp4|ds_store)$)|(^|\/)\.DS_Store$/i;
 
 async function importFromPicker(fileList) {
-  // the whole folder, minus its own name: <picked>/a/b.dat -> a/b.dat
-  const list = [...fileList].map((f) => ({ f, dest: f.webkitRelativePath.split('/').slice(1).join('/') }))
-    .filter((e) => e.dest && !SKIP.test(e.dest));
+  // Folder-capable browsers provide webkitRelativePath. File-only pickers (common on phones)
+  // provide plain names; preserve those as root-level files so the chooser still works there.
+  const list = [...fileList].map((f) => {
+    const rel = f.webkitRelativePath || '';
+    const dest = rel ? rel.split('/').slice(1).join('/') : f.name;
+    return { f, dest };
+  }).filter((e) => e.dest && !SKIP.test(e.dest));
   if (!list.some((e) => e.dest.toLowerCase() === 'igi.exe'))
     throw new Error('No igi.exe in that folder: pick the Project I.G.I. folder itself.');
   const root = await navigator.storage.getDirectory();
@@ -1157,11 +1161,24 @@ async function boot() {
   };
   $('go-online').onclick = () => followGate(goOnline);
   for (const b of document.querySelectorAll('[data-go]')) b.onclick = () => show(b.dataset.go);
-  $('folder').onchange = async (e) => {
+  const handlePickedFiles = async (input) => {
+    const files = input.files;
+    if (!files || !files.length) return;
     $('pick').classList.add('hidden');
-    try { await importFromPicker(e.target.files); ready(); }
-    catch (err) { status(err.message); $('pick').classList.remove('hidden'); }
+    try {
+      await importFromPicker(files);
+      input.value = '';
+      ready();
+    } catch (err) {
+      status(err.message);
+      $('pick').classList.remove('hidden');
+    }
   };
+  $('folder').onchange = (e) => handlePickedFiles(e.target);
+  const homeFolder = $('home-folder');
+  const homeFiles = $('home-files');
+  if (homeFolder) homeFolder.onchange = (e) => handlePickedFiles(e.target);
+  if (homeFiles) homeFiles.onchange = (e) => handlePickedFiles(e.target);
   const showPicker = (msg) => {
     status(msg);
     $('pick').classList.remove('hidden');
