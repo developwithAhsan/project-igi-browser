@@ -302,7 +302,7 @@ async function importFromPicker(fileList) {
     done += e.f.size;
     $('progress').value = done / total;
   }
-  const sig = list.map((e) => e.dest + ':' + e.f.size).sort().join('\\n');
+  const sig = list.map((e) => e.dest + ':' + e.f.size).sort().join('\n');
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sig));
   await writeMarker([...new Uint8Array(digest)].slice(0, 6).map((b) => b.toString(16).padStart(2, '0')).join(''));
   $('progress').classList.add('hidden');
